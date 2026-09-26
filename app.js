@@ -25,7 +25,6 @@ const elements = {
   scoreFilter: document.querySelector("#score-filter"),
   scoreOutput: document.querySelector("#score-output"),
   resetFilters: document.querySelector("#reset-filters"),
-  refreshData: document.querySelector("#refresh-data"),
   filterSummary: document.querySelector("#filter-summary"),
   genreMetric: document.querySelector("#genre-metric"),
   actorSearch: document.querySelector("#actor-search"),
@@ -81,16 +80,6 @@ function bindControls() {
 
   elements.resetFilters.addEventListener("click", resetFilters);
 
-  elements.refreshData.addEventListener("click", async () => {
-    const confirmed = window.confirm(
-      "Refresh data directly from AniList? This may take several seconds."
-    );
-
-    if (confirmed) {
-      await loadDashboard(true);
-    }
-  });
-
   elements.closeDrawer.addEventListener("click", closeDrawer);
   elements.drawerOverlay.addEventListener("click", closeDrawer);
 
@@ -112,8 +101,6 @@ async function loadDashboard(forceRefresh) {
     "Loading anime industry data…",
     "loading"
   );
-
-  elements.refreshData.disabled = true;
 
   try {
     const response = await fetch("data.json", {
@@ -173,8 +160,6 @@ async function loadDashboard(forceRefresh) {
     );
 
     showFatalMessage(error.message);
-  } finally {
-    elements.refreshData.disabled = false;
   }
 }
 
