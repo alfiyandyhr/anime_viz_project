@@ -9,7 +9,7 @@ from anilist_service import AniListService, DashboardDataError
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-FRONTEND_DIR = PROJECT_ROOT / "frontend"
+FRONTEND_DIR = PROJECT_ROOT
 
 app = Flask(
     __name__,
