@@ -109,21 +109,14 @@ function bindControls() {
 
 async function loadDashboard(forceRefresh) {
   setStatus(
-    forceRefresh
-      ? "Refreshing data from AniList…"
-      : "Loading anime industry data…",
+    "Loading anime industry data…",
     "loading"
   );
 
   elements.refreshData.disabled = true;
 
   try {
-    const endpoint = forceRefresh
-      ? "/api/refresh"
-      : "/api/dashboard";
-
-    const response = await fetch(endpoint, {
-      method: forceRefresh ? "POST" : "GET",
+    const response = await fetch("data.json", {
       headers: {
         Accept: "application/json"
       }
@@ -132,7 +125,7 @@ async function loadDashboard(forceRefresh) {
     const payload = await response.json();
 
     if (!response.ok) {
-      throw new Error(payload.details || payload.error || "Request failed.");
+      throw new Error("Failed to load data.json");
     }
 
     state.data = payload;
