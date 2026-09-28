@@ -4,7 +4,21 @@ const state = {
   data: null,
   filteredAnime: [],
   genreColor: null,
-  networkSimulation: null
+  networkSimulation: null,
+  activeChapter: "intro",
+  tablePage: 0,
+  tablePageSize: 25
+};
+
+// Which render functions belong to which story chapter. Charts are drawn
+// lazily — only when their chapter becomes visible — because D3 sizes each
+// chart from its container's width, which is 0 while a panel is display:none.
+const CHAPTERS = {
+  intro: [],
+  reception: [renderKPIs, renderReceptionCallout, renderScatterplot],
+  content: [renderGenreChart, renderTimeline],
+  creators: [renderStudioChart, renderHeatmap, renderNetwork],
+  explorer: [renderInsights, renderAnimeTable]
 };
 
 const numberFormatter = new Intl.NumberFormat("en-US");
@@ -32,9 +46,10 @@ const elements = {
   networkWeightOutput: document.querySelector("#network-weight-output"),
   networkSummary: document.querySelector("#network-summary"),
   tableSort: document.querySelector("#table-sort"),
+  tablePageSize: document.querySelector("#table-page-size"),
+  tablePagination: document.querySelector("#table-pagination"),
   tableBody: document.querySelector("#anime-table-body"),
   tableNote: document.querySelector("#table-note"),
-  questionList: document.querySelector("#question-list"),
   tooltip: document.querySelector("#tooltip"),
   drawer: document.querySelector("#detail-drawer"),
   drawerContent: document.querySelector("#drawer-content"),
@@ -76,12 +91,48 @@ function bindControls() {
     renderNetwork();
   });
 
-  elements.tableSort.addEventListener("change", renderAnimeTable);
+  elements.tableSort.addEventListener("change", () => {
+    state.tablePage = 0;
+    renderAnimeTable();
+  });
+
+  elements.tablePageSize.addEventListener("change", () => {
+    state.tablePageSize = Number(elements.tablePageSize.value);
+    state.tablePage = 0;
+    renderAnimeTable();
+  });
+
+  elements.tablePagination.addEventListener("click", (event) => {
+    const btn = event.target.closest(".page-btn");
+    if (!btn || btn.disabled) {
+      return;
+    }
+    state.tablePage = Number(btn.dataset.page);
+    renderAnimeTable();
+    document.querySelector(".table-wrapper")
+      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
 
   elements.resetFilters.addEventListener("click", resetFilters);
 
   elements.closeDrawer.addEventListener("click", closeDrawer);
   elements.drawerOverlay.addEventListener("click", closeDrawer);
+
+  // Any element with data-goto="<chapter>" switches the active chapter.
+  document.querySelectorAll("[data-goto]").forEach((element) => {
+    element.addEventListener("click", (event) => {
+      event.preventDefault();
+      activateChapter(element.dataset.goto);
+    });
+  });
+
+  window.addEventListener("hashchange", () => {
+    const id = location.hash.slice(1);
+
+    if (id && id !== state.activeChapter && CHAPTERS[id]) {
+      activateChapter(id);
+    }
+  });
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
@@ -91,9 +142,64 @@ function bindControls() {
 
   window.addEventListener("resize", debounce(() => {
     if (state.data) {
-      renderAll();
+      renderChapter(state.activeChapter);
     }
   }, 250));
+}
+
+function initialChapter() {
+  const id = location.hash.slice(1);
+  return CHAPTERS[id] ? id : "intro";
+}
+
+// UI-only: reveal one chapter and update the rail. Does not draw charts.
+function setActiveChapter(id) {
+  state.activeChapter = id;
+  document.body.dataset.chapter = id;
+
+  document.querySelectorAll(".chapter").forEach((section) => {
+    section.classList.toggle(
+      "is-active",
+      section.dataset.chapter === id
+    );
+  });
+
+  document.querySelectorAll(".rail-link").forEach((link) => {
+    link.classList.toggle("is-active", link.dataset.goto === id);
+  });
+
+  if (location.hash.slice(1) !== id) {
+    try {
+      history.replaceState(null, "", `#${id}`);
+    } catch (error) {
+      location.hash = id;
+    }
+  }
+}
+
+// Switch chapters in response to a click: reveal it, draw it, scroll to top.
+function activateChapter(id) {
+  if (!CHAPTERS[id]) {
+    id = "intro";
+  }
+
+  setActiveChapter(id);
+  renderChapter(id);
+
+  const stage = document.querySelector(".stage");
+  if (stage) {
+    stage.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+// Draw only the charts that live in the given (now-visible) chapter.
+function renderChapter(id) {
+  if (!state.data) {
+    return;
+  }
+
+  (CHAPTERS[id] || []).forEach((render) => render());
 }
 
 async function loadDashboard(forceRefresh) {
@@ -128,11 +234,11 @@ async function loadDashboard(forceRefresh) {
       .range(colors);
 
     populateControls();
-    renderQuestions();
 
     elements.scoreOutput.value = elements.scoreFilter.value;
     elements.networkWeightOutput.value = elements.networkWeight.value;
 
+    setActiveChapter(initialChapter());
     applyFilters();
 
     const warning = payload.meta.warning
@@ -285,20 +391,12 @@ function applyFilters() {
     );
   });
 
-  renderAll();
-}
+  state.tablePage = 0;
 
-function renderAll() {
+  // The filter bar persists across chapters, so its summary always updates;
+  // the charts themselves are redrawn only for the chapter in view.
   renderFilterSummary();
-  renderKPIs();
-  renderInsights();
-  renderScatterplot();
-  renderGenreChart();
-  renderTimeline();
-  renderStudioChart();
-  renderHeatmap();
-  renderNetwork();
-  renderAnimeTable();
+  renderChapter(state.activeChapter);
 }
 
 function renderFilterSummary() {
@@ -1369,9 +1467,7 @@ function renderNetwork() {
     .on("click", (_, item) => {
       elements.searchInput.value = item.name;
       applyFilters();
-      document.querySelector("#dashboard").scrollIntoView({
-        behavior: "smooth"
-      });
+      activateChapter("explorer");
     });
 
   node.append("circle")
@@ -1497,7 +1593,15 @@ function renderAnimeTable() {
     }
   });
 
-  const displayed = sorted.slice(0, 60);
+  const pageSize = state.tablePageSize;
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+
+  if (state.tablePage >= totalPages) {
+    state.tablePage = Math.max(0, totalPages - 1);
+  }
+
+  const pageStart = state.tablePage * pageSize;
+  const displayed = sorted.slice(pageStart, pageStart + pageSize);
 
   elements.tableBody.innerHTML = displayed.map((anime) => `
     <tr data-anime-id="${anime.id}" tabindex="0">
@@ -1554,9 +1658,71 @@ function renderAnimeTable() {
     });
   });
 
-  elements.tableNote.textContent = sorted.length > displayed.length
-    ? `Showing the first ${displayed.length} of ${sorted.length} visible titles.`
-    : `Showing ${displayed.length} visible title${displayed.length === 1 ? "" : "s"}.`;
+  renderTablePagination(sorted.length);
+
+  const pageEnd = pageStart + displayed.length;
+  elements.tableNote.textContent = sorted.length > 0
+    ? `Showing ${pageStart + 1}–${pageEnd} of ${sorted.length} visible title${sorted.length === 1 ? "" : "s"}.`
+    : "";
+}
+
+function renderTablePagination(totalItems) {
+  const container = elements.tablePagination;
+  const pageSize = state.tablePageSize;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  if (totalPages <= 1) {
+    container.innerHTML = "";
+    return;
+  }
+
+  const current = state.tablePage;
+  const delta = 2;
+
+  // Collect page indices to show, then insert ellipsis markers
+  const pageIndices = [];
+
+  for (let i = 0; i < totalPages; i++) {
+    if (
+      i === 0
+      || i === totalPages - 1
+      || (i >= current - delta && i <= current + delta)
+    ) {
+      pageIndices.push(i);
+    }
+  }
+
+  const items = [];
+  let prev = -1;
+
+  for (const page of pageIndices) {
+    if (page - prev > 1) {
+      items.push("ellipsis");
+    }
+    items.push(page);
+    prev = page;
+  }
+
+  const btnHtml = (page, label, extra = "") => {
+    const disabled = (page < 0 || page >= totalPages) ? "disabled" : "";
+    return `<button class="page-btn${extra}" data-page="${page}" ${disabled}>${label}</button>`;
+  };
+
+  const pageButtons = items.map((item) => {
+    if (item === "ellipsis") {
+      return `<span class="page-ellipsis">…</span>`;
+    }
+    const start = item * pageSize + 1;
+    const end = Math.min((item + 1) * pageSize, totalItems);
+    const active = item === current ? " is-active" : "";
+    return btnHtml(item, item + 1, active);
+  });
+
+  container.innerHTML = [
+    btnHtml(current - 1, "‹"),
+    ...pageButtons,
+    btnHtml(current + 1, "›")
+  ].join("");
 }
 
 function openAnimeDetail(anime) {
@@ -1696,22 +1862,97 @@ function closeDrawer() {
   document.body.style.overflow = "";
 }
 
-function renderQuestions() {
-  elements.questionList.innerHTML = state.data.questions.map((question) => `
-    <article class="question-card">
-      <div class="question-number">
-        ${String(question.number).padStart(2, "0")}
-      </div>
+// Chapter 1 verdict: answers "are the most popular also the highest rated?"
+// by comparing the two title extremes and reporting the score–popularity
+// correlation across the filtered sample.
+function renderReceptionCallout() {
+  const container = document.querySelector("#reception-callout");
 
-      <div>
-        <h3>${escapeHTML(question.question)}</h3>
-        <p>
-          Investigated with:
-          <strong>${escapeHTML(question.view)}</strong>
-        </p>
-      </div>
+  if (!container) {
+    return;
+  }
+
+  const anime = state.filteredAnime;
+
+  if (!anime.length) {
+    container.innerHTML = `
+      <article class="callout-card">
+        <strong>No titles match the current filters.</strong>
+        <p>Broaden the filters above to continue the story.</p>
+      </article>
+    `;
+    return;
+  }
+
+  const mostPopular = d3.greatest(anime, (item) => item.popularity || 0);
+
+  const scored = anime.filter((item) => Number.isFinite(item.average_score));
+  const highestRated = d3.greatest(scored, (item) => item.average_score);
+
+  const correlation = calculateCorrelation(
+    anime
+      .filter((item) => (
+        item.popularity > 0
+        && Number.isFinite(item.average_score)
+      ))
+      .map((item) => [
+        Math.log10(item.popularity),
+        item.average_score
+      ])
+  );
+
+  const sameTitle = mostPopular
+    && highestRated
+    && mostPopular.id === highestRated.id;
+
+  let verdict;
+  if (correlation === null) {
+    verdict = "Not enough scored titles to judge.";
+  } else if (Math.abs(correlation) < 0.2) {
+    verdict = "Barely — fame and quality track each other only weakly here.";
+  } else if (correlation >= 0.2) {
+    verdict = "Somewhat — more popular titles do tend to score higher.";
+  } else {
+    verdict = "Inversely — more popular titles tend to score a little lower.";
+  }
+
+  container.innerHTML = `
+    <article class="callout-card accent">
+      <span>Score–popularity correlation</span>
+      <strong>${correlation === null ? "N/A" : `r = ${correlation.toFixed(2)}`}</strong>
+      <p>${escapeHTML(verdict)}</p>
     </article>
-  `).join("");
+
+    <article class="callout-card">
+      <span>Most popular</span>
+      <strong>${escapeHTML(mostPopular?.title || "N/A")}</strong>
+      <p>${formatNumber(mostPopular?.popularity)} list users${
+        mostPopular && Number.isFinite(mostPopular.average_score)
+          ? ` · ${mostPopular.average_score}/100`
+          : ""
+      }</p>
+    </article>
+
+    <article class="callout-card">
+      <span>Highest rated</span>
+      <strong>${escapeHTML(highestRated?.title || "N/A")}</strong>
+      <p>${
+        highestRated
+          ? `${highestRated.average_score}/100 · ${formatNumber(highestRated.popularity)} list users`
+          : "No scored titles"
+      }</p>
+    </article>
+
+    <article class="callout-card">
+      <span>The verdict</span>
+      <strong>${sameTitle ? "Same title tops both" : "Crowd favourite ≠ top rated"}</strong>
+      <p>${
+        sameTitle
+          ? "The most-followed title is also the highest-scored under these filters."
+          : "The most-watched anime and the best-scored anime are different titles."
+      }</p>
+    </article>
+  `;
 }
 
 function computeGenreStats(anime) {

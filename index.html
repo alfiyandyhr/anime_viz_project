@@ -10,10 +10,10 @@
 
   <meta
     name="description"
-    content="Interactive visual analysis of anime, studios, genres, ratings, popularity, and Japanese voice-actor networks."
+    content="AnIViz — a story-driven visualization of what makes anime resonate: reception, content, and the creators behind popular titles."
   >
 
-  <title>Anime Industry Atlas</title>
+  <title>AnIViz — Anime Industry Visualization</title>
 
   <link
     rel="preconnect"
@@ -35,167 +35,89 @@
   <script src="app.js" defer></script>
 </head>
 
-<body>
+<body data-chapter="intro">
   <div class="ambient ambient-one"></div>
   <div class="ambient ambient-two"></div>
 
-  <header class="hero" id="top">
-    <nav class="top-nav" aria-label="Primary navigation">
-      <a class="brand" href="#top">
+  <div class="app-shell">
+    <!-- ───────────────────────── Left rail ───────────────────────── -->
+    <aside class="rail" aria-label="Story navigation">
+      <a class="brand" href="#intro" data-goto="intro">
         <span class="brand-mark">A</span>
         <span>
-          <strong>Anime Industry Atlas</strong>
-          <small>AniList × Python × D3.js</small>
+          <strong>AnIViz</strong>
+          <small>Anime Industry Visualization</small>
         </span>
       </a>
 
-      <div class="nav-links">
-        <a href="#introduction">Introduction</a>
-        <a href="#dashboard">Dashboard</a>
-        <a href="#network-section">Network</a>
-        <a href="#questions">Questions</a>
-        <a href="#methodology">Methodology</a>
-      </div>
-    </nav>
+      <nav class="rail-nav" aria-label="Chapters">
+        <a class="rail-link" data-goto="intro" href="#intro">
+          <span class="idx">◆</span>
+          <span class="rail-text">
+            <strong>Introduction</strong>
+            <small>What makes anime resonate?</small>
+          </span>
+        </a>
 
-    <div class="hero-content">
-      <div class="hero-copy">
-        <p class="eyebrow">Interactive anime-industry intelligence</p>
+        <p class="rail-group">The three questions</p>
 
-        <h1>
-          Explore the people, studios, genres, and audience signals
-          behind popular anime.
-        </h1>
+        <a class="rail-link" data-goto="reception" href="#reception">
+          <span class="idx">01</span>
+          <span class="rail-text">
+            <strong>Reception</strong>
+            <small>Do the most-watched deserve their fame?</small>
+          </span>
+        </a>
 
-        <p class="hero-description">
-          An interactive visual analytics system connecting anime ratings,
-          popularity, genres, studios, release history, and Japanese
-          voice-actor collaborations.
-        </p>
+        <a class="rail-link" data-goto="content" href="#content">
+          <span class="idx">02</span>
+          <span class="rail-text">
+            <strong>Content</strong>
+            <small>What stories rise, and when?</small>
+          </span>
+        </a>
 
-        <div class="hero-actions">
-          <a class="button button-primary" href="#dashboard">
-            Explore the dashboard
-          </a>
+        <a class="rail-link" data-goto="creators" href="#creators">
+          <span class="idx">03</span>
+          <span class="rail-text">
+            <strong>Creators</strong>
+            <small>Who makes the hits?</small>
+          </span>
+        </a>
 
-          <a class="button button-secondary" href="#questions">
-            View research questions
-          </a>
-        </div>
+        <p class="rail-group">Then</p>
 
-        <div class="hero-status" role="status" aria-live="polite">
+        <a class="rail-link" data-goto="explorer" href="#explorer">
+          <span class="idx">✦</span>
+          <span class="rail-text">
+            <strong>Explorer</strong>
+            <small>Dig into the data yourself</small>
+          </span>
+        </a>
+      </nav>
+
+      <div class="rail-foot">
+        <div class="rail-status" role="status" aria-live="polite">
           <span id="status-dot" class="status-dot loading"></span>
-          <span id="data-status">Loading anime industry data…</span>
+          <span id="data-status">Loading anime data…</span>
         </div>
+        <span id="footer-generated">Data not loaded</span>
+        <span id="footer-cache"></span>
+        <span class="rail-credit">AniList × Python × D3.js</span>
       </div>
+    </aside>
 
-      <div class="hero-visual" aria-hidden="true">
-        <div class="orbit orbit-large"></div>
-        <div class="orbit orbit-medium"></div>
-        <div class="orbit orbit-small"></div>
-
-        <div class="hero-core">
-          <span>ANIME</span>
-          <strong>ATLAS</strong>
-        </div>
-
-        <span class="floating-label label-one">Studios</span>
-        <span class="floating-label label-two">Genres</span>
-        <span class="floating-label label-three">Ratings</span>
-        <span class="floating-label label-four">Voice actors</span>
-      </div>
-    </div>
-  </header>
-
-  <main>
-    <section id="introduction" class="section introduction-section">
-      <div class="section-heading split-heading">
-        <div>
-          <p class="eyebrow">Anime 101</p>
-          <h2>What is anime?</h2>
-        </div>
-
-        <p>
-          Anime is animation associated with Japan and includes theatrical
-          films, television series, online releases, music videos, and
-          direct-to-video productions. It spans many audiences and genres,
-          rather than representing a single genre by itself.
-        </p>
-      </div>
-
-      <div class="intro-grid">
-        <article class="intro-card">
-          <span class="intro-icon">01</span>
-          <h3>Titles and formats</h3>
-          <p>
-            A title may be released as a TV series, movie, OVA, ONA, special,
-            music video, or short-form production.
-          </p>
-        </article>
-
-        <article class="intro-card">
-          <span class="intro-icon">02</span>
-          <h3>Studios</h3>
-          <p>
-            Animation studios coordinate artistic production. Multiple
-            companies may participate, while AniList identifies primary
-            studios for many titles.
-          </p>
-        </article>
-
-        <article class="intro-card">
-          <span class="intro-icon">03</span>
-          <h3>Voice actors</h3>
-          <p>
-            Japanese voice actors, often called <em>seiyuu</em>, perform
-            character roles. Their repeated collaborations form professional
-            co-starring networks.
-          </p>
-        </article>
-
-        <article class="intro-card">
-          <span class="intro-icon">04</span>
-          <h3>Audience signals</h3>
-          <p>
-            AniList provides scores, popularity, favourites, and trending
-            activity. These describe different kinds of audience attention.
-          </p>
-        </article>
-      </div>
-
-      <div class="glossary">
-        <span><strong>TV:</strong> broadcast or streamed series</span>
-        <span><strong>MOVIE:</strong> theatrical or feature film</span>
-        <span><strong>OVA:</strong> original video animation</span>
-        <span><strong>ONA:</strong> original net animation</span>
-        <span><strong>Score:</strong> weighted user rating out of 100</span>
-        <span><strong>Popularity:</strong> users listing the title</span>
-      </div>
-    </section>
-
-    <section id="dashboard" class="section dashboard-section">
-      <div class="section-heading">
-        <p class="eyebrow">Coordinated multiple views</p>
-        <h2>Anime Industry Insights Dashboard</h2>
-        <p>
-          Use the global controls to filter every chart. Click a genre,
-          studio, anime, heatmap cell, or voice actor to continue exploring.
-        </p>
-      </div>
-
-      <section class="filter-panel" aria-label="Dashboard filters">
-        <div class="filter-header">
-          <div>
-            <h3>Global filters</h3>
-            <p id="filter-summary">Waiting for data…</p>
-          </div>
-
-          <div class="filter-actions">
-            <button id="reset-filters" class="small-button ghost" type="button">
-              Reset filters
-            </button>
-          </div>
-        </div>
+    <!-- ───────────────────────── Main stage ───────────────────────── -->
+    <main class="stage">
+      <!-- Persistent, collapsible cross-filter bar (hidden on the intro) -->
+      <details class="filterbar" id="filterbar" open>
+        <summary>
+          <span class="filterbar-title">
+            <strong>Filters</strong>
+            <span id="filter-summary">Waiting for data…</span>
+          </span>
+          <span class="filterbar-hint">click to collapse</span>
+        </summary>
 
         <div class="filter-grid">
           <label>
@@ -253,61 +175,160 @@
               value="0"
             >
           </label>
+
+          <div class="filter-reset">
+            <button id="reset-filters" class="small-button ghost" type="button">
+              Reset filters
+            </button>
+          </div>
         </div>
-      </section>
+      </details>
 
-      <section class="kpi-grid" aria-label="Summary statistics">
-        <article class="kpi-card">
-          <span>Visible anime</span>
-          <strong id="kpi-count">—</strong>
-          <small>after current filters</small>
-        </article>
+      <!-- ═══════════════════ Chapter: Introduction ═══════════════════ -->
+      <section
+        class="chapter is-active"
+        id="chapter-intro"
+        data-chapter="intro"
+        aria-label="Introduction"
+      >
+        <div class="cover">
+          <p class="eyebrow">Anime Industry Visualization</p>
 
-        <article class="kpi-card">
-          <span>Average score</span>
-          <strong id="kpi-score">—</strong>
-          <small>out of 100</small>
-        </article>
+          <h1>
+            What makes an anime <span class="grad">resonate</span>?
+          </h1>
 
-        <article class="kpi-card">
-          <span>Total popularity</span>
-          <strong id="kpi-popularity">—</strong>
-          <small>combined list users</small>
-        </article>
+          <p class="lede">
+            This is a guided read through the 1,000 most-followed titles on
+            AniList. Instead of one wall of charts, the data answers three
+            questions in turn — are the most-watched anime also the best-loved,
+            what kinds of stories rise and when, and who are the studios and
+            voice actors behind the hits.
+          </p>
 
-        <article class="kpi-card">
-          <span>Studios represented</span>
-          <strong id="kpi-studios">—</strong>
-          <small>primary studios</small>
-        </article>
-
-        <article class="kpi-card">
-          <span>Voice actors represented</span>
-          <strong id="kpi-actors">—</strong>
-          <small>Japanese main-role cast</small>
-        </article>
-      </section>
-
-      <section class="insight-strip">
-        <div class="mini-heading">
-          <div>
-            <p class="eyebrow">Automatically generated</p>
-            <h3>What stands out?</h3>
+          <div class="cover-actions">
+            <button class="button button-primary" data-goto="reception" type="button">
+              Begin the story →
+            </button>
+            <button class="button button-secondary" data-goto="explorer" type="button">
+              Skip to the explorer
+            </button>
           </div>
         </div>
 
-        <div id="insight-cards" class="insight-grid"></div>
+        <div class="intro-grid">
+          <article class="intro-card">
+            <span class="intro-icon">01</span>
+            <h3>Reception</h3>
+            <p>
+              Score vs. popularity. We test the assumption that the biggest
+              audiences pick the highest-rated shows.
+            </p>
+          </article>
+
+          <article class="intro-card">
+            <span class="intro-icon">02</span>
+            <h3>Content</h3>
+            <p>
+              Genres and release years. Which kinds of stories dominate this
+              sample, and how the mix and its ratings shifted over time.
+            </p>
+          </article>
+
+          <article class="intro-card">
+            <span class="intro-icon">03</span>
+            <h3>Creators</h3>
+            <p>
+              Studios and Japanese voice actors (<em>seiyuu</em>). Who pairs
+              reach with quality, and how repeated collaborations form networks.
+            </p>
+          </article>
+
+          <article class="intro-card muted">
+            <span class="intro-icon">?</span>
+            <h3>What is anime?</h3>
+            <p>
+              Animation associated with Japan — TV series, films, OVA/ONA, and
+              shorts — spanning many audiences and genres rather than one.
+            </p>
+          </article>
+        </div>
+
+        <div class="glossary">
+          <span><strong>TV:</strong> broadcast or streamed series</span>
+          <span><strong>MOVIE:</strong> theatrical or feature film</span>
+          <span><strong>OVA:</strong> original video animation</span>
+          <span><strong>ONA:</strong> original net animation</span>
+          <span><strong>Score:</strong> weighted user rating out of 100</span>
+          <span><strong>Popularity:</strong> users listing the title</span>
+          <span><strong>Seiyuu:</strong> Japanese voice actor</span>
+        </div>
       </section>
 
-      <div class="visualization-grid">
-        <article class="viz-card span-two">
+      <!-- ═══════════════════ Chapter 1: Reception ════════════════════ -->
+      <section
+        class="chapter"
+        id="chapter-reception"
+        data-chapter="reception"
+        aria-label="Chapter 1 — Reception"
+      >
+        <header class="chapter-head">
+          <p class="chapter-eyebrow">Chapter 01 · Reception</p>
+          <h2>Do the most-watched anime deserve their fame?</h2>
+          <p class="chapter-lede">
+            We tend to assume the biggest audiences flock to the best shows.
+            Position each title by how many people follow it and how highly they
+            rate it, and the relationship turns out to be looser than expected.
+          </p>
+        </header>
+
+        <section class="kpi-grid" aria-label="The sample at a glance">
+          <article class="kpi-card">
+            <span>Visible anime</span>
+            <strong id="kpi-count">—</strong>
+            <small>after current filters</small>
+          </article>
+
+          <article class="kpi-card">
+            <span>Average score</span>
+            <strong id="kpi-score">—</strong>
+            <small>out of 100</small>
+          </article>
+
+          <article class="kpi-card">
+            <span>Total popularity</span>
+            <strong id="kpi-popularity">—</strong>
+            <small>combined list users</small>
+          </article>
+
+          <article class="kpi-card">
+            <span>Studios represented</span>
+            <strong id="kpi-studios">—</strong>
+            <small>primary studios</small>
+          </article>
+
+          <article class="kpi-card">
+            <span>Voice actors represented</span>
+            <strong id="kpi-actors">—</strong>
+            <small>Japanese main-role cast</small>
+          </article>
+        </section>
+
+        <div class="question-callout">
+          <p class="micro-q">Are the most popular anime also the highest rated?</p>
+          <div id="reception-callout" class="callout-grid"></div>
+        </div>
+
+        <article class="viz-card">
           <div class="viz-header">
             <div>
               <p class="chart-kicker">Ratings and reach</p>
               <h3>Score vs. popularity</h3>
               <p>
                 Position shows rating and audience size. Bubble area represents
-                favourites; color represents primary genre.
+                favourites; color represents primary genre. The dashed line is
+                the trend — nearly flat means fame and quality barely track each
+                other.
               </p>
             </div>
 
@@ -316,12 +337,35 @@
 
           <div id="scatter-chart" class="chart chart-large"></div>
         </article>
+      </section>
+
+      <!-- ═══════════════════ Chapter 2: Content ══════════════════════ -->
+      <section
+        class="chapter"
+        id="chapter-content"
+        data-chapter="content"
+        aria-label="Chapter 2 — Content"
+      >
+        <header class="chapter-head">
+          <p class="chapter-eyebrow">Chapter 02 · Content</p>
+          <h2>What kinds of stories rise, and how has that changed?</h2>
+          <p class="chapter-lede">
+            A handful of genres carry most popular titles — but the genres that
+            appear most often are not always the ones that score best. Switch the
+            metric to compare volume against quality, then watch how the mix and
+            its ratings drift across release years.
+          </p>
+        </header>
 
         <article class="viz-card">
           <div class="viz-header compact">
             <div>
               <p class="chart-kicker">Genre composition</p>
-              <h3>Genre leaders</h3>
+              <h3>Which genres dominate — and which score best?</h3>
+              <p>
+                Rank the top genres by number of titles, average score, or total
+                popularity. The leaders change with the metric.
+              </p>
             </div>
 
             <label class="inline-control">
@@ -337,29 +381,48 @@
           <div id="genre-chart" class="chart"></div>
         </article>
 
-        <article class="viz-card span-two">
+        <article class="viz-card">
           <div class="viz-header">
             <div>
               <p class="chart-kicker">Historical context</p>
-              <h3>Release-year timeline</h3>
+              <h3>How the sample changed over time</h3>
               <p>
-                Bars show titles represented in the sample. The line shows
-                average audience score for each release year.
+                Bars show how many sampled titles come from each release year.
+                The line tracks their average audience score.
               </p>
             </div>
           </div>
 
           <div id="timeline-chart" class="chart"></div>
         </article>
+      </section>
+
+      <!-- ═══════════════════ Chapter 3: Creators ═════════════════════ -->
+      <section
+        class="chapter"
+        id="chapter-creators"
+        data-chapter="creators"
+        aria-label="Chapter 3 — Creators"
+      >
+        <header class="chapter-head">
+          <p class="chapter-eyebrow">Chapter 03 · Creators</p>
+          <h2>Who makes the hits?</h2>
+          <p class="chapter-lede">
+            Behind every popular title is a studio and a cast. Some studios pair
+            huge reach with consistently strong scores; others specialize in a
+            genre. And the same Japanese voice actors recur again and again,
+            forming a dense co-starring network.
+          </p>
+        </header>
 
         <article class="viz-card">
           <div class="viz-header">
             <div>
               <p class="chart-kicker">Production organizations</p>
-              <h3>Studio performance</h3>
+              <h3>Which studios pair reach with quality?</h3>
               <p>
-                Compare average scores, audience reach, and title counts among
-                represented primary studios.
+                Each studio sits at its average score; dot size shows how many
+                titles it has in view, color shows its dominant genre.
               </p>
             </div>
           </div>
@@ -367,191 +430,209 @@
           <div id="studio-chart" class="chart chart-tall"></div>
         </article>
 
-        <article class="viz-card span-three">
+        <article class="viz-card">
           <div class="viz-header">
             <div>
               <p class="chart-kicker">Specialization map</p>
-              <h3>Studio × genre heatmap</h3>
+              <h3>Which studios specialize in which genres?</h3>
               <p>
-                Darker cells indicate more titles connecting a studio to a
-                genre. Select a cell to cross-filter the dashboard.
+                Darker cells indicate more titles connecting a studio to a genre.
+                Select a cell to cross-filter the whole story.
               </p>
             </div>
           </div>
 
-          <div
-            id="heatmap-chart"
-            class="chart heatmap-chart"
-          ></div>
+          <div id="heatmap-chart" class="chart heatmap-chart"></div>
         </article>
-      </div>
-    </section>
 
-    <section id="network-section" class="section network-section">
-      <div class="section-heading split-heading">
-        <div>
-          <p class="eyebrow">Collaboration structure</p>
-          <h2>Japanese voice-actor co-starring network</h2>
+        <article class="viz-card">
+          <div class="viz-header">
+            <div>
+              <p class="chart-kicker">Collaboration structure</p>
+              <h3>Which voice actors repeatedly co-star?</h3>
+              <p>
+                Each node is a Japanese voice actor; a link means two actors
+                played main characters in the same sampled anime. Larger nodes
+                appear in more titles, thicker links mean more shared shows.
+                Click a node to see that actor's filmography in the explorer.
+              </p>
+            </div>
+          </div>
+
+          <div class="network-controls">
+            <label>
+              <span>Highlight an actor</span>
+              <input
+                id="actor-search"
+                type="search"
+                placeholder="Type a voice actor's name"
+              >
+            </label>
+
+            <label class="range-control">
+              <span>
+                Minimum shared anime:
+                <output id="network-weight-output">1</output>
+              </span>
+
+              <input
+                id="network-weight"
+                type="range"
+                min="1"
+                max="5"
+                step="1"
+                value="1"
+              >
+            </label>
+
+            <p id="network-summary">Waiting for network data…</p>
+          </div>
+
+          <div id="network-chart" class="network-chart"></div>
+        </article>
+      </section>
+
+      <!-- ═══════════════════ Chapter: Explorer ═══════════════════════ -->
+      <section
+        class="chapter"
+        id="chapter-explorer"
+        data-chapter="explorer"
+        aria-label="Explorer"
+      >
+        <header class="chapter-head">
+          <p class="chapter-eyebrow">Explore · Details on demand</p>
+          <h2>Dig into the data yourself</h2>
+          <p class="chapter-lede">
+            The story argued that popularity, quality, content, and creators pull
+            in different directions. Here are the raw titles behind it — filter
+            above, sort below, and open any row for the full record.
+          </p>
+        </header>
+
+        <section class="insight-strip">
+          <div class="mini-heading">
+            <p class="eyebrow">Automatically generated</p>
+            <h3>Key facts at a glance</h3>
+          </div>
+
+          <div id="insight-cards" class="insight-grid"></div>
+        </section>
+
+        <div class="explorer-head">
+          <h3>Anime explorer</h3>
+          <div class="explorer-controls">
+            <label class="table-sort">
+              <span>Sort visible titles</span>
+              <select id="table-sort">
+                <option value="popularity">Popularity</option>
+                <option value="score">Average score</option>
+                <option value="favourites">Favourites</option>
+                <option value="year-desc">Newest release</option>
+                <option value="year-asc">Oldest release</option>
+                <option value="title">Title</option>
+              </select>
+            </label>
+            <label class="table-page-size">
+              <span>Show</span>
+              <select id="table-page-size">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </label>
+          </div>
         </div>
 
-        <p>
-          Each node is a Japanese voice actor. Two actors are connected when
-          they perform main characters in the same sampled anime. Larger nodes
-          appear in more filtered titles; thicker links represent repeated
-          collaborations.
-        </p>
-      </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Anime</th>
+                <th>Year</th>
+                <th>Format</th>
+                <th>Studio</th>
+                <th>Score</th>
+                <th>Popularity</th>
+                <th>Genres</th>
+              </tr>
+            </thead>
 
-      <article class="network-card">
-        <div class="network-controls">
-          <label>
-            <span>Highlight an actor</span>
-            <input
-              id="actor-search"
-              type="search"
-              placeholder="Type a voice actor's name"
-            >
-          </label>
-
-          <label class="range-control">
-            <span>
-              Minimum shared anime:
-              <output id="network-weight-output">1</output>
-            </span>
-
-            <input
-              id="network-weight"
-              type="range"
-              min="1"
-              max="5"
-              step="1"
-              value="1"
-            >
-          </label>
-
-          <p id="network-summary">Waiting for network data…</p>
+            <tbody id="anime-table-body"></tbody>
+          </table>
         </div>
 
-        <div id="network-chart" class="network-chart"></div>
-      </article>
-    </section>
+        <div id="table-pagination" class="table-pagination"></div>
 
-    <section class="section explorer-section">
-      <div class="section-heading split-heading">
-        <div>
-          <p class="eyebrow">Details on demand</p>
-          <h2>Anime explorer</h2>
+        <p id="table-note" class="table-note"></p>
+
+        <details class="methodology">
+          <summary>Methodology &amp; limitations</summary>
+
+          <div class="method-grid">
+            <article>
+              <h3>Data source</h3>
+              <p>
+                Data is requested from AniList's GraphQL API. The backend
+                retrieves popular non-adult anime and derives coordinated
+                summaries for the frontend.
+              </p>
+            </article>
+
+            <article>
+              <h3>Unit of analysis</h3>
+              <p>
+                One record represents one anime entry. Franchise seasons, movies,
+                specials, and related adaptations may appear as separate entries.
+              </p>
+            </article>
+
+            <article>
+              <h3>Sampling caution</h3>
+              <p>
+                This is a popularity-sorted sample. It is useful for studying
+                highly visible anime, but it is not a random sample or a complete
+                history of the anime industry.
+              </p>
+            </article>
+
+            <article>
+              <h3>Network definition</h3>
+              <p>
+                A voice-actor link indicates co-starring among Japanese main-role
+                cast records returned by AniList. It does not prove a personal or
+                contractual relationship.
+              </p>
+            </article>
+
+            <article>
+              <h3>Missing values</h3>
+              <p>
+                Some entries lack scores, dates, studios, episode counts, or cast
+                information. Visualizations exclude missing values only when the
+                corresponding encoding requires them.
+              </p>
+            </article>
+
+            <article>
+              <h3>Reproducibility</h3>
+              <p>
+                The backend caches processed API responses. The generation time
+                and cache status appear in the left rail.
+              </p>
+            </article>
+          </div>
+        </details>
+
+        <div class="stage-foot">
+          <strong>AnIViz</strong>
+          <p>Educational data-visualization project using AniList and D3.js.</p>
         </div>
+      </section>
+    </main>
+  </div>
 
-        <label class="table-sort">
-          <span>Sort visible titles</span>
-          <select id="table-sort">
-            <option value="popularity">Popularity</option>
-            <option value="score">Average score</option>
-            <option value="favourites">Favourites</option>
-            <option value="year-desc">Newest release</option>
-            <option value="year-asc">Oldest release</option>
-            <option value="title">Title</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>Anime</th>
-              <th>Year</th>
-              <th>Format</th>
-              <th>Studio</th>
-              <th>Score</th>
-              <th>Popularity</th>
-              <th>Genres</th>
-            </tr>
-          </thead>
-
-          <tbody id="anime-table-body"></tbody>
-        </table>
-      </div>
-
-      <p id="table-note" class="table-note"></p>
-    </section>
-
-    <section id="questions" class="section questions-section">
-      <div class="section-heading">
-        <p class="eyebrow">Analytical purpose</p>
-        <h2>Ten questions the visualization investigates</h2>
-        <p>
-          The project is designed as an analytical system rather than a
-          collection of unrelated charts.
-        </p>
-      </div>
-
-      <div id="question-list" class="question-grid"></div>
-    </section>
-
-    <section id="methodology" class="section methodology-section">
-      <div class="section-heading">
-        <p class="eyebrow">Responsible interpretation</p>
-        <h2>Methodology and limitations</h2>
-      </div>
-
-      <div class="method-grid">
-        <article>
-          <h3>Data source</h3>
-          <p>
-            Data is requested from AniList's GraphQL API. The backend retrieves
-            popular non-adult anime and derives coordinated summaries for the
-            frontend.
-          </p>
-        </article>
-
-        <article>
-          <h3>Unit of analysis</h3>
-          <p>
-            One record represents one anime entry. Franchise seasons, movies,
-            specials, and related adaptations may appear as separate entries.
-          </p>
-        </article>
-
-        <article>
-          <h3>Sampling caution</h3>
-          <p>
-            This is a popularity-sorted sample. It is useful for studying
-            highly visible anime, but it is not a random sample or a complete
-            history of the anime industry.
-          </p>
-        </article>
-
-        <article>
-          <h3>Network definition</h3>
-          <p>
-            A voice-actor link indicates co-starring among Japanese main-role
-            cast records returned by AniList. It does not prove a personal or
-            contractual relationship.
-          </p>
-        </article>
-
-        <article>
-          <h3>Missing values</h3>
-          <p>
-            Some entries lack scores, dates, studios, episode counts, or cast
-            information. Visualizations exclude missing values only when the
-            corresponding encoding requires them.
-          </p>
-        </article>
-
-        <article>
-          <h3>Reproducibility</h3>
-          <p>
-            The backend caches processed API responses. The generation time,
-            sample size, and cache status are displayed in the page footer.
-          </p>
-        </article>
-      </div>
-    </section>
-  </main>
-
+  <!-- ───────────────────────── Overlays ───────────────────────── -->
   <aside
     id="detail-drawer"
     class="detail-drawer"
@@ -578,17 +659,5 @@
     role="tooltip"
     aria-hidden="true"
   ></div>
-
-  <footer>
-    <div>
-      <strong>Anime Industry Atlas</strong>
-      <p>Educational data-visualization project using AniList and D3.js.</p>
-    </div>
-
-    <div class="footer-meta">
-      <span id="footer-generated">Data not loaded</span>
-      <span id="footer-cache"></span>
-    </div>
-  </footer>
 </body>
 </html>
