@@ -34,7 +34,7 @@ def health():
 
     return jsonify({
         "status": "ok",
-        "service": "Anime Industry Atlas API",
+        "service": "AnIViz API",
         "anilist_endpoint": service.anilist_url,
         "cache": cache_info
     })
@@ -111,7 +111,7 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
 
     print("=" * 68)
-    print("Anime Industry Atlas")
+    print("AnIViz — Anime Industry Visualization")
     print(f"Dashboard: http://localhost:{port}")
     print(f"Health API: http://localhost:{port}/api/health")
     print("=" * 68)

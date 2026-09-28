@@ -1,6 +1,6 @@
-# Anime Industry Atlas
+# AnIViz — Anime Industry Visualization
 
-Interactive visualization of anime titles, studios, genres, scores, and Japanese voice-actor networks — built with Python/Flask, AniList GraphQL API, and D3.js.
+A story-driven visualization of what makes anime resonate — reading through the most-followed titles on AniList in three chapters (Reception → Content → Creators), built with Python/Flask, AniList GraphQL API, and D3.js.
 
 **Live site:** https://alfiyandyhr.github.io/anime_viz_project/
 
