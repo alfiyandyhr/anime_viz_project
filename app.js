@@ -720,10 +720,10 @@ function renderScatterplot() {
   dots.append("title")
     .text((item) => item.title);
 
-  renderGenreLegend(svg, data, width, margin);
+  renderGenreLegend(svg, data, width, height, margin);
 }
 
-function renderGenreLegend(svg, data, width, margin) {
+function renderGenreLegend(svg, data, width, height, margin) {
   const genres = d3.rollups(
     data,
     (rows) => rows.length,
@@ -737,7 +737,7 @@ function renderGenreLegend(svg, data, width, margin) {
     .attr(
       "transform",
       `translate(${Math.max(margin.left, width - margin.right - 145)},`
-      + `${margin.top + 4})`
+      + `${height - 160})`
     );
 
   genres.forEach((genre, index) => {
@@ -1147,6 +1147,7 @@ function renderStudioChart() {
     .on("mousemove", moveTooltip)
     .on("mouseleave", hideTooltip)
     .on("click", (_, item) => {
+      hideTooltip();
       elements.studioFilter.value = item.studio;
       applyFilters();
     });
