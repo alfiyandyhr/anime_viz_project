@@ -736,8 +736,8 @@ function renderGenreLegend(svg, data, width, margin) {
   const legend = svg.append("g")
     .attr(
       "transform",
-      `translate(${Math.max(margin.left, width - margin.right - 145)},`
-      + `${margin.top + 4})`
+      `translate(${width - margin.right - 145},`
+      + `${svg.attr("viewBox").split(" ")[3] - margin.bottom - (genres.length * 19) - 4})`
     );
 
   genres.forEach((genre, index) => {
@@ -1147,6 +1147,7 @@ function renderStudioChart() {
     .on("mousemove", moveTooltip)
     .on("mouseleave", hideTooltip)
     .on("click", (_, item) => {
+      hideTooltip();
       elements.studioFilter.value = item.studio;
       applyFilters();
     });
