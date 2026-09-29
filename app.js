@@ -736,8 +736,8 @@ function renderGenreLegend(svg, data, width, margin) {
   const legend = svg.append("g")
     .attr(
       "transform",
-      `translate(${width - margin.right - 145},`
-      + `${svg.attr("viewBox").split(" ")[3] - margin.bottom - (genres.length * 19) - 4})`
+      `translate(${Math.max(margin.left, width - margin.right - 145)},`
+      + `${height - margin.bottom - (genres.length * 19 + 6)})`
     );
 
   genres.forEach((genre, index) => {
