@@ -411,7 +411,7 @@
             Behind every popular title is a studio and a cast. Some studios pair
             huge reach with consistently strong scores; others specialize in a
             genre. And the same Japanese voice actors recur again and again,
-            forming a dense co-starring network.
+            connecting the characters they play and the works they appear in.
           </p>
         </header>
 
@@ -449,45 +449,47 @@
           <div class="viz-header">
             <div>
               <p class="chart-kicker">Collaboration structure</p>
-              <h3>Which voice actors repeatedly co-star?</h3>
+              <h3>How do voice actors, characters, and works connect?</h3>
               <p>
-                Each node is a Japanese voice actor; a link means two actors
-                played main characters in the same sampled anime. Larger nodes
-                appear in more titles, thicker links mean more shared shows.
-                Click a node to see that actor's filmography in the explorer.
+                Links connect Japanese voice actors to their characters and
+                anime works, and each work to its characters. Actors who share
+                an anime are linked, as are characters in the same anime.
+                Thicker links indicate more shared works. Larger, more
+                opaque nodes have more connections in the visible network.
+                Toggle node types below, drag nodes, or zoom to explore.
+                Click an actor for their profile, or a character or work
+                for anime details in the right-hand panel.
               </p>
             </div>
           </div>
 
           <div class="network-controls">
             <label>
-              <span>Highlight an actor</span>
+              <span>Find an actor, character, or work</span>
               <input
-                id="actor-search"
+                id="network-search"
                 type="search"
-                placeholder="Type a voice actor's name"
+                placeholder="Search names or anime titles"
               >
             </label>
 
-            <label class="range-control">
-              <span>
-                Minimum shared anime:
-                <output id="network-weight-output">1</output>
-              </span>
-
-              <input
-                id="network-weight"
-                type="range"
-                min="1"
-                max="5"
-                step="1"
-                value="1"
-              >
-            </label>
-
-            <p id="network-summary">Waiting for network data…</p>
+            <div class="network-type-controls">
+              <span id="network-types-label">Show node types</span>
+              <div class="network-type-buttons" role="group" aria-labelledby="network-types-label">
+                <button type="button" data-network-type="actor" aria-pressed="true">
+                  <span class="network-type-dot" aria-hidden="true"></span>Voice actor
+                </button>
+                <button type="button" data-network-type="character" aria-pressed="true">
+                  <span class="network-type-dot" aria-hidden="true"></span>Characters
+                </button>
+                <button type="button" data-network-type="work" aria-pressed="true">
+                  <span class="network-type-dot" aria-hidden="true"></span>Works
+                </button>
+              </div>
+            </div>
           </div>
 
+          <p id="network-summary" class="network-summary" role="status">Waiting for network data…</p>
           <div id="network-chart" class="network-chart"></div>
         </article>
       </section>
@@ -599,9 +601,12 @@
             <article>
               <h3>Network definition</h3>
               <p>
-                A voice-actor link indicates co-starring among Japanese main-role
-                cast records returned by AniList. It does not prove a personal or
-                contractual relationship.
+                The network uses Japanese main-role cast records returned by
+                AniList. Links show who voices a character, which works an actor
+                appears in, and which work contains a character. Character nodes
+                represent roles within individual works. Actors and characters
+                are also linked to peers in the same anime. Up to 35 matching works
+                with the highest popularity are shown to keep the graph readable.
               </p>
             </article>
 
