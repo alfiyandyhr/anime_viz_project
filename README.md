@@ -15,6 +15,7 @@ filters, tooltips, and detail drawers live in `frontend/common/`.
 frontend/
 ├── common/
 │   ├── app.js
+│   ├── api.js
 │   ├── styles.css
 │   └── redirect.js
 ├── intro/
@@ -33,9 +34,14 @@ frontend/
 │   ├── index.html
 │   ├── styles.css
 │   └── app.js
-└── explorer/
+├── explorer/
+│   ├── index.html
+│   ├── styles.css
+│   └── app.js
+└── story/
     ├── index.html
     ├── styles.css
+    ├── data.js
     └── app.js
 ```
 
@@ -88,3 +94,49 @@ git push
 ```
 
 GitHub Pages picks up the new data automatically after the push.
+
+## Story — The Evolution of Anime
+
+Open **Story** from any page, or visit `http://localhost:5000/story` with Flask
+running. The page tells six connected chapters from 1963 to the current year.
+Scrolling in either direction updates one sticky archive: an annual timeline,
+the year's Top 10 posters, and a period-level genre or main-studio ranking.
+The year selector jumps to a particular release year. Posters open accessible
+detail dialogs. Mobile layouts and reduced-motion preferences are supported.
+
+`GET /api/story` serves its own cached dataset. `backend/story_service.py`
+reuses the existing AniList request/retry and normalization code, querying four
+independent annual Top 10 rankings per request. Results include Japanese,
+non-adult anime by `startDate.year`, excluding unreleased entries. The service
+uses `CACHE_TTL_HOURS`, writes `data/anilist_story_cache.json` locally, and falls
+back to cached years with explicit stale or unavailable states on failure.
+
+For static hosting, the page falls back to the published `story.json` snapshot.
+Refresh that snapshot separately from the global dashboard sample:
+
+```bash
+python data/refresh_story.py
+```
+
+Commit `story.json` to update GitHub Pages. An incomplete refresh preserves the
+previous static snapshot. The local backend cache is ignored by Git.
+
+**Interpretation:** popularity is current AniList user-list popularity, not
+historical viewing figures. The current year is provisional. Genre/studio
+shares describe only the annual Top 10 sample and may overlap because a title
+can have multiple genres or credited main studios. Historical milestones link
+to primary sources in the narrative; the rankings are not evidence of those
+events' causes or effects.
+
+To add a historical chapter, add a `.story-step` section to
+`frontend/story/index.html` with its start/end years, theme, and accent color,
+then add its link to `.era-nav`. Scroll and chart logic derive periods from
+these attributes. `data.js` contains independently testable sample and scroll
+transformations; `app.js` owns the D3 joins, controls, and data loading.
+
+Run the relevant checks with:
+
+```bash
+python -m unittest discover -s tests -p 'test_*.py'
+node --test tests/*.test.cjs
+```
