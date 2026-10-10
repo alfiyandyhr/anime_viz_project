@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <meta
+    name="description"
+    content="AnIViz — a story-driven visualization of what makes anime resonate: reception, content, and the creators behind popular titles."
+  >
+
+  <title>AnIViz — Creators</title>
+
+  <link
+    rel="preconnect"
+    href="https://fonts.googleapis.com"
+  >
+  <link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin
+  >
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap"
+    rel="stylesheet"
+  >
+
+  <link rel="stylesheet" href="../common/styles.css">
+  <link rel="stylesheet" href="styles.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script src="../common/app.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+
+<body data-chapter="creators">
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <div class="app-shell">
+    <!-- ───────────────────────── Left rail ───────────────────────── -->
+    <aside class="rail" aria-label="Story navigation">
+      <a class="brand" href="../intro/index.html" data-goto="intro">
+        <span class="brand-mark">A</span>
+        <span>
+          <strong>AnIViz</strong>
+          <small>Anime Industry Visualization</small>
+        </span>
+      </a>
+
+      <nav class="rail-nav" aria-label="Chapters">
+        <a class="rail-link" data-goto="intro" href="../intro/index.html">
+          <span class="idx">◆</span>
+          <span class="rail-text">
+            <strong>Introduction</strong>
+            <small>What makes anime resonate?</small>
+          </span>
+        </a>
+
+        <p class="rail-group">The three questions</p>
+
+        <a class="rail-link" data-goto="reception" href="../reception/index.html">
+          <span class="idx">01</span>
+          <span class="rail-text">
+            <strong>Reception</strong>
+            <small>Do the most-watched deserve their fame?</small>
+          </span>
+        </a>
+
+        <a class="rail-link" data-goto="content" href="../content/index.html">
+          <span class="idx">02</span>
+          <span class="rail-text">
+            <strong>Content</strong>
+            <small>What stories rise, and when?</small>
+          </span>
+        </a>
+
+        <a class="rail-link is-active" aria-current="page" data-goto="creators" href="../creators/index.html">
+          <span class="idx">03</span>
+          <span class="rail-text">
+            <strong>Creators</strong>
+            <small>Who makes the hits?</small>
+          </span>
+        </a>
+
+        <p class="rail-group">Then</p>
+
+        <a class="rail-link" data-goto="explorer" href="../explorer/index.html">
+          <span class="idx">✦</span>
+          <span class="rail-text">
+            <strong>Explorer</strong>
+            <small>Dig into the data yourself</small>
+          </span>
+        </a>
+      </nav>
+
+      <div class="rail-foot">
+        <div class="rail-status" role="status" aria-live="polite">
+          <span id="status-dot" class="status-dot loading"></span>
+          <span id="data-status">Loading anime data…</span>
+        </div>
+        <span id="footer-generated">Data not loaded</span>
+        <span id="footer-cache"></span>
+        <span class="rail-credit">AniList × Python × D3.js</span>
+      </div>
+    </aside>
+
+    <!-- ───────────────────────── Main stage ───────────────────────── -->
+    <main class="stage">
+      <!-- Persistent, collapsible cross-filter bar (hidden on the intro) -->
+      <details class="filterbar" id="filterbar" open>
+        <summary>
+          <span class="filterbar-title">
+            <strong>Filters</strong>
+            <span id="filter-summary">Waiting for data…</span>
+          </span>
+          <span class="filterbar-hint">click to collapse</span>
+        </summary>
+
+        <div class="filter-grid">
+          <label>
+            <span>Search titles, studios, or actors</span>
+            <input
+              id="search-input"
+              type="search"
+              placeholder="e.g. Attack on Titan"
+            >
+          </label>
+
+          <label>
+            <span>Genre</span>
+            <select id="genre-filter">
+              <option value="All">All genres</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Studio</span>
+            <select id="studio-filter">
+              <option value="All">All studios</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Format</span>
+            <select id="format-filter">
+              <option value="All">All formats</option>
+            </select>
+          </label>
+
+          <label>
+            <span>From year</span>
+            <select id="year-from"></select>
+          </label>
+
+          <label>
+            <span>To year</span>
+            <select id="year-to"></select>
+          </label>
+
+          <label class="range-control">
+            <span>
+              Minimum score:
+              <output id="score-output">0</output>
+            </span>
+
+            <input
+              id="score-filter"
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value="0"
+            >
+          </label>
+
+          <div class="filter-reset">
+            <button id="reset-filters" class="small-button ghost" type="button">
+              Reset filters
+            </button>
+          </div>
+        </div>
+      </details>
+
+      <!-- ═══════════════════ Chapter 3: Creators ═════════════════════ -->
+      <section
+        class="chapter is-active"
+        id="chapter-creators"
+        data-chapter="creators"
+        aria-label="Chapter 3 — Creators"
+      >
+        <header class="chapter-head">
+          <p class="chapter-eyebrow">Chapter 03 · Creators</p>
+          <h2>Who makes the hits?</h2>
+          <p class="chapter-lede">
+            Behind every popular title is a studio and a cast. Some studios pair
+            huge reach with consistently strong scores; others specialize in a
+            genre. And the same Japanese voice actors recur again and again,
+            connecting the characters they play and the works they appear in.
+          </p>
+        </header>
+
+        <article class="viz-card">
+          <div class="viz-header">
+            <div>
+              <p class="chart-kicker">Production organizations</p>
+              <h3>Which studios pair reach with quality?</h3>
+              <p>
+                Each studio sits at its average score; dot size shows how many
+                titles it has in view, color shows its dominant genre.
+              </p>
+            </div>
+          </div>
+
+          <div id="studio-chart" class="chart chart-tall"></div>
+        </article>
+
+        <article class="viz-card">
+          <div class="viz-header">
+            <div>
+              <p class="chart-kicker">Specialization map</p>
+              <h3>Which studios specialize in which genres?</h3>
+              <p>
+                Darker cells indicate more titles connecting a studio to a genre.
+                Select a cell to cross-filter the whole story.
+              </p>
+            </div>
+          </div>
+
+          <div id="heatmap-chart" class="chart heatmap-chart"></div>
+        </article>
+
+        <article class="viz-card">
+          <div class="viz-header">
+            <div>
+              <p class="chart-kicker">Collaboration structure</p>
+              <h3>How do voice actors, characters, and works connect?</h3>
+              <p>
+                Links connect Japanese voice actors to their characters and
+                anime works, and each work to its characters. Actors who share
+                an anime are linked, as are characters in the same anime.
+                Thicker links indicate more shared works. Larger, more
+                opaque nodes have more connections in the visible network.
+                Toggle node types below, drag nodes, or zoom to explore.
+                Click an actor for their profile, or a character or work
+                for anime details in the right-hand panel.
+              </p>
+            </div>
+          </div>
+
+          <div class="network-controls">
+            <label>
+              <span>Find an actor, character, or work</span>
+              <input
+                id="network-search"
+                type="search"
+                placeholder="Search names or anime titles"
+              >
+            </label>
+
+            <div class="network-type-controls">
+              <span id="network-types-label">Show node types</span>
+              <div class="network-type-buttons" role="group" aria-labelledby="network-types-label">
+                <button type="button" data-network-type="actor" aria-pressed="true">
+                  <span class="network-type-dot" aria-hidden="true"></span>Voice actor
+                </button>
+                <button type="button" data-network-type="character" aria-pressed="true">
+                  <span class="network-type-dot" aria-hidden="true"></span>Characters
+                </button>
+                <button type="button" data-network-type="work" aria-pressed="true">
+                  <span class="network-type-dot" aria-hidden="true"></span>Works
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <p id="network-summary" class="network-summary" role="status">Waiting for network data…</p>
+          <div id="network-chart" class="network-chart"></div>
+        </article>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ───────────────────────── Overlays ───────────────────────── -->
+  <aside
+    id="detail-drawer"
+    class="detail-drawer"
+    aria-hidden="true"
+    aria-label="Anime details"
+  >
+    <button
+      id="close-drawer"
+      class="drawer-close"
+      type="button"
+      aria-label="Close details"
+    >
+      ×
+    </button>
+
+    <div id="drawer-content"></div>
+  </aside>
+
+  <div id="drawer-overlay" class="drawer-overlay"></div>
+
+  <div
+    id="tooltip"
+    class="tooltip"
+    role="tooltip"
+    aria-hidden="true"
+  ></div>
+</body>
+</html>

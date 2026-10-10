@@ -1,0 +1,111 @@
+/* KPI row */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 13px;
+}
+
+.kpi-card {
+  min-height: 140px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-medium);
+  background:
+    radial-gradient(circle at top right, rgba(157, 123, 255, 0.13), transparent 45%),
+    var(--surface);
+}
+
+.kpi-card span,
+.kpi-card small {
+  color: var(--text-muted);
+}
+
+.kpi-card span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.kpi-card strong {
+  margin: 6px 0 1px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(1.6rem, 2.6vw, 2.4rem);
+}
+
+.kpi-card small {
+  font-size: 0.72rem;
+}
+
+/* Inline question callout (Chapter 1) */
+
+.question-callout {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-large);
+  background: rgba(14, 19, 36, 0.72);
+}
+
+.micro-q {
+  margin: 0 0 16px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.15rem;
+  color: white;
+}
+
+.micro-q::before {
+  content: "Q  ";
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+.callout-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 11px;
+}
+
+.callout-card {
+  padding: 17px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.callout-card.accent {
+  background: rgba(157, 123, 255, 0.14);
+  border: 1px solid rgba(157, 123, 255, 0.3);
+}
+
+.callout-card span {
+  color: var(--cyan);
+  font-size: 0.69rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.callout-card strong {
+  margin: 6px 0;
+  display: block;
+  font-size: 1.02rem;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.callout-card p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+
+@media (max-width: 1250px) {
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .callout-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 680px) {
+  .kpi-grid, .callout-grid { grid-template-columns: 1fr; }
+}

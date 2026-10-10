@@ -1,0 +1,112 @@
+/* Intro cover */
+
+.cover {
+  padding: clamp(30px, 5vw, 66px) clamp(26px, 4vw, 56px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-large);
+  background:
+    radial-gradient(circle at 82% 18%, rgba(255, 111, 174, 0.22), transparent 46%),
+    radial-gradient(circle at 12% 90%, rgba(67, 217, 230, 0.16), transparent 45%),
+    linear-gradient(150deg, rgba(157, 123, 255, 0.16), transparent 60%),
+    var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.cover h1 {
+  margin: 0 0 22px;
+  max-width: 900px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(2.6rem, 5.4vw, 5rem);
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.grad {
+  background: linear-gradient(120deg, var(--purple), var(--pink), var(--cyan));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.lede {
+  max-width: 760px;
+  margin: 0 0 30px;
+  color: var(--text-soft);
+  font-size: clamp(1rem, 1.5vw, 1.18rem);
+}
+
+.cover-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 13px;
+}
+
+.intro-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.intro-card {
+  min-height: 210px;
+  padding: 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-medium);
+  background:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.045), transparent 45%),
+    var(--surface);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(15px);
+}
+
+.intro-card.muted {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.intro-card h3 {
+  margin: 22px 0 8px;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.intro-card p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.91rem;
+}
+
+.intro-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(157, 123, 255, 0.14);
+  color: var(--purple);
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 700;
+}
+
+.glossary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.glossary span {
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text-soft);
+  font-size: 0.76rem;
+}
+
+
+body[data-chapter="intro"] .filterbar { display: none; }
+
+@media (max-width: 1000px) {
+  .intro-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 680px) {
+  .intro-grid { grid-template-columns: 1fr; }
+}

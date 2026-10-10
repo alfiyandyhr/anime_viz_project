@@ -1,0 +1,10 @@
+.inline-control {
+  width: 160px;
+  flex: none;
+}
+
+.inline-control select {
+  min-height: 38px;
+  font-size: 0.76rem;
+}
+

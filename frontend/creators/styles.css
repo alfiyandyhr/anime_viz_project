@@ -1,0 +1,99 @@
+/* Network */
+
+.network-controls {
+  display: grid;
+  grid-template-columns: minmax(250px, 1fr) minmax(340px, 1fr);
+  gap: 20px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+
+.network-summary {
+  margin: 0 0 16px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.network-type-controls {
+  display: grid;
+  gap: 7px;
+}
+
+.network-type-controls > span {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.network-type-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.network-type-buttons button {
+  --node-color: var(--purple);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 9px 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-small);
+  background: var(--bg-soft);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.network-type-buttons [data-network-type="character"] {
+  --node-color: var(--pink);
+}
+
+.network-type-buttons [data-network-type="work"] {
+  --node-color: var(--cyan);
+}
+
+.network-type-buttons button[aria-pressed="true"] {
+  border-color: var(--node-color);
+  background: var(--surface-light);
+  color: var(--text);
+}
+
+.network-type-buttons button:hover,
+.network-type-buttons button:focus-visible {
+  border-color: var(--node-color);
+}
+
+.network-type-buttons button:focus-visible {
+  outline: 2px solid var(--node-color);
+  outline-offset: 3px;
+}
+
+.network-type-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--node-color);
+}
+
+.network-type-buttons button[aria-pressed="false"] .network-type-dot {
+  opacity: 0.3;
+}
+
+.network-chart {
+  min-height: 700px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at center, rgba(157, 123, 255, 0.08), transparent 48%),
+    #0b1020;
+}
+
+
+@media (max-width: 1000px) {
+  .network-controls { grid-template-columns: 1fr; }
+}
+@media (max-width: 680px) {
+  .network-chart { min-height: 560px; }
+}
