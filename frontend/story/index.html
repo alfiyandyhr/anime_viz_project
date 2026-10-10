@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <meta
+    name="description"
+    content="A scroll-driven journey through Japanese anime from 1963 to today, with annual AniList Top 10 rankings, genres, and studios."
+  >
+
+  <title>AnIViz — Story: The Evolution of Anime</title>
+
+  <link
+    rel="preconnect"
+    href="https://fonts.googleapis.com"
+  >
+  <link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin
+  >
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap"
+    rel="stylesheet"
+  >
+
+  <link rel="stylesheet" href="../common/styles.css">
+  <link rel="stylesheet" href="styles.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script src="../common/api.js" defer></script>
+  <script src="data.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+
+<body data-chapter="story">
+  <a class="skip-story" href="#story-narrative">Skip to the story</a>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <div class="app-shell">
+    <!-- ───────────────────────── Left rail ───────────────────────── -->
+    <aside class="rail" aria-label="Story navigation">
+      <a class="brand" href="../intro/index.html" data-goto="intro">
+        <span class="brand-mark">A</span>
+        <span>
+          <strong>AnIViz</strong>
+          <small>Anime Industry Visualization</small>
+        </span>
+      </a>
+
+      <nav class="rail-nav" aria-label="Chapters">
+        <a class="rail-link" data-goto="intro" href="../intro/index.html">
+          <span class="idx">◆</span>
+          <span class="rail-text">
+            <strong>Introduction</strong>
+            <small>What makes anime resonate?</small>
+          </span>
+        </a>
+
+        <a class="rail-link is-active" aria-current="page" data-goto="story" href="../story/index.html">
+          <span class="idx">◷</span>
+          <span class="rail-text">
+            <strong>Story</strong>
+            <small>The evolution of anime · 1963 to today</small>
+          </span>
+        </a>
+
+        <p class="rail-group">The three questions</p>
+
+        <a class="rail-link" data-goto="reception" href="../reception/index.html">
+          <span class="idx">01</span>
+          <span class="rail-text">
+            <strong>Reception</strong>
+            <small>Do the most-watched deserve their fame?</small>
+          </span>
+        </a>
+
+        <a class="rail-link" data-goto="content" href="../content/index.html">
+          <span class="idx">02</span>
+          <span class="rail-text">
+            <strong>Content</strong>
+            <small>What stories rise, and when?</small>
+          </span>
+        </a>
+
+        <a class="rail-link" data-goto="creators" href="../creators/index.html">
+          <span class="idx">03</span>
+          <span class="rail-text">
+            <strong>Creators</strong>
+            <small>Who makes the hits?</small>
+          </span>
+        </a>
+
+        <p class="rail-group">Then</p>
+
+        <a class="rail-link" data-goto="explorer" href="../explorer/index.html">
+          <span class="idx">✦</span>
+          <span class="rail-text">
+            <strong>Explorer</strong>
+            <small>Dig into the data yourself</small>
+          </span>
+        </a>
+      </nav>
+
+      <div class="rail-foot">
+        <div class="rail-status" role="status" aria-live="polite">
+          <span id="status-dot" class="status-dot loading"></span>
+          <span id="data-status">Loading the anime archive…</span>
+        </div>
+        <span id="footer-generated">Annual Top 10 · AniList</span>
+        <span id="footer-cache"></span>
+        <span class="rail-credit">AniList × Python × D3.js</span>
+      </div>
+    </aside>
+
+    <main class="stage story-stage" id="story-main">
+      <header class="story-cover">
+        <div class="hero-covers" id="hero-covers" aria-hidden="true"></div>
+        <div class="cover-grain" aria-hidden="true"></div>
+        <div class="hero-copy">
+          <p class="eyebrow">AnIViz presents <span>•</span> A story in six acts</p>
+          <p class="hero-range">1963 <span>⟶</span> <span data-present-year>Today</span></p>
+          <h1>From a small screen.<br>To a <span class="story-gradient">whole world.</span></h1>
+          <p class="hero-lede">Six decades of Japanese anime. New ways to make it.<br class="desktop-break"> New ways to find it. Stories that stay with us.</p>
+          <a class="button button-primary" href="#birth">Begin the journey <span aria-hidden="true">↓</span></a>
+          <span class="hero-instruction">Scroll to travel through time</span>
+        </div>
+        <div class="cover-bottom"><span>THE EVOLUTION OF ANIME</span><span>History × data × the stories we remember</span></div>
+      </header>
+
+      <aside class="story-lens" aria-label="How to read this story">
+        <span class="lens-mark" aria-hidden="true">◈</span>
+        <p><strong>A history told through today’s lens.</strong> Each year contributes up to 10 Japanese anime ranked by <em>current</em> AniList user-list popularity. These are today’s remembered favourites, not audience rankings from the year they aired. Genres and studios describe this selected sample, not the whole industry.</p>
+      </aside>
+      <div class="story-load" id="story-load" role="status" aria-live="polite">
+        <span>Opening the archive… You can start reading while the data loads.</span>
+        <button type="button" class="small-button ghost" id="retry-data" hidden>Retry data</button>
+      </div>
+      <noscript><p class="story-load">The historical narrative is available below. Enable JavaScript for the interactive timeline and AniList data.</p></noscript>
+
+      <div class="story-journey" id="story-journey">
+        <figure class="sticky-stage" id="visual-stage" aria-label="Anime archive for the active historical period">
+          <div class="visual-topline"><span><i aria-hidden="true"></i> THE LIVING ARCHIVE</span><span id="act-indicator">ACT 00 / 05</span></div>
+          <div class="period-heading"><div><p id="active-theme">The Birth of Modern Anime</p><h2 id="active-period">1963–1979</h2></div><span id="active-year">1963</span></div>
+          <nav class="era-nav" aria-label="Jump to a historical period">
+            <a href="#birth" aria-current="step">1963–79</a><a href="#expansion">1980s</a><a href="#global">1990s</a><a href="#digital">2000s</a><a href="#streaming">2010s</a><a href="#modern">2020s</a>
+          </nav>
+          <div id="story-timeline" class="story-timeline" aria-label="Timeline of annual sample coverage"></div>
+          <div class="showcase-heading"><h3>Top anime of <span id="showcase-year">1963</span></h3><span id="year-count">Waiting for data</span><select id="year-picker" aria-label="Explore a first-release year" disabled><option>1963</option></select></div>
+          <p class="showcase-caption">Ranked by current AniList list users · select a poster for details</p>
+          <div id="poster-shelf" class="poster-shelf" aria-label="Annual anime rankings"></div>
+          <div class="ranking-heading"><h3 id="ranking-title">Genres in this period</h3><div class="ranking-tabs" role="group" aria-label="Choose sample breakdown"><button type="button" data-metric="genres" aria-pressed="true">Genres</button><button type="button" data-metric="studios" aria-pressed="false">Studios</button></div></div>
+          <div id="story-ranking" class="story-ranking"></div>
+          <figcaption id="ranking-caption">Share of titles in the period’s annual Top 10 samples. A title can have multiple genres.</figcaption>
+          <p class="period-sample" id="period-sample">The archive will appear here when the data is ready.</p>
+          <div class="chapter-track" aria-hidden="true"><span id="chapter-progress"></span></div>
+        </figure>
+
+        <div class="story-narrative" id="story-narrative">
+          <section class="story-step is-active" id="birth" data-start="1963" data-end="1979" data-color="#9d7bff" data-theme="The Birth of Modern Anime" aria-labelledby="birth-title">
+            <p class="act-label">INTRODUCTION <span>1963–1979</span></p>
+            <h2 id="birth-title">A new ritual.<br>A story every week.</h2>
+            <p class="step-lede">Japanese animation existed before television. In 1963, a robot boy helped bring it into the weekly rhythm of everyday life.</p>
+            <p>Osamu Tezuka’s <em>Astro Boy</em> began its Japanese television run on January 1, 1963. Its half-hour serial format became an important model for television anime. The series also reached overseas audiences during the 1960s, including a US broadcast in 1963.</p>
+            <div class="history-milestone"><span>1963</span><div><strong>Astro Boy arrives on television</strong><p>A milestone in the development of modern TV anime, rather than the beginning of Japanese animation itself.</p></div></div>
+            <p>As you move through these early years, notice the titles and formats that survive in today’s online lists. A small sample from an older year tells us about AniList’s catalogue and its users’ memories; it does not tell us how many people watched at the time.</p>
+            <a class="history-source" href="https://tezukaosamu.net/en/anime/30.html" target="_blank" rel="noopener noreferrer">Historical source: Tezuka Productions ↗</a>
+            <div class="reading-prompt"><span>LOOK AT THE ARCHIVE</span><p>The year changes as you scroll. Open a poster to meet a title, or switch from genres to studios.</p></div>
+          </section>
+
+          <section class="story-step" id="expansion" data-start="1980" data-end="1989" data-color="#ffcc70" data-theme="The Expansion of Anime" aria-labelledby="expansion-title">
+            <p class="act-label">CHAPTER 01 <span>1980–1989</span></p>
+            <h2 id="expansion-title">The screen<br>gets bigger.</h2>
+            <p class="step-lede">Television was only one home for anime. The 1980s also left a distinctive legacy of theatrical animation.</p>
+            <p>Studio Ghibli began in 1985, after the release of <em>Nausicaä of the Valley of the Wind</em> in 1984. Its official chronology places <em>Castle in the Sky</em> in 1986, followed by <em>My Neighbor Totoro</em> and <em>Grave of the Fireflies</em> in 1988.</p>
+            <div class="history-milestone"><span>1985</span><div><strong>A new studio takes shape</strong><p>Ghibli’s filmography would make room for fantasy, childhood, and the memory of war.</p></div></div>
+            <p>Film, television, and home-video formats offered different spaces for storytelling. The annual selections let us inspect those formats side by side, without assuming that one catalogue sample measures the size of each market.</p>
+            <a class="history-source" href="https://www.ghibli.jp/chronology/" target="_blank" rel="noopener noreferrer">Historical source: Studio Ghibli chronology ↗</a>
+            <div class="reading-prompt"><span>FOLLOW THE MAKERS</span><p>Switch to studios. Which production names recur across the decade’s selected works?</p></div>
+          </section>
+
+          <section class="story-step" id="global" data-start="1990" data-end="1999" data-color="#ff6fae" data-theme="Anime Goes Global" aria-labelledby="global-title">
+            <p class="act-label">CHAPTER 02 <span>1990–1999</span></p>
+            <h2 id="global-title">Stories cross<br>more borders.</h2>
+            <p class="step-lede">Anime’s international circulation did not begin in the 1990s. But this decade supplied another generation of shared reference points.</p>
+            <p>One documented example is <em>Pokémon</em>: the franchise’s official history records the animated series’ North American premiere in 1998. It joined a longer history of Japanese animation being translated and distributed beyond Japan.</p>
+            <div class="history-milestone"><span>1998</span><div><strong>Pokémon reaches North American TV</strong><p>A concrete moment in international distribution, not evidence that every anime travelled in the same way.</p></div></div>
+            <p>The archive may surface films, long-running television series, and shorter productions together. Their current popularity reflects years of reissues, recommendations, and discovery. It should not be read as a record of international reach in 1998.</p>
+            <a class="history-source" href="https://corporate.pokemon.com/en-us/about/" target="_blank" rel="noopener noreferrer">Historical source: The Pokémon Company ↗</a>
+            <div class="reading-prompt"><span>LOOK BEYOND ONE HIT</span><p>Slide through all ten posters for a year. What else shares the shelf with a familiar title?</p></div>
+          </section>
+
+          <section class="story-step" id="digital" data-start="2000" data-end="2009" data-color="#43d9e6" data-theme="The Digital Transformation" aria-labelledby="digital-title">
+            <p class="act-label">CHAPTER 03 <span>2000–2009</span></p>
+            <h2 id="digital-title">New tools.<br>The same imagination.</h2>
+            <p class="step-lede">Digital production was a transition across years and studios, not a switch flipped at the start of a decade.</p>
+            <p>Toei Animation’s company history dates the beginning of its TV production digitization using RETAS software to 1997. That change provides context for the 2000s: drawing, colouring, and compositing could take different routes to the finished frame. “Digital” does not necessarily mean 3D animation.</p>
+            <div class="history-milestone"><span>2003</span><div><strong>Spirited Away wins an Academy Award</strong><p>The 2001 film won Animated Feature at the 2003 Oscars, another point of international recognition.</p></div></div>
+            <p>The data here records titles, genres, and studios. It does not record each production’s animation pipeline, so the charts cannot measure digitization directly. Use them to explore the works that accompanied this period of change.</p>
+            <div class="source-pair"><a class="history-source" href="https://corp.toei-anim.co.jp/ja/company/history.html" target="_blank" rel="noopener noreferrer">Toei company history ↗</a><a class="history-source" href="https://www.oscars.org/oscars/ceremonies/2003" target="_blank" rel="noopener noreferrer">The Academy, 2003 ↗</a></div>
+            <div class="reading-prompt"><span>COMPARE THE MIX</span><p>The same ranking changes shape with each period. Genre labels describe the selected works, not their production technology.</p></div>
+          </section>
+
+          <section class="story-step" id="streaming" data-start="2010" data-end="2019" data-color="#6be6a8" data-theme="The Streaming Era" aria-labelledby="streaming-title">
+            <p class="act-label">CHAPTER 04 <span>2010–2019</span></p>
+            <h2 id="streaming-title">A season in Japan.<br>A conversation elsewhere.</h2>
+            <p class="step-lede">Online distribution opened another route between a Japanese release and an overseas audience.</p>
+            <p>Crunchyroll announced streaming for <em>Attack on Titan</em> in April 2013, a concrete example of a seasonal series reaching viewers through a licensed online service. Availability still depended on region and rights; streaming did not remove every border.</p>
+            <div class="history-milestone"><span>2013</span><div><strong>A seasonal title reaches streaming viewers</strong><p>Attack on Titan’s licensing is one example of the decade’s distribution landscape.</p></div></div>
+            <p>As these years pass, compare the genres and production studios represented in the annual selections. A change in their share can prompt a question. It cannot, by itself, prove that streaming caused that change.</p>
+            <a class="history-source" href="https://www.crunchyroll.com/news/latest/2013/4/12/crunchyroll-to-stream-attack-on-titan-anime" target="_blank" rel="noopener noreferrer">Historical source: Crunchyroll’s 2013 announcement ↗</a>
+            <div class="reading-prompt"><span>REVISIT A DECADE</span><p>Scroll back and the archive returns with you. The timeline buttons also jump directly to any period.</p></div>
+          </section>
+
+          <section class="story-step" id="modern" data-start="2020" data-end="present" data-color="#a9b7ff" data-theme="The Modern Anime Landscape" aria-labelledby="modern-title">
+            <p class="act-label">CHAPTER 05 <span>2020–PRESENT</span></p>
+            <h2 id="modern-title">The next chapter<br>is still being drawn.</h2>
+            <p class="step-lede">Today’s anime landscape has more than one measure: what gets made, how it travels, and what viewers remember.</p>
+            <p>The Association of Japanese Animations publishes industry reports that examine markets and distribution, including overseas activity. That wider economic picture is different from this archive’s view of current AniList list users.</p>
+            <div class="history-milestone"><span>NOW</span><div><strong>An unfinished year, an unfinished story</strong><p>The current year includes only released entries available when the archive was fetched. Rankings and scores can still change.</p></div></div>
+            <p>New works can sit alongside franchise sequels in the annual Top 10. Neither a high rank nor a high score is a complete verdict on a decade. From a weekly television ritual to an international conversation, anime’s history contains far more than any ten titles can hold.</p>
+            <a class="history-source" href="https://aja.gr.jp/english/japan-anime-data" target="_blank" rel="noopener noreferrer">Further context: AJA industry reports ↗</a>
+            <div class="reading-prompt"><span>YOUR TURN</span><p>Choose a year, open a work, or return to a period you want to explore again.</p></div>
+          </section>
+        </div>
+      </div>
+
+      <section class="story-ending" aria-labelledby="ending-title">
+        <p class="eyebrow">The credits are only the beginning</p>
+        <h2 id="ending-title">Every era leaves<br>a story worth finding.</h2>
+        <p>The archive is a doorway. The films and series are the journey.</p>
+        <a href="../explorer/index.html" class="button button-primary">Explore more anime →</a>
+        <a href="#birth" class="button button-secondary">Read the story again ↑</a>
+        <details class="story-methodology"><summary>About the data &amp; historical sources</summary><div>
+          <p><strong>Selection.</strong> AniList’s GraphQL API returns up to 10 non-adult anime with Japan as country of origin for each first-release year, sorted by current popularity. Unreleased entries are excluded. Seasons, films, specials, OVA, and ONA entries are distinct records; franchises are not collapsed.</p>
+          <p><strong>What the numbers mean.</strong> Popularity counts current AniList user lists, including planning and completed lists. Scores are current AniList averages, not contemporaneous reviews. Genre percentages divide appearances by selected titles in the period; multiple genres per title mean they need not sum to 100%. Main-studio appearances count a title once for each credited main studio, so co-productions can overlap.</p>
+          <p><strong>Gaps.</strong> Some early years contain fewer than 10 eligible records. A confirmed empty year is distinct from an unavailable query. Missing scores, artwork, genres, and studio credits are shown as unknown. The current year is provisional. Cached data’s retrieval date and any unavailable or stale years are displayed beside the archive.</p>
+          <p><strong>Historical context.</strong> The linked sources alongside each chapter document specific milestones. Chapter names are editorial framing; AniList data does not establish historical audience sizes, market shares, or causes of change.</p>
+          <p id="snapshot-description">Retrieval details will appear when data loads.</p>
+        </div></details>
+      </section>
+    </main>
+  </div>
+  <div class="tooltip" id="story-tooltip" role="tooltip" aria-hidden="true"></div>
+  <dialog class="story-dialog" id="anime-dialog" aria-labelledby="dialog-title">
+    <button class="drawer-close" type="button" id="close-dialog" aria-label="Close anime details">×</button>
+    <div id="dialog-content"></div>
+  </dialog>
+</body>
+</html>

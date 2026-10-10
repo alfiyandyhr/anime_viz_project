@@ -1,11 +1,12 @@
 from pathlib import Path
 import os
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, redirect, request, send_from_directory, url_for
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
 from anilist_service import AniListService, DashboardDataError
+from story_service import StoryService
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -21,6 +22,7 @@ app = Flask(
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 service = AniListService()
+story_service = StoryService()
 
 
 @app.get("/")
@@ -31,6 +33,23 @@ def index():
 @app.get("/data.json")
 def static_dashboard_data():
     return send_from_directory(PROJECT_ROOT, "data.json")
+
+
+@app.get("/story.json")
+def static_story_data():
+    return send_from_directory(PROJECT_ROOT, "story.json")
+
+
+@app.get("/story")
+@app.get("/story/")
+def story_page():
+    return redirect(url_for("static", filename="story/index.html"))
+
+
+@app.get("/api/story")
+def story():
+    """Serve cached annual rankings; refreshes happen server-side, never on scroll."""
+    return jsonify(story_service.get_story())
 
 
 @app.get("/api/health")
