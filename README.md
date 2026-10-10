@@ -6,6 +6,46 @@ A story-driven visualization of what makes anime resonate — reading through th
 
 ---
 
+## Frontend structure
+
+Each page has its own HTML, CSS, and JavaScript. Shared styles, data loading,
+filters, tooltips, and detail drawers live in `frontend/common/`.
+
+```text
+frontend/
+├── common/
+│   ├── app.js
+│   ├── styles.css
+│   └── redirect.js
+├── intro/
+│   ├── index.html
+│   ├── styles.css
+│   └── app.js
+├── reception/
+│   ├── index.html
+│   ├── styles.css
+│   └── app.js
+├── content/
+│   ├── index.html
+│   ├── styles.css
+│   └── app.js
+├── creators/
+│   ├── index.html
+│   ├── styles.css
+│   └── app.js
+└── explorer/
+    ├── index.html
+    ├── styles.css
+    └── app.js
+```
+
+The root `index.html` redirects to the introduction and preserves existing
+chapter bookmarks such as `#creators`. Page navigation uses relative URLs for
+Flask and GitHub Pages. Filters persist across pages for the current browser
+session. The bundled dataset remains at the project root as `data.json`.
+
+---
+
 ## Configuration
 
 Sampling and runtime behaviour is controlled by `.env` at the project root (already tracked in the repo — copy and edit as needed):

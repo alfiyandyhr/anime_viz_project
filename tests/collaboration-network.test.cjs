@@ -5,7 +5,7 @@ const vm = require("node:vm");
 const { test } = require("node:test");
 
 // Load the pure graph builder without bootstrapping the dashboard DOM.
-const source = readFileSync(path.join(__dirname, "../app.js"), "utf8");
+const source = readFileSync(path.join(__dirname, "../frontend/creators/app.js"), "utf8");
 const start = source.indexOf("function buildCollaborationNetwork(");
 const end = source.indexOf("function renderNetwork()", start);
 const build = vm.runInNewContext(`(${source.slice(start, end).trim()})`);

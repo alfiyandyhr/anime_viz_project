@@ -9,12 +9,12 @@ from anilist_service import AniListService, DashboardDataError
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-FRONTEND_DIR = PROJECT_ROOT
+FRONTEND_DIR = PROJECT_ROOT / "frontend"
 
 app = Flask(
     __name__,
     static_folder=str(FRONTEND_DIR),
-    static_url_path=""
+    static_url_path="/frontend"
 )
 
 # Same-origin serving is preferred, but CORS also makes local development easier.
@@ -25,7 +25,12 @@ service = AniListService()
 
 @app.get("/")
 def index():
-    return send_from_directory(FRONTEND_DIR, "index.html")
+    return send_from_directory(PROJECT_ROOT, "index.html")
+
+
+@app.get("/data.json")
+def static_dashboard_data():
+    return send_from_directory(PROJECT_ROOT, "data.json")
 
 
 @app.get("/api/health")
