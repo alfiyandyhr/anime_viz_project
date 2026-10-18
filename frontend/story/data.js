@@ -49,7 +49,14 @@ const StoryData = (() => {
       availableYears: available.size };
   }
 
-  function locatePeriod(steps, probe, progressProbe = probe) {
+  // Finish before the next chapter starts, leaving time to view its last year.
+  const chapterTravel = .9;
+
+  function yearScrollProgress(period, year) {
+    return chapterTravel * (year - period.start + .5) / (period.end - period.start + 1);
+  }
+
+  function locatePeriod(steps, probe) {
     let index = 0;
     for (let i = 0; i < steps.length; i++) {
       // Fractional layout pixels can put an anchored heading just past the
@@ -57,11 +64,11 @@ const StoryData = (() => {
       if (steps[i].top <= probe + 2) index = i;
     }
     const step = steps[index];
-    const progress = Math.max(0, Math.min(1, (progressProbe - step.top) / Math.max(1, step.height)));
+    const progress = Math.max(0, Math.min(1, (probe - step.top) / Math.max(1, step.height * chapterTravel)));
     const year = Math.min(step.end, step.start + Math.floor(progress * (step.end - step.start + 1)));
     return { index, progress, year };
   }
 
-  return { validate, summarizePeriod, locatePeriod };
+  return { validate, summarizePeriod, locatePeriod, yearScrollProgress };
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = StoryData;

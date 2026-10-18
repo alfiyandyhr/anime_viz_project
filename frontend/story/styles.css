@@ -58,17 +58,16 @@ body[data-chapter="story"] { --rail-width: 250px; --era-color: var(--purple); }
 .poster-card small { display: block; color: var(--text-muted); font-size: .55rem; margin-top: 2px; }
 .archive-empty { display: grid; place-items: center; width: 100%; text-align: center; color: var(--text-muted); font-size: .75rem; padding: 20px; border: 1px dashed var(--border-strong); border-radius: 8px; }
 .ranking-heading { margin-top: 8px; }
-.ranking-tabs { display: flex; gap: 3px; }
-.ranking-tabs button { min-height: 32px; font-size: .6rem; border: 1px solid transparent; padding: 4px 8px; color: var(--text-muted); border-radius: 7px; background: transparent; }
-.ranking-tabs button[aria-pressed="true"] { color: var(--text); background: var(--surface-light); border-color: var(--border-strong); }
+.period-rankings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.period-rankings > section { min-width: 0; }
 .story-ranking { height: 182px; margin-top: 6px; }
 .story-ranking svg { width: 100%; height: 100%; overflow: visible; }
 .sticky-stage figcaption { font-size: .59rem; line-height: 1.6; color: var(--text-soft); margin-top: 4px; }
 .period-sample { font-size: .55rem; color: var(--text-muted); margin: 9px 0 0; }
 .chapter-track { height: 2px; background: var(--border); margin: 18px -22px -22px; }
 .chapter-track span { display: block; height: 100%; width: 0; background: var(--era-color); }
-.story-narrative { grid-column: 1; grid-row: 1; min-width: 0; }
-.story-step { min-height: 125svh; padding: 65px 0 120px; scroll-margin-top: 35px; color: var(--text-soft); border-top: 1px solid var(--border); }
+.story-narrative { grid-column: 1; grid-row: 1; min-width: 0; padding-bottom: var(--story-end-space, 50svh); }
+.story-step { min-height: max(125svh, calc(var(--story-years, 10) * 160px)); padding: 65px 0 120px; scroll-margin-top: 35px; color: var(--text-soft); border-top: 1px solid var(--border); }
 .story-step:first-child { border-top: none; }
 .act-label { font-size: .63rem; letter-spacing: .14em; font-weight: 700; color: var(--era-color); }
 .act-label span { display: block; color: var(--text-muted); font-weight: 400; margin-top: 8px; letter-spacing: .08em; }
@@ -141,12 +140,12 @@ body[data-chapter="story"] { --rail-width: 250px; --era-color: var(--purple); }
   .poster-card strong { font-size: .52rem; margin-top: 3px; }
   .poster-card small { display: none; }
   .ranking-heading { margin-top: 2px; }
-  .ranking-tabs button { font-size: .55rem; min-height: 26px; padding: 2px 6px; }
+  .period-rankings { gap: 14px; }
   .story-ranking { height: 105px; margin-top: 2px; }
   .sticky-stage figcaption { font-size: .52rem; margin: 0; }
   .period-sample { display: none; }
   .chapter-track { margin: 9px -16px -12px; }
-  .story-step { padding: 55px 10px 90px; min-height: 135svh; scroll-margin-top: var(--story-scroll-offset, 540px); }
+  .story-step { padding: 55px 10px 90px; min-height: max(135svh, calc(var(--story-years, 10) * 160px)); scroll-margin-top: var(--story-scroll-offset, 540px); }
   .story-step h2 { font-size: 2.5rem; }
   .story-step > p:not(.act-label) { font-size: .95rem; }
   .story-ending { padding: 50px 24px; }

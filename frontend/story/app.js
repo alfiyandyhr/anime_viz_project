@@ -12,7 +12,11 @@
     present: step.dataset.end === "present",
     theme: step.dataset.theme, color: step.dataset.color
   }));
-  const store = { data: null, index: 0, year: 1963, metric: "genres", summaries: [], frame: 0 };
+  function sizeChapters() {
+    steps.forEach((step, i) => step.style.setProperty("--story-years", periods[i].end - periods[i].start + 1));
+  }
+  sizeChapters();
+  const store = { data: null, index: 0, year: 1963, summaries: [], frame: 0 };
   const format = new Intl.NumberFormat("en-US");
   const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
   const color = d3.scaleOrdinal(d3.schemeTableau10);
@@ -51,6 +55,7 @@
       periods.forEach(period => {
         if (period.present) period.end = Math.max(period.start, payload.meta.end_year);
       });
+      sizeChapters();
       store.summaries = periods.map(period => StoryData.summarizePeriod(payload, period));
       const picker = $("#year-picker");
       picker.innerHTML = d3.range(1963, payload.meta.end_year + 1)
@@ -169,38 +174,47 @@
 
   function renderRanking() {
     const summary = store.summaries[store.index];
-    const isGenre = store.metric === "genres";
-    $("#ranking-title").textContent = `${isGenre ? "Genres" : "Studios"} in this period`;
-    $("#ranking-caption").textContent = isGenre
-      ? `Share of ${summary?.anime.length || 0} selected titles. Multiple genres per title; shares can overlap.`
-      : `Share of ${summary?.anime.length || 0} selected titles. Co-productions can overlap; unknown main-studio credits excluded.`;
-    const data = summary?.[store.metric].slice(0, mobile.matches ? 4 : 6) || [];
-    const container = d3.select("#story-ranking");
+    renderRankingChart("genres", summary);
+    renderRankingChart("studios", summary);
+    $("#ranking-caption").textContent = `Share of ${summary?.anime.length || 0} selected titles. Genre and studio shares can overlap; unknown main-studio credits excluded.`;
+    const info = `${summary?.anime.length || 0} titles · ${summary?.availableYears || 0} first-release years`;
+    const gaps = summary?.missing.length ? ` · ${summary.missing.length} years unavailable` : "";
+    const stale = summary?.stale.length ? ` · ${summary.stale.length} cached years not refreshed` : "";
+    $("#period-sample").textContent = info + gaps + stale;
+  }
+
+  function renderRankingChart(metric, summary) {
+    const isGenre = metric === "genres";
+    const data = summary?.[metric].slice(0, mobile.matches ? 4 : 6) || [];
+    const container = d3.select(`#${metric}-ranking`);
     container.selectAll(".archive-empty").remove();
     const height = mobile.matches ? 150 : 210;
+    const width = mobile.matches ? 180 : 300;
     const svg = container.selectAll("svg").data([null]).join("svg")
-      .attr("viewBox", `0 0 600 ${height}`).attr("role", "img")
+      .attr("viewBox", `0 0 ${width} ${height}`).attr("role", "img")
       .attr("aria-label", `${isGenre ? "Genre" : "Studio"} shares of selected titles in ${periods[store.index].start} to ${periods[store.index].end}`);
-    svg.selectAll("title").data([null]).join("title").text(`${$("#ranking-title").textContent}: ${data.map(row => `${row.name} ${row.percent.toFixed(1)}%`).join(", ")}`);
-    const x = d3.scaleLinear().domain([0, 100]).range([180, 548]);
+    svg.selectAll("title").data([null]).join("title").text(`${isGenre ? "Genres" : "Studios"} in this period: ${data.map(row => `${row.name} ${row.percent.toFixed(1)}%`).join(", ")}`);
+    const x = d3.scaleLinear().domain([0, 100]).range([0, width]);
     const y = d3.scaleBand().domain(data.map(row => row.name)).range([8, height - 8]).padding(.3);
-    const groups = svg.selectAll("g.rank-row").data(data, row => `${store.metric}:${row.name}`);
+    const groups = svg.selectAll("g.rank-row").data(data, row => row.name);
     groups.exit().interrupt().transition().duration(duration() / 2).style("opacity", 0).remove();
     const added = groups.enter().append("g").attr("class", "rank-row").style("opacity", 0)
       .attr("transform", `translate(0,${height})`);
-    added.append("rect").attr("class", "rank-track").attr("x", 180).attr("width", 368).attr("fill", "#1b243c").attr("rx", 3);
-    added.append("rect").attr("class", "rank-bar").attr("x", 180).attr("width", 0).attr("rx", 3);
+    added.append("rect").attr("class", "rank-track").attr("y", 16).attr("width", width).attr("fill", "#1b243c").attr("rx", 3);
+    added.append("rect").attr("class", "rank-bar").attr("y", 16).attr("width", 0).attr("rx", 3);
     added.append("text").attr("class", "rank-name").attr("x", 0).attr("fill", "#bbc3db").attr("font-size", 12);
-    added.append("text").attr("class", "rank-value").attr("x", 600).attr("text-anchor", "end").attr("fill", "#bbc3db").attr("font-size", 12);
+    added.append("text").attr("class", "rank-value").attr("text-anchor", "end").attr("fill", "#bbc3db").attr("font-size", 12);
     const merged = added.merge(groups);
     merged.interrupt().transition().duration(duration()).style("opacity", 1)
       .attr("transform", row => `translate(0,${y(row.name)})`);
-    merged.select(".rank-name").attr("y", y.bandwidth() / 2 + 4)
-      .text(row => row.name.length > 23 ? row.name.slice(0, 22) + "…" : row.name);
-    merged.select(".rank-value").attr("y", y.bandwidth() / 2 + 4).text(row => `${row.percent.toFixed(0)}%`);
-    merged.select(".rank-track").attr("height", y.bandwidth());
+    const labelLength = mobile.matches ? 20 : 32;
+    merged.select(".rank-name").attr("y", 10).attr("font-size", mobile.matches ? 11 : 12)
+      .text(row => row.name.length > labelLength ? row.name.slice(0, labelLength - 1) + "…" : row.name);
+    merged.select(".rank-value").attr("x", width).attr("y", 10).attr("font-size", mobile.matches ? 11 : 12)
+      .text(row => `${row.percent.toFixed(0)}%`);
+    merged.select(".rank-track").attr("width", width).attr("height", 8);
     merged.select(".rank-bar").interrupt().transition().duration(duration())
-      .attr("height", y.bandwidth()).attr("width", row => x(row.percent) - 180)
+      .attr("height", 8).attr("width", row => x(row.percent))
       .attr("fill", row => isGenre ? color(row.name) : periods[store.index].color);
     merged.selectAll("title").data(row => [row]).join("title")
       .text(row => `${row.name}: ${row.count} of ${summary.anime.length} selected titles (${row.percent.toFixed(1)}%)`);
@@ -208,16 +222,20 @@
       container.append("p").attr("class", "archive-empty").text(`No ${isGenre ? "genre" : "main-studio"} metadata is available for this period’s selected titles.`);
       svg.style("display", "none");
     } else { svg.style("display", null); }
-    const info = `${summary?.anime.length || 0} titles · ${summary?.availableYears || 0} first-release years`;
-    const gaps = summary?.missing.length ? ` · ${summary.missing.length} years unavailable` : "";
-    const stale = summary?.stale.length ? ` · ${summary.stale.length} cached years not refreshed` : "";
-    $("#period-sample").textContent = info + gaps + stale;
   }
 
   function renderUnavailable(message) {
-    for (const selector of ["#poster-shelf", "#story-ranking"]) {
+    for (const selector of ["#poster-shelf", "#genres-ranking", "#studios-ranking"]) {
       $(selector).innerHTML = `<p class="archive-empty">${escapeHTML(message)}</p>`;
     }
+  }
+
+  function scrollProbe() {
+    const panel = $("#visual-stage");
+    return mobile.matches
+      ? Math.min(innerHeight - 40, Math.max(innerHeight * .5,
+        parseFloat(getComputedStyle(panel).top) + panel.offsetHeight + 30))
+      : 65;
   }
 
   function syncScroll(force = false) {
@@ -226,14 +244,14 @@
     const rail = $(".rail");
     document.body.style.setProperty("--story-sticky-top", `${rail.getBoundingClientRect().height + 10}px`);
     document.body.style.setProperty("--story-scroll-offset", `${panel.offsetHeight + rail.getBoundingClientRect().height + 24}px`);
-    // On narrow screens the archive sits above the reading area. Keep the
-    // activation line below it, so reverse scrolling selects the same chapter.
-    const probe = mobile.matches
-      ? Math.min(innerHeight - 40, Math.max(innerHeight * .5, panel.getBoundingClientRect().bottom + 30))
-      : innerHeight * .5;
+    // Use the same line for chapter activation, year progress, and year jumps.
+    const probe = scrollProbe();
+    // Keep the archive pinned through the final chapter's last year as well.
+    document.body.style.setProperty("--story-end-space",
+      `${Math.max(0, parseFloat(getComputedStyle(panel).top) + panel.offsetHeight - probe) + 40}px`);
     const located = StoryData.locatePeriod(steps.map((step, i) => ({
       ...periods[i], top: step.getBoundingClientRect().top, height: step.getBoundingClientRect().height
-    })), probe, mobile.matches ? probe : 65);
+    })), probe);
     const changed = located.index !== store.index;
     const yearChanged = located.year !== store.year;
     store.index = located.index;
@@ -288,13 +306,6 @@
     $("#anime-dialog").showModal();
   }
 
-  document.querySelectorAll("[data-metric]").forEach(button => {
-    button.addEventListener("click", () => {
-      store.metric = button.dataset.metric;
-      document.querySelectorAll("[data-metric]").forEach(item => item.setAttribute("aria-pressed", item === button));
-      if (store.data) renderRanking();
-    });
-  });
   $("#close-dialog").addEventListener("click", () => $("#anime-dialog").close());
   $("#anime-dialog").addEventListener("click", event => {
     if (event.target === event.currentTarget) {
@@ -309,10 +320,8 @@
     if (index < 0) return;
     const period = periods[index];
     const section = steps[index];
-    const probe = mobile.matches
-      ? Math.min(innerHeight - 40, $("#visual-stage").getBoundingClientRect().bottom + 30)
-      : 65;
-    const progress = (year - period.start + .25) / (period.end - period.start + 1);
+    const probe = scrollProbe();
+    const progress = StoryData.yearScrollProgress(period, year);
     window.scrollTo({
       top: scrollY + section.getBoundingClientRect().top - probe + progress * section.offsetHeight,
       behavior: motion.matches ? "instant" : "smooth"

@@ -163,9 +163,17 @@
           <div class="showcase-heading"><h3>Top anime of <span id="showcase-year">1963</span></h3><span id="year-count">Waiting for data</span><select id="year-picker" aria-label="Explore a first-release year" disabled><option>1963</option></select></div>
           <p class="showcase-caption">Ranked by current AniList list users · select a poster for details</p>
           <div id="poster-shelf" class="poster-shelf" aria-label="Annual anime rankings"></div>
-          <div class="ranking-heading"><h3 id="ranking-title">Genres in this period</h3><div class="ranking-tabs" role="group" aria-label="Choose sample breakdown"><button type="button" data-metric="genres" aria-pressed="true">Genres</button><button type="button" data-metric="studios" aria-pressed="false">Studios</button></div></div>
-          <div id="story-ranking" class="story-ranking"></div>
-          <figcaption id="ranking-caption">Share of titles in the period’s annual Top 10 samples. A title can have multiple genres.</figcaption>
+          <div class="period-rankings">
+            <section aria-labelledby="genres-title">
+              <div class="ranking-heading"><h3 id="genres-title">Genres in this period</h3></div>
+              <div id="genres-ranking" class="story-ranking"></div>
+            </section>
+            <section aria-labelledby="studios-title">
+              <div class="ranking-heading"><h3 id="studios-title">Studios in this period</h3></div>
+              <div id="studios-ranking" class="story-ranking"></div>
+            </section>
+          </div>
+          <figcaption id="ranking-caption">Share of titles in the period’s annual Top 10 samples. Genre and studio shares can overlap; unknown main-studio credits excluded.</figcaption>
           <p class="period-sample" id="period-sample">The archive will appear here when the data is ready.</p>
           <div class="chapter-track" aria-hidden="true"><span id="chapter-progress"></span></div>
         </figure>
@@ -179,7 +187,7 @@
             <div class="history-milestone"><span>1963</span><div><strong>Astro Boy arrives on television</strong><p>A milestone in the development of modern TV anime, rather than the beginning of Japanese animation itself.</p></div></div>
             <p>As you move through these early years, notice the titles and formats that survive in today’s online lists. A small sample from an older year tells us about AniList’s catalogue and its users’ memories; it does not tell us how many people watched at the time.</p>
             <a class="history-source" href="https://tezukaosamu.net/en/anime/30.html" target="_blank" rel="noopener noreferrer">Historical source: Tezuka Productions ↗</a>
-            <div class="reading-prompt"><span>LOOK AT THE ARCHIVE</span><p>The year changes as you scroll. Open a poster to meet a title, or switch from genres to studios.</p></div>
+            <div class="reading-prompt"><span>LOOK AT THE ARCHIVE</span><p>The year changes as you scroll. Open a poster to meet a title, or compare the genres and studios below.</p></div>
           </section>
 
           <section class="story-step" id="expansion" data-start="1980" data-end="1989" data-color="#ffcc70" data-theme="The Expansion of Anime" aria-labelledby="expansion-title">
@@ -190,7 +198,7 @@
             <div class="history-milestone"><span>1985</span><div><strong>A new studio takes shape</strong><p>Ghibli’s filmography would make room for fantasy, childhood, and the memory of war.</p></div></div>
             <p>Film, television, and home-video formats offered different spaces for storytelling. The annual selections let us inspect those formats side by side, without assuming that one catalogue sample measures the size of each market.</p>
             <a class="history-source" href="https://www.ghibli.jp/chronology/" target="_blank" rel="noopener noreferrer">Historical source: Studio Ghibli chronology ↗</a>
-            <div class="reading-prompt"><span>FOLLOW THE MAKERS</span><p>Switch to studios. Which production names recur across the decade’s selected works?</p></div>
+            <div class="reading-prompt"><span>FOLLOW THE MAKERS</span><p>Look at the studio chart. Which production names recur across the decade’s selected works?</p></div>
           </section>
 
           <section class="story-step" id="global" data-start="1990" data-end="1999" data-color="#ff6fae" data-theme="Anime Goes Global" aria-labelledby="global-title">
