@@ -19,6 +19,7 @@ const CHAPTERS = {
   reception: [renderKPIs, renderReceptionCallout, renderScatterplot],
   content: [renderGenreChart, renderTimeline],
   creators: [renderStudioChart, renderHeatmap, renderNetwork],
+  recommendations: [renderRecommendations],
   explorer: [renderInsights, renderAnimeTable]
 };
 
@@ -61,10 +62,13 @@ document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   bindControls();
+  setActiveChapter(initialChapter());
+  renderChapter(state.activeChapter);
   await loadDashboard(false);
 }
 
 function bindControls() {
+  bindRecommendationControls();
   const filterElements = [
     elements.searchInput,
     elements.genreFilter,
@@ -149,7 +153,7 @@ function bindControls() {
   });
 
   window.addEventListener("resize", debounce(() => {
-    if (state.data) {
+    if (state.data || state.activeChapter === "recommendations") {
       renderChapter(state.activeChapter);
     }
   }, 250));
@@ -203,7 +207,7 @@ function activateChapter(id) {
 
 // Draw only the charts that live in the given (now-visible) chapter.
 function renderChapter(id) {
-  if (!state.data) {
+  if (!state.data && id !== "recommendations") {
     return;
   }
 
