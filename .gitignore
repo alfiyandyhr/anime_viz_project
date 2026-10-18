@@ -12,3 +12,5 @@ venv/
 node_modules/
 .vscode/
 *.log
+.env.local
+data/semantic_similarity/output/
