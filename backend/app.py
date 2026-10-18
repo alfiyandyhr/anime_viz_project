@@ -35,6 +35,23 @@ def static_dashboard_data():
     return send_from_directory(PROJECT_ROOT, "data.json")
 
 
+@app.get("/data/movie_recommendations.json")
+@app.get("/data/movie_anime_scores.bin")
+def recommendation_data():
+    return send_from_directory(PROJECT_ROOT / "data", Path(request.path).name)
+
+
+@app.get("/assets/tmdb-logo.svg")
+def tmdb_logo():
+    return send_from_directory(PROJECT_ROOT / "assets", "tmdb-logo.svg")
+
+
+@app.get("/recommendations")
+@app.get("/recommendations/")
+def recommendations_page():
+    return redirect(url_for("static", filename="recommendations/index.html"))
+
+
 @app.get("/story.json")
 def static_story_data():
     return send_from_directory(PROJECT_ROOT, "story.json")

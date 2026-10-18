@@ -13,3 +13,5 @@ node_modules/
 .vscode/
 *.log
 data/anilist_story_cache.json
+.env.local
+data/semantic_similarity/output/
