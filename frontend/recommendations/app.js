@@ -249,6 +249,7 @@ function renderRecommendations() {
   document.querySelector("#dust-limit-control").hidden = !magnets;
   document.querySelector("#recommendation-limit-control").hidden = magnets;
   document.querySelector("#dust-toolbar").hidden = !magnets;
+  document.querySelector("#dust-layout-status").hidden = true;
   document.querySelector("#dust-selection").hidden = true;
   document.querySelector("#recommendation-table-heading").hidden = magnets;
   document.querySelector("#recommendation-table-wrapper").hidden = magnets;
