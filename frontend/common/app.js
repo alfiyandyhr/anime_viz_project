@@ -49,7 +49,8 @@ document.addEventListener("DOMContentLoaded", init);
 async function init() {
   bindControls();
   pageControls.bindControls?.();
-  await loadDashboard();
+  if (pageControls.usesDashboard === false) renderPage();
+  else await loadDashboard();
 }
 
 function bindControls() {
@@ -77,7 +78,7 @@ function bindControls() {
 }
 
 function renderPage() {
-  if (state.data) pageControls.render?.();
+  if (state.data || pageControls.usesDashboard === false) pageControls.render?.();
 }
 
 function saveFilters() {

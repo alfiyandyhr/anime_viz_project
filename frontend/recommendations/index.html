@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <meta
+    name="description"
+    content="Discover anime similar to your favorite movies using story embeddings, interactive movie magnets, and full similarity rankings."
+  >
+
+  <title>AnIViz — Movie → Anime</title>
+
+  <link
+    rel="preconnect"
+    href="https://fonts.googleapis.com"
+  >
+  <link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin
+  >
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap"
+    rel="stylesheet"
+  >
+
+  <link rel="stylesheet" href="../common/styles.css">
+  <link rel="stylesheet" href="styles.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script src="../common/app.js" defer></script>
+  <script src="app.js" defer></script>
+  <script src="dust-magnet.js" defer></script>
+</head>
+
+<body data-chapter="recommendations">
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <div class="app-shell">
+    <!-- ───────────────────────── Left rail ───────────────────────── -->
+    <aside class="rail" aria-label="Story navigation">
+      <a class="brand" href="../intro/index.html" data-goto="intro">
+        <span class="brand-mark">A</span>
+        <span>
+          <strong>AnIViz</strong>
+          <small>Anime Industry Visualization</small>
+        </span>
+      </a>
+
+      <nav class="rail-nav" aria-label="Chapters">
+        <a class="rail-link" data-goto="intro" href="../intro/index.html">
+          <span class="idx">◆</span>
+          <span class="rail-text">
+            <strong>Introduction</strong>
+            <small>What makes anime resonate?</small>
+          </span>
+        </a>
+
+        <a class="rail-link" data-goto="story" href="../story/index.html">
+          <span class="idx">◷</span>
+          <span class="rail-text">
+            <strong>Story</strong>
+            <small>The evolution of anime · 1963 to today</small>
+          </span>
+        </a>
+
+        <p class="rail-group">The four questions</p>
+
+        <a class="rail-link" data-goto="reception" href="../reception/index.html">
+          <span class="idx">01</span>
+          <span class="rail-text">
+            <strong>Reception</strong>
+            <small>Do the most-watched deserve their fame?</small>
+          </span>
+        </a>
+
+        <a class="rail-link" data-goto="content" href="../content/index.html">
+          <span class="idx">02</span>
+          <span class="rail-text">
+            <strong>Content</strong>
+            <small>What stories rise, and when?</small>
+          </span>
+        </a>
+
+        <a class="rail-link" data-goto="creators" href="../creators/index.html">
+          <span class="idx">03</span>
+          <span class="rail-text">
+            <strong>Creators</strong>
+            <small>Who makes the hits?</small>
+          </span>
+        </a>
+
+        <a class="rail-link is-active" aria-current="page" data-goto="recommendations" href="../recommendations/index.html">
+          <span class="idx">04</span>
+          <span class="rail-text">
+            <strong>Movie → Anime</strong>
+            <small>Love a movie? Find your first anime.</small>
+          </span>
+        </a>
+
+        <p class="rail-group">Then</p>
+
+        <a class="rail-link" data-goto="explorer" href="../explorer/index.html">
+          <span class="idx">✦</span>
+          <span class="rail-text">
+            <strong>Explorer</strong>
+            <small>Dig into the data yourself</small>
+          </span>
+        </a>
+      </nav>
+
+      <div class="rail-foot">
+        <div class="rail-status" role="status" aria-live="polite">
+          <span id="status-dot" class="status-dot loading"></span>
+          <span id="data-status">Loading anime data…</span>
+        </div>
+        <span id="footer-generated">Data not loaded</span>
+        <span id="footer-cache"></span>
+        <span class="rail-credit">AniList × TMDB × D3.js</span>
+      </div>
+    </aside>
+
+    <!-- ───────────────────────── Main stage ───────────────────────── -->
+    <main class="stage">
+      <!-- Persistent, collapsible cross-filter bar (hidden on the intro) -->
+      <details class="filterbar" id="filterbar" open>
+        <summary>
+          <span class="filterbar-title">
+            <strong>Filters</strong>
+            <span id="filter-summary">Waiting for data…</span>
+          </span>
+          <span class="filterbar-hint">click to collapse</span>
+        </summary>
+
+        <div class="filter-grid">
+          <label>
+            <span>Search titles, studios, or actors</span>
+            <input
+              id="search-input"
+              type="search"
+              placeholder="e.g. Attack on Titan"
+            >
+          </label>
+
+          <label>
+            <span>Genre</span>
+            <select id="genre-filter">
+              <option value="All">All genres</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Studio</span>
+            <select id="studio-filter">
+              <option value="All">All studios</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Format</span>
+            <select id="format-filter">
+              <option value="All">All formats</option>
+            </select>
+          </label>
+
+          <label>
+            <span>From year</span>
+            <select id="year-from"></select>
+          </label>
+
+          <label>
+            <span>To year</span>
+            <select id="year-to"></select>
+          </label>
+
+          <label class="range-control">
+            <span>
+              Minimum score:
+              <output id="score-output">0</output>
+            </span>
+
+            <input
+              id="score-filter"
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value="0"
+            >
+          </label>
+
+          <div class="filter-reset">
+            <button id="reset-filters" class="small-button ghost" type="button">
+              Reset filters
+            </button>
+          </div>
+        </div>
+      </details>
+
+      <section class="chapter is-active" id="chapter-recommendations" data-chapter="recommendations" aria-label="Movie to anime recommendations">
+        <header class="chapter-head">
+          <p class="chapter-eyebrow">Chapter 04 · Movie → Anime</p>
+          <h2>Your favorite movies.<br><span class="grad">Your next anime.</span></h2>
+          <p class="chapter-lede">Your movies are magnets. Anime are dust. Add up to three favorites and explore the stories drawn to your taste.</p>
+        </header>
+
+        <article class="recommendation-picker">
+          <div class="recommendation-controls">
+            <label class="movie-search-label" for="movie-search">
+              <span id="movie-search-label">Add a movie magnet · up to 3</span>
+              <input id="movie-search" type="search" placeholder="Try Inception, Interstellar, or The Matrix" autocomplete="off" aria-controls="movie-search-results" disabled>
+            </label>
+            <label id="dust-limit-control" for="dust-limit"><span>Anime dots</span>
+              <select id="dust-limit"><option value="30">30 · quiet</option><option value="60" selected>60 · balanced</option><option value="90">90 · explore</option></select>
+            </label>
+            <label id="recommendation-limit-control" for="recommendation-limit" hidden><span>Map matches</span>
+              <select id="recommendation-limit">
+                <option value="5" selected>Top &amp; Bottom 5</option><option value="10">Top &amp; Bottom 10</option>
+              </select>
+            </label>
+          </div>
+          <div id="movie-magnets" class="movie-magnets" aria-label="Your movie magnets"></div>
+          <div id="movie-search-results" class="movie-search-results" aria-label="Movie search results" hidden></div>
+          <div id="movie-suggestions" class="movie-suggestions" aria-label="Movies to try"></div>
+          <p id="recommendation-status" class="recommendation-status" role="status" aria-live="polite">Loading movie–anime similarities…</p>
+          <button id="recommendation-retry" class="small-button ghost" type="button" hidden>Retry loading</button>
+        </article>
+
+        <article id="selected-movie" class="selected-movie" hidden></article>
+
+        <div id="recommendation-content" hidden>
+          <div class="recommendation-workspace">
+            <article class="chart-card recommendation-chart-card">
+              <div class="chart-heading">
+                <div><p id="recommendation-chart-kicker" class="chart-kicker">A constellation of your taste</p><h3 id="recommendation-chart-title">Follow the pull of a familiar story.</h3></div>
+              </div>
+              <div class="recommendation-chart-tabs" role="group" aria-label="Visualization style">
+                <button type="button" data-recommendation-viz="magnets" aria-pressed="true">Dust &amp; magnets</button>
+                <button type="button" data-recommendation-viz="connections" aria-pressed="false">Connection map</button>
+              </div>
+              <p id="recommendation-chart-guide" class="recommendation-chart-guide"></p>
+              <div id="dust-toolbar" class="dust-toolbar">
+                <div class="dust-legend"><span><i class="dust-legend-dot"></i>Anime</span><span><i class="dust-legend-dot is-selected"></i>Selected</span></div>
+                <button id="reset-magnets" class="small-button ghost" type="button">Reset positions</button>
+              </div>
+              <div id="recommendation-chart" class="recommendation-chart"></div>
+              <button id="dust-selection" class="dust-selection" type="button" aria-controls="recommendation-detail" hidden></button>
+              <p id="recommendation-score-note" class="recommendation-score-note">Cosine similarity · higher means closer in the model’s text embedding space. A score of 0.8 does not mean an 80% match.</p>
+            </article>
+            <aside id="recommendation-detail" class="recommendation-detail" aria-label="Selected anime details"></aside>
+          </div>
+
+          <div id="recommendation-table-heading" class="explorer-head"><h3 id="recommendation-table-title">Full anime ranking</h3><p id="recommendation-table-note" class="table-note" role="status"></p></div>
+          <div id="recommendation-table-wrapper" class="table-wrapper recommendation-table-wrapper">
+            <table>
+              <caption id="recommendation-table-caption" class="sr-only">Anime ranked by semantic similarity to the selected movie</caption>
+              <thead><tr><th scope="col">Rank</th><th scope="col">Anime</th><th scope="col">Similarity</th><th scope="col">Format</th><th scope="col">Year</th><th scope="col">Genres</th></tr></thead>
+              <tbody id="recommendation-table-body"></tbody>
+            </table>
+          </div>
+          <nav id="recommendation-table-pagination" class="table-pagination" aria-label="Anime ranking pages" hidden></nav>
+        </div>
+
+        <details class="methodology">
+          <summary>How these recommendations work</summary>
+          <div class="method-grid">
+            <article><h3>One million comparisons</h3><p id="recommendation-method-data">1,000 popular AniList anime × 1,000 popular TMDB movies. The dust view uses the complete score matrix; the connection map shows each movie’s top and bottom matches, with the full ranking available below in pages of 10.</p></article>
+            <article><h3>Story similarity</h3><p id="recommendation-method-model">Qwen3-Embedding-4B embeds titles, genres, tags, and synopses. Cosine similarity compares the normalized vectors; ratings and popularity do not affect the score.</p></article>
+            <article><h3>Reading the magnets</h3><p>Dots combine strong matches to each movie and the highest average scores across your movies. Target distance scales with √(2 − 2 × cosine). A two-dimensional layout balances those distances and separates overlapping dots, so positions are approximate. Color identifies the closest movie by score; pink marks your selection. Hover or focus a dot for exact scores. Distances between anime carry no meaning.</p></article>
+            <article><h3>A starting point</h3><p>These are text-based recommendations, not predictions of your enjoyment. Seasons, sequels, and the same animated film in both databases can appear separately. Genre labels are context, not an explanation of the model’s score.</p></article>
+          </div>
+        </details>
+        <div class="stage-foot recommendation-credits">
+          <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer" aria-label="The Movie Database">
+            <img src="../../assets/tmdb-logo.svg" alt="TMDB" width="72" height="52">
+          </a>
+          <p>This product uses the TMDB API but is not endorsed or certified by TMDB. Anime metadata: <a href="https://anilist.co/" target="_blank" rel="noopener noreferrer">AniList</a>.</p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ───────────────────────── Overlays ───────────────────────── -->
+  <aside
+    id="detail-drawer"
+    class="detail-drawer"
+    aria-hidden="true"
+    aria-label="Anime details"
+  >
+    <button
+      id="close-drawer"
+      class="drawer-close"
+      type="button"
+      aria-label="Close details"
+    >
+      ×
+    </button>
+
+    <div id="drawer-content"></div>
+  </aside>
+
+  <div id="drawer-overlay" class="drawer-overlay"></div>
+
+  <div
+    id="tooltip"
+    class="tooltip"
+    role="tooltip"
+    aria-hidden="true"
+  ></div>
+</body>
+</html>

@@ -1,0 +1,7 @@
+# Separate from the existing Flask/collector environment. Python 3.10+.
+# Bounded compatible versions; run_metadata.json records installed versions.
+numpy>=1.26,<3
+torch>=2.2,<3
+sentence-transformers>=5.1,<6
+transformers>=4.56,<5
+huggingface-hub>=0.34,<1
