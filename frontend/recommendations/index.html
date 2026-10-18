@@ -250,6 +250,7 @@
                 <button id="reset-magnets" class="small-button ghost" type="button">Reset positions</button>
               </div>
               <div id="recommendation-chart" class="recommendation-chart"></div>
+              <p id="dust-layout-status" class="recommendation-chart-guide" role="status" hidden></p>
               <button id="dust-selection" class="dust-selection" type="button" aria-controls="recommendation-detail" hidden></button>
               <p id="recommendation-score-note" class="recommendation-score-note">Cosine similarity · higher means closer in the model’s text embedding space. A score of 0.8 does not mean an 80% match.</p>
             </article>
@@ -272,7 +273,7 @@
           <div class="method-grid">
             <article><h3>One million comparisons</h3><p id="recommendation-method-data">1,000 popular AniList anime × 1,000 popular TMDB movies. The dust view uses the complete score matrix; the connection map shows each movie’s top and bottom matches, with the full ranking available below in pages of 10.</p></article>
             <article><h3>Story similarity</h3><p id="recommendation-method-model">Qwen3-Embedding-4B embeds titles, genres, tags, and synopses. Cosine similarity compares the normalized vectors; ratings and popularity do not affect the score.</p></article>
-            <article><h3>Reading the magnets</h3><p>Dots combine strong matches to each movie and the highest average scores across your movies. Target distance scales with √(2 − 2 × cosine). A two-dimensional layout balances those distances and separates overlapping dots, so positions are approximate. Color identifies the closest movie by score; pink marks your selection. Hover or focus a dot for exact scores. Distances between anime carry no meaning.</p></article>
+            <article><h3>Reading the magnets</h3><p>Dots combine strong matches to each movie and the highest average scores across your movies. Target distance scales with √(2 − 2 × cosine), with a minimum clearance around magnet circles and captions. A shared grid keeps dots separated while minimizing distance error and prioritizing each dot’s movie score order. Moving magnets cannot change the scores. Competing targets and chart edges make distances approximate, particularly for small score differences; some three-movie score orders cannot fit every arrangement. Color identifies the closest movie by score; pink marks your selection. Hover or focus a dot for exact scores. Distances between anime carry no meaning.</p></article>
             <article><h3>A starting point</h3><p>These are text-based recommendations, not predictions of your enjoyment. Seasons, sequels, and the same animated film in both databases can appear separately. Genre labels are context, not an explanation of the model’s score.</p></article>
           </div>
         </details>

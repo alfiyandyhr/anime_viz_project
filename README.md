@@ -162,13 +162,23 @@ candidate budget equally for each movie's strongest matches, then fills remainin
 slots with the highest mean cosine scores across all selected movies, deduplicating
 overlap. All candidates are scored using the complete matrix. Color identifies
 the highest-scoring movie; pink marks the selected anime. Only selected/hovered
-connections appear, and collision spacing keeps dots apart.
+connections appear, and reserved positions on a 16 px grid keep dots apart.
 
 Target distance is proportional to `sqrt(2 - 2 * cosine)`, the Euclidean distance
-between normalized embeddings. A deterministic stress layout balances those
-target distances in 2D, then separates dots for readability. Distances are
-approximate, especially with multiple magnets; anime-to-anime distances carry
-no meaning. Exact per-movie scores remain available in tooltips and details.
+between normalized embeddings. The layout searches the entire field on a shared hexagonal grid, reserves
+one position per dot, then refines assignments by moving or swapping dots to
+reduce distance error. Movie score-order penalties prioritize placing a dot
+closer to its higher-scoring movies. Similarity and spacing stay active together;
+there is no later collision-only phase that can scatter dots away from their
+targets. Magnet circles have 48 px clearance and captions have reserved space.
+Dragging and keyboard movement keep magnets separated and inside the chart.
+
+Distances remain approximate: arbitrary magnet arrangements, chart edges, and
+dot spacing cannot represent every embedding distance or score order in 2D.
+A visible message reports arrangements where a dot’s movie score order cannot
+be represented. Small distance differences between anime should be checked
+against the exact scores in tooltips and details. Anime-to-anime distances carry
+no meaning.
 
 **Connection map** compares one movie’s **Top & Bottom 5** or **Top & Bottom 10**,
 including global ranks. Below the map, **Full anime ranking** lists all anime by

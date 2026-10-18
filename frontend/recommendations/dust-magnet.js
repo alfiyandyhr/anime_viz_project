@@ -40,57 +40,124 @@ function dustTargetDistance(score, scale) {
   return Math.sqrt(2 - 2 * Math.max(-1, Math.min(1, score))) * scale;
 }
 
-// Deterministic stress minimization with a small collision adjustment. No running
-// simulation means settled dots remain easy to point at, click, and keyboard-focus.
-function layoutDust(matches, anchors, width, height) {
-  const scale = Math.min(width, height) * .38;
-  const center = { x: width / 2, y: height / 2 };
-  const nodes = matches.map((match) => {
-    const angle = match.index * 2.399963229728653;
-    const radius = anchors.length === 1 ? dustTargetDistance(match.scores[0], scale) : scale * .7;
-    return { ...match, x: center.x + Math.cos(angle) * radius, y: center.y + Math.sin(angle) * radius };
-  });
-  for (let iteration = 0; iteration < 300; iteration++) {
-    for (const node of iteration < 180 ? nodes : []) {
-      let dx = 0, dy = 0;
-      anchors.forEach((anchor, index) => {
-        const vx = node.x - anchor.x, vy = node.y - anchor.y;
-        const distance = Math.hypot(vx, vy) || .001;
-        const error = distance - dustTargetDistance(node.scores[index], scale);
-        dx += error * vx / distance;
-        dy += error * vy / distance;
-      });
-      node.x -= .32 * dx / anchors.length;
-      node.y -= .32 * dy / anchors.length;
-    }
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        const a = nodes[i], b = nodes[j];
-        let dx = b.x - a.x, dy = b.y - a.y;
-        let distance = Math.hypot(dx, dy);
-        if (distance < .001) { dx = .01; dy = .01; distance = Math.hypot(dx, dy); }
-        if (distance < 18) {
-          const push = (18 - distance) / distance * .5;
-          a.x -= dx * push; a.y -= dy * push;
-          b.x += dx * push; b.y += dy * push;
-        }
-      }
-    }
-    for (const node of nodes) {
-      for (const anchor of anchors) {
-        // Keep the magnet's circle and its caption free of dust.
-        const dx = node.x - anchor.x, dy = node.y - anchor.y;
-        const distance = Math.hypot(dx, dy) || .001;
-        if (distance < 41) { node.x = anchor.x + dx / distance * 41; node.y = anchor.y + dy / distance * 41; }
-        if (Math.abs(node.x - anchor.x) < Math.min(75, width * .19) && node.y > anchor.y + 27 && node.y < anchor.y + 66) {
-          node.y = node.y < anchor.y + 46 ? anchor.y + 26 : anchor.y + 67;
-        }
-      }
-      node.x = Math.max(14, Math.min(width - 14, node.x));
-      node.y = Math.max(18, Math.min(height - 18, node.y));
+// Search the whole field instead of following a local force minimum. Each site
+// is a possible dot position; reserving sites keeps spacing in the optimization,
+// rather than pushing settled dots away from their similarity distances later.
+const DUST_SPACING = 16;
+const DUST_CLEARANCE = 48;
+
+function dustSites(anchors, width, height) {
+  const sites = [];
+  const rowHeight = DUST_SPACING * Math.sqrt(3) / 2;
+  for (let row = 0, y = 18; y <= height - 18; row++, y += rowHeight) {
+    for (let x = 14 + (row % 2) * DUST_SPACING / 2; x <= width - 14; x += DUST_SPACING) {
+      const distances = anchors.map((anchor) => Math.hypot(x - anchor.x, y - anchor.y));
+      if (anchors.some((anchor, index) => distances[index] < DUST_CLEARANCE
+        || (Math.abs(x - anchor.x) < Math.min(75, width * .19)
+          && y > anchor.y + 27 && y < anchor.y + 66))) continue;
+      sites.push({ x, y, distances });
     }
   }
-  return nodes;
+  return sites;
+}
+
+// Penalize score-order reversals independently of distance error. Close scores
+// may share a bisector; ties impose no arbitrary movie-order preference.
+function dustOrderError(scores, distances) {
+  let error = 0;
+  for (let i = 0; i < scores.length; i++) {
+    for (let j = i + 1; j < scores.length; j++) {
+      const gap = scores[i] - scores[j];
+      if (Math.abs(gap) > 1e-7 && gap * (distances[i] - distances[j]) > 1e-7) {
+        error += 1 + Math.abs(distances[i] - distances[j]);
+      }
+    }
+  }
+  return error;
+}
+
+function layoutDust(matches, anchors, width, height) {
+  if (!matches.length || !anchors.length) return [];
+  const scale = Math.min(width, height) * .38;
+  const sites = dustSites(anchors, width, height);
+  // A very small/degenerate viewport is still handled without NaN coordinates.
+  if (!sites.length) return matches.map((match) => ({ ...match, x: width / 2, y: 18, approximate: true }));
+  const targets = matches.map((match) => match.scores.map((score) =>
+    Math.max(DUST_CLEARANCE, dustTargetDistance(score, scale))));
+  const orderWeight = (width * width + height * height) * anchors.length;
+  const costs = matches.map((match, index) => Float64Array.from(sites, (site) => {
+    const stress = site.distances.reduce((sum, distance, magnet) =>
+      sum + (distance - targets[index][magnet]) ** 2, 0);
+    return stress + dustOrderError(match.scores, site.distances) * orderWeight;
+  }));
+  const assigned = new Int32Array(matches.length).fill(-1);
+  const occupied = new Int32Array(sites.length).fill(-1);
+  // Give the most distinctive matches first choice, with stable record-order ties.
+  const order = matches.map((_, index) => index).sort((a, b) =>
+    Math.max(...matches[b].scores) - Math.max(...matches[a].scores) || matches[a].index - matches[b].index);
+  for (const index of order) {
+    let best = -1;
+    for (let site = 0; site < sites.length; site++) {
+      if (occupied[site] < 0 && (best < 0 || costs[index][site] < costs[index][best])) best = site;
+    }
+    if (best < 0) best = costs[index].indexOf(Math.min(...costs[index]));
+    assigned[index] = best;
+    occupied[best] = index;
+  }
+  // Refine the assignment jointly: a dot may move to a free site or swap with
+  // another dot, but only when the combined similarity error improves. Every
+  // step retains the collision spacing and score-order penalty.
+  for (let pass = 0; pass < 6; pass++) {
+    let changed = false;
+    for (const index of order) {
+      const current = assigned[index];
+      let best = current, improvement = 1e-6;
+      for (let site = 0; site < sites.length; site++) {
+        const other = occupied[site];
+        const gain = costs[index][current] - costs[index][site]
+          + (other < 0 ? 0 : costs[other][site] - costs[other][current]);
+        if (gain > improvement) { best = site; improvement = gain; }
+      }
+      if (best === current) continue;
+      const other = occupied[best];
+      if (other >= 0) assigned[other] = current;
+      occupied[current] = other;
+      occupied[best] = index;
+      assigned[index] = best;
+      changed = true;
+    }
+    if (!changed) break;
+  }
+  return matches.map((match, index) => {
+    const site = sites[assigned[index]];
+    return { ...match, x: site.x, y: site.y,
+      approximate: dustOrderError(match.scores, site.distances) > 0 };
+  });
+}
+
+// Keep magnets distinct, including pointer/keyboard moves and restored positions.
+// A crowded set of anchors can make their score orders impossible to display.
+function constrainMagnetPosition(anchor, x, y, anchors, width, height) {
+  const margin = Math.min(76, width * .22);
+  const clamp = (point) => ({ x: Math.max(margin, Math.min(width - margin, point.x)),
+    y: Math.max(44, Math.min(height - 78, point.y)) });
+  const desired = clamp({ x, y });
+  const separation = Math.min(110, width * .42);
+  const available = (point) => anchors.every((other) => other === anchor
+    || Math.hypot(point.x - other.x, point.y - other.y) >= separation - 1e-6);
+  if (available(desired)) return desired;
+  // Find the nearest valid point, without pushing the other magnets or letting
+  // sequential projections bounce a dragged magnet between two neighbors.
+  const boundedAnchor = clamp(anchor);
+  let best = available(boundedAnchor) ? boundedAnchor : null;
+  for (let cy = 44; cy <= height - 78; cy += 4) {
+    for (let cx = margin; cx <= width - margin; cx += 4) {
+      const point = { x: cx, y: cy };
+      if (available(point) && (!best || Math.hypot(cx - desired.x, cy - desired.y)
+        < Math.hypot(best.x - desired.x, best.y - desired.y))) best = point;
+    }
+  }
+  return best || desired;
 }
 
 function selectedMagnetMovies() {
@@ -134,8 +201,8 @@ function renderDustRecommendations() {
   document.querySelector("#recommendation-chart-kicker").textContent = "A constellation of your taste";
   document.querySelector("#recommendation-chart-title").textContent = movies.length > 1
     ? "Find the stories between your favorites." : "Follow the pull of a familiar story.";
-  document.querySelector("#recommendation-chart-guide").textContent = "Closer to a movie magnet = a stronger story match. Hover a dot for scores; click it to explore. Drag magnets to rearrange, or focus one and use arrow keys.";
-  document.querySelector("#recommendation-score-note").textContent = "A 2D approximation of semantic distance, with dots spaced for readability. Color = highest-scoring movie; pink = selected anime. Anime-to-anime distances have no meaning. Exact cosine scores appear on hover or focus.";
+  document.querySelector("#recommendation-chart-guide").textContent = "Dots seek shorter distances to higher-scoring movies. Hover a dot for exact scores; click it to explore. Drag magnets to rearrange, or focus one and use arrow keys.";
+  document.querySelector("#recommendation-score-note").textContent = "Distances approximate similarity on a shared scale; spacing, chart edges, and competing magnets can distort them. Small distance differences may not reflect score order. Color = highest-scoring movie; pink = selected anime. Anime-to-anime distances have no meaning. Hover or focus for exact cosine scores.";
   document.querySelector("#movie-magnets").innerHTML = movies.map((movie, index) => `
     <div class="movie-magnet-chip" style="--magnet-color:${MAGNET_COLORS[index]}">
       <span class="magnet-chip-number">${index + 1}</span><span>${escapeHTML(movie.title)} <small>${movie.year || ""}</small></span>
@@ -185,6 +252,9 @@ function renderDustChart(container, movies, matches) {
     const saved = recommendationState.magnetPositions[`${movies.length}:${movie.id}`];
     return { movie, color: MAGNET_COLORS[index], ...(saved ? { x: saved.x * width, y: saved.y * height } : initial[index]) };
   });
+  for (const anchor of anchors) {
+    Object.assign(anchor, constrainMagnetPosition(anchor, anchor.x, anchor.y, anchors, width, height));
+  }
   const svg = d3.select(container).append("svg").attr("viewBox", `0 0 ${width} ${height}`)
     .attr("width", width).attr("height", height).attr("class", "dust-map").attr("role", "group")
     .attr("aria-label", `Anime similarity to ${movies.map((movie) => movie.title).join(", ")}`);
@@ -225,7 +295,12 @@ function renderDustChart(container, movies, matches) {
       event.preventDefault();
       moveAnchor(anchor, anchor.x + delta[0], anchor.y + delta[1]);
     })
-    .call(d3.drag().on("start", hideTooltip).on("drag", (event, anchor) => moveAnchor(anchor, event.x, event.y)));
+    .call(d3.drag().on("start", hideTooltip)
+      .on("drag", (event, anchor) => moveAnchor(anchor, event.x, event.y))
+      .on("end", () => {
+        cancelAnimationFrame(frame); frame = null;
+        if (svg.node().isConnected) draw();
+      }));
   magnets.append("circle").attr("class", "magnet-halo").attr("r", 34).attr("stroke", (anchor) => anchor.color);
   magnets.append("circle").attr("class", "magnet-core").attr("r", 25).attr("stroke", (anchor) => anchor.color);
   magnets.append("text").attr("class", "magnet-number").attr("text-anchor", "middle").attr("dy", 5)
@@ -234,16 +309,26 @@ function renderDustChart(container, movies, matches) {
     .text((anchor) => truncate(anchor.movie.title, width < 400 ? 16 : 23));
   magnets.append("title").text((anchor) => `${anchor.movie.title} (${anchor.movie.year || "Year unknown"})`);
 
+  let frame = null;
   function moveAnchor(anchor, x, y) {
-    const margin = Math.min(76, width * .22);
-    anchor.x = Math.max(margin, Math.min(width - margin, x));
-    anchor.y = Math.max(44, Math.min(height - 78, y));
+    Object.assign(anchor, constrainMagnetPosition(anchor, x, y, anchors, width, height));
     recommendationState.magnetPositions[`${movies.length}:${anchor.movie.id}`] = { x: anchor.x / width, y: anchor.y / height };
-    draw();
+    // Coalesce rapid pointer events, always laying out the latest anchor position.
+    if (frame === null) frame = requestAnimationFrame(() => {
+      frame = null;
+      if (svg.node().isConnected) draw();
+    });
   }
   function draw() {
     const nodes = layoutDust(matches, anchors, width, height);
     const positions = new Map(nodes.map((node) => [node.anime.id, node]));
+    const status = document.querySelector("#dust-layout-status");
+    const approximate = nodes.some((node) => node.approximate);
+    const message = approximate
+      ? "Some movie score orders do not fit this layout. Compare exact scores on hover or focus, or spread the magnets apart and try Reset positions."
+      : "";
+    if (status.textContent !== message) status.textContent = message;
+    status.hidden = !approximate;
     dots.attr("transform", (match) => { const node = positions.get(match.anime.id); return `translate(${node.x},${node.y})`; });
     magnets.attr("transform", (anchor) => `translate(${anchor.x},${anchor.y})`);
     rings.attr("transform", `translate(${anchors[0].x},${anchors[0].y})`);
@@ -289,5 +374,5 @@ function renderDustDetail() {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { getDustMatches, defaultMagnetPositions, dustTargetDistance, layoutDust };
+  module.exports = { getDustMatches, defaultMagnetPositions, dustTargetDistance, layoutDust, constrainMagnetPosition };
 }
