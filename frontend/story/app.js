@@ -78,6 +78,7 @@
       buildTimeline();
       buildHero();
       syncScroll(true);
+      StoryConnections.load({ archive: payload, periods, openAnime: openDetail, openMovie: openMovieDetail });
     } catch (error) {
       status("Archive temporarily unavailable", "error");
       $("#story-load span").textContent = "The annual archive could not be loaded. The historical story is still available. Try again to load its visualizations.";
@@ -306,6 +307,12 @@
     $("#anime-dialog").showModal();
   }
 
+  function openMovieDetail(movie, anime, match) {
+    const url = safeURL(movie.url);
+    $("#dialog-content").innerHTML = `<p class="chart-kicker">From ${escapeHTML(anime.title)} → movie</p><h2 id="dialog-title">${escapeHTML(movie.title)}</h2><p class="dialog-description">${movie.year || "Year unknown"} · ${escapeHTML((movie.genres || []).join(" · "))}</p><div class="detail-stats"><div class="detail-stat"><span>Cosine similarity</span><strong>${match.score.toFixed(3)}</strong></div><div class="detail-stat"><span>Movie ranking</span><strong>Top ${anime.matches.indexOf(match) + 1} / 1,000</strong></div></div><p class="dialog-description">${escapeHTML(movie.synopsis || "No synopsis available.")}</p><p class="dialog-caveat">Compared by story text with Qwen3-Embedding-4B. A score of 0.8 does not mean an 80% match. Similarity does not establish historical influence.</p>${url ? `<a class="button button-primary" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">View on TMDB ↗</a>` : ""}`;
+    $("#anime-dialog").showModal();
+  }
+
   $("#close-dialog").addEventListener("click", () => $("#anime-dialog").close());
   $("#anime-dialog").addEventListener("click", event => {
     if (event.target === event.currentTarget) {
@@ -328,7 +335,7 @@
     });
   });
   window.addEventListener("scroll", requestSync, { passive: true });
-  window.addEventListener("resize", () => { hideTooltip(); syncScroll(true); });
+  window.addEventListener("resize", () => { hideTooltip(); StoryConnections.layout(); syncScroll(true); });
   motion.addEventListener("change", () => syncScroll(true));
   syncScroll();
   loadData();

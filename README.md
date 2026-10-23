@@ -47,6 +47,8 @@ frontend/
     ├── index.html
     ├── styles.css
     ├── data.js
+    ├── connections-data.js
+    ├── connections.js
     └── app.js
 ```
 
@@ -138,6 +140,45 @@ To add a historical chapter, add a `.story-step` section to
 then add its link to `.era-nav`. Scroll and chart logic derive periods from
 these attributes. `data.js` contains independently testable sample and scroll
 transformations; `app.js` owns the D3 joins, controls, and data loading.
+
+The **Top anime of decade → movie** detours use only the whitespace after each
+chapter's historical text. They measure the available height and show as many
+complete connection maps as fit, without extending chapters or changing the
+year picker and scroll progression. Small screens may show fewer maps or none.
+Anime are ordered by current AniList popularity within the period's annual
+Top 10 sample. Each map shows the three most similar movies from the same
+1,000-movie corpus as Movie → Anime; select an anime or movie for its details.
+
+Regenerate the separate published snapshot after updating `story.json`:
+
+```bash
+python data/export_story_recommendations.py --compute-missing
+```
+
+This requires the environment in `data/semantic_similarity/requirements-embeddings.txt`
+only when supplemental scores are needed. Existing anime rows are read directly
+from the verified published `movie_anime_scores.bin`, retaining their exact
+float32 values. Missing anime metadata uses the original collector's non-spoiler
+tag rules and the original embedding preprocessing. Inference uses
+**Qwen/Qwen3-Embedding-4B**, revision
+`5cf2132abc99cad020ac570b19d031efec650f2b`, float16 eager attention, an empty prompt,
+a 2,048-token budget with no silent truncation, and normalized 2,560-dimensional
+vectors. This is the model in the existing computation script and published
+scores; older 0.6B references in the embedding documentation describe an earlier
+configuration.
+
+The first supplemental run downloads the fixed model revision. If the original
+completed run is available, pass `--similarity-dir /path/to/similarity` to reuse its
+validated movie vectors. Otherwise the unchanged movie texts are encoded once;
+only missing anime-to-movie score rows are calculated. Metadata, movie vectors,
+model weights, and supplemental full score rows are cached under the ignored
+`data/semantic_similarity/output/` directory, with model/input hashes to prevent
+reuse across incompatible runs. Reruns reuse completed supplemental rows.
+`--offline` requires cached metadata and weights. Commit
+`data/story_movie_recommendations.json` for Flask and GitHub Pages; the site does
+not load a model or calculate embeddings in the browser. A failed computation
+preserves the previous published snapshot. Missing optional recommendations do
+not interrupt the historical narrative or annual archive.
 
 Run the relevant checks with:
 

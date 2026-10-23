@@ -49,6 +49,14 @@ const StoryData = (() => {
       availableYears: available.size };
   }
 
+  function topAnime(payload, period, limit = 10) {
+    const works = new Map(payload.years.filter(row => row.status !== "unavailable"
+      && row.year >= period.start && row.year <= period.end)
+      .flatMap(row => row.anime).map(work => [work.id, work]));
+    return [...works.values()].sort((a, b) => (b.popularity || 0) - (a.popularity || 0) || a.id - b.id)
+      .slice(0, limit);
+  }
+
   // Finish before the next chapter starts, leaving time to view its last year.
   const chapterTravel = .9;
 
@@ -69,6 +77,6 @@ const StoryData = (() => {
     return { index, progress, year };
   }
 
-  return { validate, summarizePeriod, locatePeriod, yearScrollProgress };
+  return { validate, summarizePeriod, topAnime, locatePeriod, yearScrollProgress };
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = StoryData;

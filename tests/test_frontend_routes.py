@@ -20,6 +20,7 @@ class FrontendRoutesTests(unittest.TestCase):
             for url, relative in [
                 ("/data/movie_recommendations.json", "data/movie_recommendations.json"),
                 ("/data/movie_anime_scores.bin", "data/movie_anime_scores.bin"),
+                ("/data/story_movie_recommendations.json", "data/story_movie_recommendations.json"),
                 ("/assets/tmdb-logo.svg", "assets/tmdb-logo.svg"),
                 ("/frontend/recommendations/app.js", "frontend/recommendations/app.js"),
                 ("/frontend/recommendations/dust-magnet.js", "frontend/recommendations/dust-magnet.js"),

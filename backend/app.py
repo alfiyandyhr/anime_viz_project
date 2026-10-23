@@ -37,6 +37,7 @@ def static_dashboard_data():
 
 @app.get("/data/movie_recommendations.json")
 @app.get("/data/movie_anime_scores.bin")
+@app.get("/data/story_movie_recommendations.json")
 def recommendation_data():
     return send_from_directory(PROJECT_ROOT / "data", Path(request.path).name)
 

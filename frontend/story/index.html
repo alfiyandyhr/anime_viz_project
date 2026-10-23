@@ -35,6 +35,8 @@
   <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
   <script src="../common/api.js" defer></script>
   <script src="data.js" defer></script>
+  <script src="connections-data.js" defer></script>
+  <script src="connections.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 
@@ -258,6 +260,8 @@
           <p><strong>What the numbers mean.</strong> Popularity counts current AniList user lists, including planning and completed lists. Scores are current AniList averages, not contemporaneous reviews. Genre percentages divide appearances by selected titles in the period; multiple genres per title mean they need not sum to 100%. Main-studio appearances count a title once for each credited main studio, so co-productions can overlap.</p>
           <p><strong>Gaps.</strong> Some early years contain fewer than 10 eligible records. A confirmed empty year is distinct from an unavailable query. Missing scores, artwork, genres, and studio credits are shown as unknown. The current year is provisional. Cached data’s retrieval date and any unavailable or stale years are displayed beside the archive.</p>
           <p><strong>Historical context.</strong> The linked sources alongside each chapter document specific milestones. Chapter names are editorial framing; AniList data does not establish historical audience sizes, market shares, or causes of change.</p>
+          <p><strong>Anime → movie detours.</strong> Popular anime are ranked by current AniList list users within each period’s annual Top 10 sample. Only as many connection maps as fit in the existing chapter space are shown. Each map recommends the three highest cosine scores among the same 1,000 TMDB movies used in Movie → Anime. The model is Qwen3-Embedding-4B, comparing titles, genres, non-spoiler tags, and synopses. Scores measure text similarity, not a match percentage or evidence of influence. Same-work adaptations and sequels are retained.</p>
+          <p class="story-movie-attribution"><img src="../../assets/tmdb-logo.svg" alt="TMDB"> Movie metadata from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
           <p id="snapshot-description">Retrieval details will appear when data loads.</p>
         </div></details>
       </section>
@@ -265,7 +269,7 @@
   </div>
   <div class="tooltip" id="story-tooltip" role="tooltip" aria-hidden="true"></div>
   <dialog class="story-dialog" id="anime-dialog" aria-labelledby="dialog-title">
-    <button class="drawer-close" type="button" id="close-dialog" aria-label="Close anime details">×</button>
+    <button class="drawer-close" type="button" id="close-dialog" aria-label="Close details">×</button>
     <div id="dialog-content"></div>
   </dialog>
 </body>

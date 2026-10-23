@@ -1,6 +1,5 @@
 html { scroll-behavior: smooth; }
-body[data-chapter="story"] { --rail-width: 250px; --era-color: var(--purple); }
-.story-stage { padding: 24px clamp(20px, 3vw, 44px) 80px; }
+body[data-chapter="story"] { --era-color: var(--purple); }
 .skip-story { position: fixed; left: 16px; top: -80px; z-index: 300; padding: 12px; border-radius: 10px; background: var(--surface-solid); }
 .skip-story:focus { top: 16px; }
 .story-stage a:focus-visible, .story-stage button:focus-visible, .poster-card:focus-visible, .story-dialog button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; }
@@ -67,7 +66,7 @@ body[data-chapter="story"] { --rail-width: 250px; --era-color: var(--purple); }
 .chapter-track { height: 2px; background: var(--border); margin: 18px -22px -22px; }
 .chapter-track span { display: block; height: 100%; width: 0; background: var(--era-color); }
 .story-narrative { grid-column: 1; grid-row: 1; min-width: 0; padding-bottom: var(--story-end-space, 50svh); }
-.story-step { min-height: max(125svh, calc(var(--story-years, 10) * 160px)); padding: 65px 0 120px; scroll-margin-top: 35px; color: var(--text-soft); border-top: 1px solid var(--border); }
+.story-step { position: relative; min-height: max(125svh, calc(var(--story-years, 10) * 160px)); padding: 65px 0 120px; scroll-margin-top: 35px; color: var(--text-soft); border-top: 1px solid var(--border); }
 .story-step:first-child { border-top: none; }
 .act-label { font-size: .63rem; letter-spacing: .14em; font-weight: 700; color: var(--era-color); }
 .act-label span { display: block; color: var(--text-muted); font-weight: 400; margin-top: 8px; letter-spacing: .08em; }
@@ -84,6 +83,37 @@ body[data-chapter="story"] { --rail-width: 250px; --era-color: var(--purple); }
 .reading-prompt { padding-left: 17px; border-left: 2px solid var(--era-color); margin-top: 40px; }
 .reading-prompt > span { color: var(--era-color); font-size: .58rem; letter-spacing: .13em; }
 .reading-prompt p { font-size: .77rem; line-height: 1.8; margin: 7px 0 0; }
+.period-discovery { position: absolute; left: 0; right: 0; border-top: 1px solid var(--border-strong); padding-top: 20px; }
+.period-discovery[hidden], .period-connection-card[hidden] { display: none; }
+.period-discovery-heading { margin-bottom: 20px; }
+.period-detour-label { margin: 0 0 10px; color: var(--era-color); font-size: .56rem; letter-spacing: .13em; font-weight: 700; }
+.period-discovery h3 { margin: 0 0 12px; font-family: "Space Grotesk", sans-serif; font-size: 1.3rem; line-height: 1.25; letter-spacing: -.025em; color: var(--text); }
+.period-discovery-heading > p:not(.period-detour-label) { margin: 0 0 10px; font-size: .74rem; line-height: 1.7; }
+.period-discovery-heading > small { display: block; color: var(--text-muted); font-size: .62rem; line-height: 1.65; }
+.period-connection-cards { display: grid; gap: 20px; }
+.period-connection-card { min-width: 0; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: linear-gradient(135deg, rgba(157,123,255,.055), transparent 65%), #101628; }
+.period-anime-open { display: flex; width: 100%; align-items: flex-start; gap: 10px; text-align: left; color: var(--text); padding: 0 0 14px; margin-bottom: 12px; border: 0; border-bottom: 1px solid var(--border); background: transparent; }
+.period-anime-rank { flex: none; color: var(--era-color); font-family: "Space Grotesk", sans-serif; font-size: .85rem; }
+.period-anime-open > span:nth-child(2) { min-width: 0; flex: 1; }
+.period-anime-open strong { display: block; font-size: .78rem; line-height: 1.45; overflow-wrap: anywhere; }
+.period-anime-open small { display: block; color: var(--text-muted); font-size: .6rem; margin-top: 5px; }
+.period-anime-open > span:last-child { font-size: .75rem; color: var(--text-muted); }
+.period-anime-open:hover strong { color: var(--era-color); }
+.period-connection-map { width: 100%; min-width: 0; line-height: 0; }
+.period-connection-map svg { display: block; }
+.period-map-axis { font-size: 8px; letter-spacing: 1px; fill: var(--text-muted); }
+.period-map-source { fill: var(--surface-light); stroke: var(--era-color); stroke-width: 1; }
+.period-map-rank { fill: var(--era-color); font-size: 12px; font-weight: 700; }
+.period-map-line { fill: none; stroke: var(--era-color); opacity: .35; }
+.period-map-target { fill: rgba(255,255,255,.025); stroke: transparent; }
+.period-map-dot { fill: var(--era-color); }
+.period-map-title { fill: var(--text); font-size: 11px; }
+.period-map-score { fill: var(--text-muted); font-size: 9px; }
+.period-movie-row { cursor: pointer; }
+.period-movie-row:hover .period-map-target, .period-movie-row:focus .period-map-target { fill: rgba(157,123,255,.14); stroke: var(--era-color); }
+.period-movie-row:hover .period-map-line, .period-movie-row:focus .period-map-line { opacity: .9; }
+.period-movie-row:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.story-movie-attribution img { width: 55px; vertical-align: middle; margin-right: 10px; }
 .story-ending { padding: 80px clamp(20px, 4vw, 70px); border: 1px solid var(--border); border-radius: 22px; background: radial-gradient(ellipse at 0% 100%, rgba(157,123,255,.12), transparent 70%), #101628; }
 .story-ending h2 { font-family: "Space Grotesk", sans-serif; font-size: clamp(2rem, 4vw, 3.7rem); line-height: 1.1; letter-spacing: -.05em; margin: 20px 0; }
 .story-ending > p:not(.eyebrow) { color: var(--text-soft); }
@@ -103,7 +133,6 @@ body[data-chapter="story"] { --rail-width: 250px; --era-color: var(--purple); }
 .dialog-caveat { font-size: .73rem; color: var(--text-muted); margin: 20px 0; }
 @media (min-width: 1600px) { .hero-covers { inset: -80px -90px -80px 53%; } }
 @media (max-width: 1150px) and (min-width: 1001px) {
-  body[data-chapter="story"] { --rail-width: 215px; }
   .story-journey { grid-template-columns: minmax(200px, .7fr) minmax(0, 1.3fr); gap: 20px; }
   .sticky-stage { padding: 16px; }
   .poster-art { height: 100px; }
@@ -115,7 +144,6 @@ body[data-chapter="story"] { --rail-width: 250px; --era-color: var(--purple); }
   .hero-copy h1 { font-size: clamp(2.7rem, 5.7vw, 4.4rem); }
 }
 @media (max-width: 760px) {
-  .story-stage { padding: 16px 16px 60px; }
   .story-cover { min-height: 650px; }
   .hero-copy { padding: 30px 24px 70px; }
   .hero-copy h1 { font-size: clamp(2.5rem, 7vw, 3.5rem); }
