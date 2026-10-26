@@ -2,7 +2,7 @@
 
 const recommendationState = {
   data: null, loading: false, error: null, movieId: null,
-  animeId: null, limit: 5, viz: "magnets", movieIds: [], dustLimit: 60,
+  animeId: null, limit: 5, viz: "connections", movieIds: [], dustLimit: 60,
   scores: null, scoresLoading: false, scoresError: null, magnetPositions: {},
   ranking: [], tablePage: 0
 };
@@ -73,6 +73,9 @@ function bindRecommendationControls() {
   document.querySelectorAll("[data-recommendation-viz]").forEach((button) => {
     button.addEventListener("click", () => {
       hideTooltip();
+      if (button.dataset.recommendationViz === "magnets" && recommendationState.viz !== "magnets") {
+        recommendationState.animeId = null;
+      }
       recommendationState.viz = button.dataset.recommendationViz;
       renderRecommendations();
     });
@@ -239,6 +242,7 @@ function selectedRecommendationMovie() {
 }
 
 function renderRecommendations() {
+  stopDustChart();
   const data = recommendationState.data;
   if (!data) {
     if (!recommendationState.error) void loadRecommendations();
@@ -416,13 +420,14 @@ function selectRecommendationAnime(id) {
 
 function highlightRecommendation(previewId) {
   const selectedId = recommendationState.animeId;
+  if (recommendationState.viz === "magnets") previewId = null;
   document.querySelectorAll("[data-match-id]").forEach((row) => {
     row.classList.toggle("is-selected", row.dataset.matchId === selectedId);
     row.classList.toggle("is-preview", row.dataset.matchId === previewId);
     if (row.getAttribute("role") === "button") row.setAttribute("aria-pressed", row.dataset.matchId === selectedId);
     row.querySelector("button")?.setAttribute("aria-pressed", row.dataset.matchId === selectedId);
   });
-  if (recommendationState.viz === "magnets") highlightDustConnections(previewId || selectedId);
+  if (recommendationState.viz === "magnets") highlightDustConnections(selectedId);
 }
 
 function renderRecommendationDetail() {
