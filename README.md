@@ -189,37 +189,44 @@ node --test tests/*.test.cjs
 
 ## Movie → Anime recommendations (chapter 04)
 
-Open **Movie → Anime** in the rail, or visit `frontend/recommendations/index.html` (the existing `#recommendations` bookmark also works). The default
-**Dust & magnets** view lets you add one, two, or three favorite movies through
-search or suggestions. Remove a movie with its × button. Drag magnets (or focus
-one and use arrow keys) to rearrange the field; **Reset positions** restores the
-layout. Hover or keyboard-focus an anime dot for its title and exact cosine score
-to each movie. Click or press Enter to update the anime details, storyline,
-genres, tags, and AniList link. **Read story** takes you to the detail panel on
-smaller screens.
+Open **Movie → Anime** in the rail, or visit `frontend/recommendations/index.html` (the existing `#recommendations` bookmark also works). **Connection map** is the default view and the first view button. Switch to
+**Dust & magnets** to add one, two, or three favorite movies through search or
+suggestions. Remove a movie with its × button. Drag magnets (or focus one and
+use arrow keys) to rearrange the field; **Reset positions** restores the layout.
+Hover or keyboard-focus an anime dot for its title and exact cosine score to
+each movie. Click or press Enter to update the details, storyline, genres, tags,
+and AniList link. The field starts with no anime selected and invites you to
+click a dot. Clicking anywhere outside a dot or using **Reset positions** clears
+the highlight, dashed connections, and anime details.
 
-The field defaults to **60 dots**, with 30 and 90 options. It reserves half the
-candidate budget equally for each movie's strongest matches, then fills remaining
-slots with the highest mean cosine scores across all selected movies, deduplicating
-overlap. All candidates are scored using the complete matrix. Color identifies
-the highest-scoring movie; pink marks the selected anime. Only selected/hovered
-connections appear, and reserved positions on a 16 px grid keep dots apart.
+The dust field defaults to **60 dots**, with 30 and 90 options. It reserves half
+the candidate budget equally for each movie's strongest matches, then fills
+remaining slots with the highest mean cosine scores, deduplicating overlap.
+All candidates use the complete matrix. Color identifies the highest-scoring
+movie; pink marks the selected anime. Only the selected dot shows connections;
+hover and keyboard focus show score tooltips without selecting an anime.
 
-Target distance is proportional to `sqrt(2 - 2 * cosine)`, the Euclidean distance
-between normalized embeddings. The layout searches the entire field on a shared hexagonal grid, reserves
-one position per dot, then refines assignments by moving or swapping dots to
-reduce distance error. Movie score-order penalties prioritize placing a dot
-closer to its higher-scoring movies. Similarity and spacing stay active together;
-there is no later collision-only phase that can scatter dots away from their
-targets. Magnet circles have 48 px clearance and captions have reserved space.
-Dragging and keyboard movement keep magnets separated and inside the chart.
+With two or three magnets, each dot is closer to its higher-scoring movies.
+Targets fit squared-distance differences to cosine-score differences, including
+zero and negative scores. Each dot is constrained to the intersection of the
+appropriate sides of the magnets' perpendicular bisectors. Collision separation
+also respects these constraints, so crowding cannot reverse the score order.
+Tied scores impose no ordering. A single magnet gathers a compact cloud at its
+surface using positive-score attraction.
 
-Distances remain approximate: arbitrary magnet arrangements, chart edges, and
-dot spacing cannot represent every embedding distance or score order in 2D.
-A visible message reports arrangements where a dot’s movie score order cannot
-be represented. Small distance differences between anime should be checked
-against the exact scores in tooltips and details. Anime-to-anime distances carry
-no meaning.
+Damping and fixed time substeps animate movement while retaining particle
+identities and momentum. Dragging or resizing projects dots into their valid
+score regions immediately, then they settle around their new targets. Motion
+settles when idle; reduced-motion preferences use settled positions. Switching
+views stops the animation. Magnets stay separated and inside the chart.
+
+Distances encode each dot's **preference order across movies**, rather than an
+exact cosine scale or a ranking of different anime. Some nearly collinear
+magnet arrangements cannot express all three preferences inside the chart.
+In that case the highest-scoring movie stays nearest and an inline message
+suggests spreading the magnets or resetting their positions. Anime-to-anime
+distances carry no meaning. Exact scores remain in tooltips and details. Moving
+magnets does not change the candidate set, scores, or rank.
 
 **Connection map** compares one movie’s **Top & Bottom 5** or **Top & Bottom 10**,
 including global ranks. Below the map, **Full anime ranking** lists all anime by

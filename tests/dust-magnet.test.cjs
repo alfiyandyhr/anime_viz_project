@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const { createHash } = require("node:crypto");
-const { getDustMatches, defaultMagnetPositions, dustTargetDistance, layoutDust } = require("../frontend/recommendations/dust-magnet.js");
+const { getDustMatches, defaultMagnetPositions, dustAttraction, createDustNodes, stepDust, layoutDust } = require("../frontend/recommendations/dust-magnet.js");
 const data = JSON.parse(readFileSync(require.resolve("../data/movie_recommendations.json"), "utf8"));
 const binary = readFileSync(require.resolve("../data/movie_anime_scores.bin"));
 const view = new DataView(binary.buffer, binary.byteOffset, binary.byteLength);
@@ -60,131 +60,127 @@ test("empty magnets and unavailable scores do not invent matches", () => {
   assert.equal(getDustMatches(data, scores, favorites, 90).length, 90);
 });
 
-test("higher cosine scores have monotonically shorter target distances, including negative scores", () => {
-  assert.equal(dustTargetDistance(1, 100), 0);
-  assert.equal(dustTargetDistance(-1, 100), 200);
-  const distances = [-1, -.5, 0, .3, .6, .9, 1].map((score) => dustTargetDistance(score, 100));
-  distances.forEach((distance, index) => { if (index) assert.ok(distance < distances[index - 1]); });
+function simulate(nodes, anchors, width = 640, height = 500, ticks = 480) {
+  for (let tick = 0; tick < ticks; tick++) stepDust(nodes, anchors, width, height);
+  return nodes;
+}
+
+function grain(scores, x = 100, y = 100) {
+  return { anime: { id: "test", title: "Test" }, index: 0, scores, x, y, vx: 0, vy: 0 };
+}
+
+test("single-magnet attraction retains positive-score pull", () => {
+  const anchors = [{ x: 300, y: 100 }];
+  const force = dustAttraction(grain([.8]), anchors);
+  assert.equal(force.x, 18 * .8 * 200);
+  assert.equal(force.y, 0);
+  assert.deepEqual(dustAttraction(grain([0]), anchors), { x: 0, y: 0 });
+  assert.deepEqual(dustAttraction(grain([-.5]), anchors), { x: 0, y: 0 });
+  const weak = dustAttraction(grain([.2]), anchors);
+  const strong = dustAttraction(grain([.8]), anchors);
+  assert.equal(strong.x, weak.x * 4);
 });
 
-test("1–3 magnets keep 30–90 dots separated and within mobile and desktop bounds", () => {
+test("one magnet gathers dust at its surface instead of a distant score radius", () => {
+  const anchors = [{ x: 320, y: 250 }];
+  const nodes = simulate([grain([.2], 20, 250), grain([.9], 620, 250)], anchors);
+  for (const node of nodes) assert.ok(Math.abs(Math.hypot(node.x - 320, node.y - 250) - 34) < 2);
+});
+
+function assertScoreOrder(node, anchors) {
+  const distances = anchors.map((a) => Math.hypot(node.x - a.x, node.y - a.y));
+  for (let i = 0; i < anchors.length; i++) for (let j = i + 1; j < anchors.length; j++) {
+    if (node.scores[i] === node.scores[j]) continue;
+    assert.ok((node.scores[i] - node.scores[j]) * (distances[i] - distances[j]) < 0,
+      `${node.anime.title || node.anime.id}: scores ${node.scores}, distances ${distances}`);
+  }
+}
+
+test("higher scores mean shorter distances for uneven triangles and signed scores", () => {
+  const layouts = [[{ x: 100, y: 250 }, { x: 540, y: 250 }],
+    [{ x: 100, y: 100 }, { x: 540, y: 100 }, { x: 320, y: 450 }],
+    defaultMagnetPositions(3, 1000, 500)];
+  const permutations = [[.8, .6, .4], [.8, .4, .6], [.6, .8, .4], [.4, .8, .6], [.6, .4, .8], [.4, .6, .8],
+    [.501, .5, .499], [0, -.2, -.7], [-.8, -.1, -.5], [.5, .5, .4]];
+  for (const anchors of layouts) for (const scores of permutations) {
+    const nodes = layoutDust([grain(scores.slice(0, anchors.length))], anchors, 1000, 500);
+    assertScoreOrder(nodes[0], anchors);
+  }
+});
+
+test("moving magnets preserves score order immediately and throughout the animation", () => {
+  const anchors = defaultMagnetPositions(3, 640, 500);
+  const nodes = layoutDust(getDustMatches(data, scores, favorites, 60), anchors, 640, 500);
+  const identities = nodes.slice();
+  for (const position of [{ x: 90, y: 75 }, { x: 550, y: 140 }, { x: 320, y: 100 }]) {
+    Object.assign(anchors[0], position);
+    for (let tick = 0; tick < 60; tick++) {
+      stepDust(nodes, anchors, 640, 500, tick === 0 ? 0 : 1 / 60);
+      nodes.forEach((node, i) => { assert.equal(node, identities[i]); assertScoreOrder(node, anchors); });
+    }
+  }
+});
+
+test("impossible collinear orders keep the best movie nearest and flag the limitation", () => {
+  const anchors = [{ x: 100, y: 250 }, { x: 320, y: 250 }, { x: 540, y: 250 }];
+  const [node] = layoutDust([grain([.8, .2, .6])], anchors, 640, 500);
+  const distances = anchors.map((a) => Math.hypot(node.x - a.x, node.y - a.y));
+  assert.equal(node.scoreLayout.approximate, true);
+  assert.equal(distances.indexOf(Math.min(...distances)), 0);
+});
+
+test("magnet drags preserve particle identity and bound per-frame travel, even through dust", () => {
+  const anchors = [{ x: 320, y: 250 }];
+  const nodes = layoutDust(getDustMatches(data, scores, favorites.slice(0, 1), 60), anchors, 640, 500);
+  const identities = nodes.slice();
+  for (const target of [{ x: 330, y: 250 }, { x: nodes[0].x, y: nodes[0].y }, { x: 76, y: 44 }]) {
+    Object.assign(anchors[0], target);
+    for (let tick = 0; tick < 120; tick++) {
+      const before = nodes.map((n) => ({ x: n.x, y: n.y }));
+      stepDust(nodes, anchors, 640, 500);
+      nodes.forEach((node, i) => {
+        assert.equal(node, identities[i]);
+        assert.ok(Math.hypot(node.x - before[i].x, node.y - before[i].y) <= 5.00001);
+      });
+    }
+  }
+  const before = { ...nodes[0] };
+  stepDust(nodes, anchors, 640, 500, 10); // Resuming a hidden tab must not jump ten seconds.
+  assert.ok(Math.hypot(nodes[0].x - before.x, nodes[0].y - before.y) <= 10.00001);
+});
+
+test("restoring a chart retains positions and momentum by anime ID, including resize", () => {
+  const matches = getDustMatches(data, scores, favorites, 30);
+  const nodes = layoutDust(matches, defaultMagnetPositions(3, 640, 500), 640, 500);
+  const previous = { width: 640, height: 500, positions: new Map(nodes.map((n) => [n.anime.id, n])) };
+  const restored = createDustNodes(matches.slice().reverse(), defaultMagnetPositions(3, 320, 440), 320, 440, previous);
+  restored.forEach((node) => {
+    const saved = previous.positions.get(node.anime.id);
+    assert.ok(Math.abs(node.x - saved.x / 2) < 1e-10);
+    assert.ok(Math.abs(node.y - saved.y * 440 / 500) < 1e-10);
+    assert.equal(node.vx, saved.vx);
+  });
+});
+
+test("1-3 magnets gather 30-90 readable dots inside mobile and desktop bounds", () => {
   for (const width of [240, 320, 640, 1000]) {
     for (const count of [1, 2, 3]) {
       for (const limit of [30, 60, 90]) {
         const matches = getDustMatches(data, scores, favorites.slice(0, count), limit);
         const before = JSON.stringify(matches);
-        const nodes = layoutDust(matches, defaultMagnetPositions(count, width, 500), width, 500);
-        assert.equal(JSON.stringify(matches), before, "layout must not mutate source matches");
-        for (const [index, node] of nodes.entries()) {
+        const anchors = defaultMagnetPositions(count, width, 500);
+        const nodes = layoutDust(matches, anchors, width, 500);
+        assert.equal(JSON.stringify(matches), before);
+        for (const [i, node] of nodes.entries()) {
+          assertScoreOrder(node, anchors);
           assert.ok(Number.isFinite(node.x) && Number.isFinite(node.y));
           assert.ok(node.x >= 14 && node.x <= width - 14 && node.y >= 18 && node.y <= 482);
-          for (const other of nodes.slice(index + 1)) {
-            assert.ok(Math.hypot(node.x - other.x, node.y - other.y) > 13, `overlap at ${width}px, ${count} magnets, ${limit} dots`);
+          for (const other of nodes.slice(i + 1)) {
+            assert.ok(Math.hypot(node.x - other.x, node.y - other.y) > 10,
+              `overlap at ${width}px, ${count} magnets, ${limit} dots`);
           }
+          for (const anchor of anchors) assert.ok(Math.hypot(node.x - anchor.x, node.y - anchor.y) > 29);
         }
-      }
-    }
-  }
-});
-
-test("dragged positions produce a stable, finite layout without leaving the chart", () => {
-  const matches = getDustMatches(data, scores, favorites, 60);
-  const anchors = [{ x: 76, y: 44 }, { x: 244, y: 422 }, { x: 76, y: 422 }];
-  const first = layoutDust(matches, anchors, 320, 500);
-  assert.deepEqual(first, layoutDust(matches, anchors, 320, 500));
-  first.forEach((node) => assert.ok(node.x >= 14 && node.x <= 306 && node.y >= 18 && node.y <= 482));
-});
-
-function distancesTo(node, anchors) {
-  return anchors.map((anchor) => Math.hypot(node.x - anchor.x, node.y - anchor.y));
-}
-
-function assertMovieScoreOrder(nodes, anchors) {
-  for (const node of nodes) {
-    const distances = distancesTo(node, anchors);
-    for (let i = 0; i < anchors.length; i++) {
-      for (let j = i + 1; j < anchors.length; j++) {
-        assert.ok((node.scores[i] - node.scores[j]) * (distances[i] - distances[j]) <= 1e-7,
-          `${node.anime.title}: higher-scoring movie must be nearer`);
-      }
-    }
-    assert.equal(node.approximate, false);
-  }
-}
-
-test("Avengers/Inception regression: dragging does not strand low-similarity dots near a magnet", () => {
-  const ids = ["Avengers: Endgame", "Inception"].map((title) => data.movies.find((movie) => movie.title === title).id);
-  const matches = getDustMatches(data, scores, ids, 60);
-  const anchors = [{ x: 150, y: 290 }, { x: 410, y: 305 }];
-  const nodes = layoutDust(matches, anchors, 640, 500);
-  assertMovieScoreOrder(nodes, anchors);
-  let squaredError = 0, inversions = 0, comparisons = 0;
-  for (const [index, node] of nodes.entries()) {
-    const distances = distancesTo(node, anchors);
-    distances.forEach((distance, magnet) => {
-      const target = dustTargetDistance(node.scores[magnet], 190);
-      assert.ok(distance >= target * .7, "no stray dot dramatically inside its similarity radius");
-      squaredError += (distance - target) ** 2;
-      for (const other of nodes.slice(index + 1)) {
-        const gap = node.scores[magnet] - other.scores[magnet];
-        // Ignore nearly equal scores when assessing the comparative reading.
-        if (Math.abs(gap) < .03) continue;
-        comparisons++;
-        if (gap * (distance - distancesTo(other, anchors)[magnet]) > 0) inversions++;
-      }
-    });
-  }
-  assert.ok(Math.sqrt(squaredError / (nodes.length * anchors.length)) < 20,
-    "the whole field must fit the similarity targets, not just keep dots apart");
-  assert.ok(inversions / comparisons < .06, "at least 94% of distinct-score comparisons preserve radial order");
-});
-
-test("a dot stays closer to its higher-scoring movie across chart widths and densities", () => {
-  const ids = ["Avengers: Endgame", "Inception"].map((title) => data.movies.find((movie) => movie.title === title).id);
-  for (const width of [240, 320, 640, 1000]) {
-    for (const limit of [30, 60, 90]) {
-      const matches = getDustMatches(data, scores, ids, limit);
-      const anchors = defaultMagnetPositions(2, width, 500);
-      assertMovieScoreOrder(layoutDust(matches, anchors, width, 500), anchors);
-    }
-  }
-});
-
-test("single-movie distances preserve the complete anime score ordering after an edge drag", () => {
-  const matches = getDustMatches(data, scores, favorites.slice(0, 1), 60);
-  const anchors = [{ x: 76, y: 44 }];
-  const nodes = layoutDust(matches, anchors, 640, 500);
-  for (let i = 1; i < nodes.length; i++) {
-    assert.ok(distancesTo(nodes[i], anchors)[0] >= distancesTo(nodes[i - 1], anchors)[0] - 1e-7);
-  }
-});
-
-test("three-magnet score order is retained when the geometry has space for it", () => {
-  const matches = getDustMatches(data, scores, favorites, 60);
-  for (const anchors of [defaultMagnetPositions(3, 640, 500),
-    [{ x: 150, y: 290 }, { x: 410, y: 305 }, { x: 250, y: 80 }]]) {
-    assertMovieScoreOrder(layoutDust(matches, anchors, 640, 500), anchors);
-  }
-});
-
-test("impossible three-movie orders are explicitly flagged instead of silently claiming accuracy", () => {
-  // The middle of three collinear anchors cannot be farthest from any point.
-  const matches = [{ anime: { id: "impossible" }, index: 0, scores: [.9, .1, .8] }];
-  const anchors = [{ x: 120, y: 250 }, { x: 320, y: 250 }, { x: 520, y: 250 }];
-  const [node] = layoutDust(matches, anchors, 640, 500);
-  assert.equal(node.approximate, true);
-  assert.ok(Number.isFinite(node.x) && Number.isFinite(node.y));
-});
-
-test("all dots clear magnet halos and captions, including after extreme drags", () => {
-  for (const width of [240, 320, 640]) {
-    const anchors = [{ x: 76, y: 44 }, { x: width - 76, y: 422 }, { x: 76, y: 422 }];
-    const nodes = layoutDust(getDustMatches(data, scores, favorites, 90), anchors, width, 500);
-    for (const node of nodes) {
-      for (const anchor of anchors) {
-        assert.ok(Math.hypot(node.x - anchor.x, node.y - anchor.y) >= 48);
-        assert.ok(!(Math.abs(node.x - anchor.x) < Math.min(75, width * .19)
-          && node.y > anchor.y + 27 && node.y < anchor.y + 66));
       }
     }
   }
@@ -209,12 +205,27 @@ test("pointer and keyboard movement keep magnets separated and within bounds", (
   }
 });
 
-test("layout handles empty selections and tied, perfect, or negative similarity scores", () => {
+test("dense constrained dust settles instead of animating idle contact jitter forever", () => {
+  for (const width of [240, 640]) {
+    const anchors = defaultMagnetPositions(3, width, 500);
+    const nodes = layoutDust(getDustMatches(data, scores, favorites, 90), anchors, width, 500);
+    let quietFrames = 0;
+    for (let frame = 0; frame < 600 && quietFrames < 24; frame++) {
+      quietFrames = stepDust(nodes, anchors, width, 500) < .015 ? quietFrames + 1 : 0;
+    }
+    assert.equal(quietFrames, 24, `never settled at ${width}px`);
+    nodes.forEach((node) => assertScoreOrder(node, anchors));
+  }
+});
+
+test("empty selections, tied and nonpositive scores remain finite and deterministic", () => {
   const anchors = defaultMagnetPositions(2, 640, 500);
   assert.deepEqual(layoutDust([], anchors, 640, 500), []);
-  assert.deepEqual(layoutDust([{ index: 0, scores: [.5] }], [], 640, 500), []);
-  const matches = [[1, 0], [0, 1], [-1, -.5], [.5, .5]].map((values, index) => ({
-    anime: { id: `synthetic-${index}`, title: `synthetic-${index}` }, index, scores: values
+  assert.deepEqual(layoutDust([grain([.5])], [], 640, 500), []);
+  const matches = [[1, 0], [0, 1], [-1, -.5], [0, 0], [.5, .5]].map((values, index) => ({
+    anime: { id: `synthetic-${index}` }, index, scores: values
   }));
-  assertMovieScoreOrder(layoutDust(matches, anchors, 640, 500), anchors);
+  const nodes = layoutDust(matches, anchors, 640, 500);
+  assert.deepEqual(nodes, layoutDust(matches, anchors, 640, 500));
+  for (const node of nodes) assert.ok(Number.isFinite(node.x) && Number.isFinite(node.y));
 });

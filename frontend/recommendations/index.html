@@ -207,25 +207,25 @@
         <header class="chapter-head">
           <p class="chapter-eyebrow">Chapter 04 · Movie → Anime</p>
           <h2>Your favorite movies.<br><span class="grad">Your next anime.</span></h2>
-          <p class="chapter-lede">Your movies are magnets. Anime are dust. Add up to three favorites and explore the stories drawn to your taste.</p>
+          <p class="chapter-lede">Start with a movie you love and discover anime with similar stories. Compare the ranking, or explore up to three favorites with Dust &amp; magnets.</p>
         </header>
 
         <article class="recommendation-picker">
           <div class="recommendation-controls">
             <label class="movie-search-label" for="movie-search">
-              <span id="movie-search-label">Add a movie magnet · up to 3</span>
+              <span id="movie-search-label">Find a movie in the sample</span>
               <input id="movie-search" type="search" placeholder="Try Inception, Interstellar, or The Matrix" autocomplete="off" aria-controls="movie-search-results" disabled>
             </label>
-            <label id="dust-limit-control" for="dust-limit"><span>Anime dots</span>
+            <label id="dust-limit-control" for="dust-limit" hidden><span>Anime dots</span>
               <select id="dust-limit"><option value="30">30 · quiet</option><option value="60" selected>60 · balanced</option><option value="90">90 · explore</option></select>
             </label>
-            <label id="recommendation-limit-control" for="recommendation-limit" hidden><span>Map matches</span>
+            <label id="recommendation-limit-control" for="recommendation-limit"><span>Map matches</span>
               <select id="recommendation-limit">
                 <option value="5" selected>Top &amp; Bottom 5</option><option value="10">Top &amp; Bottom 10</option>
               </select>
             </label>
           </div>
-          <div id="movie-magnets" class="movie-magnets" aria-label="Your movie magnets"></div>
+          <div id="movie-magnets" class="movie-magnets" aria-label="Your movie magnets" hidden></div>
           <div id="movie-search-results" class="movie-search-results" aria-label="Movie search results" hidden></div>
           <div id="movie-suggestions" class="movie-suggestions" aria-label="Movies to try"></div>
           <p id="recommendation-status" class="recommendation-status" role="status" aria-live="polite">Loading movie–anime similarities…</p>
@@ -241,17 +241,17 @@
                 <div><p id="recommendation-chart-kicker" class="chart-kicker">A constellation of your taste</p><h3 id="recommendation-chart-title">Follow the pull of a familiar story.</h3></div>
               </div>
               <div class="recommendation-chart-tabs" role="group" aria-label="Visualization style">
-                <button type="button" data-recommendation-viz="magnets" aria-pressed="true">Dust &amp; magnets</button>
-                <button type="button" data-recommendation-viz="connections" aria-pressed="false">Connection map</button>
+                <button type="button" data-recommendation-viz="connections" aria-pressed="true">Connection map</button>
+                <button type="button" data-recommendation-viz="magnets" aria-pressed="false">Dust &amp; magnets</button>
               </div>
               <p id="recommendation-chart-guide" class="recommendation-chart-guide"></p>
-              <div id="dust-toolbar" class="dust-toolbar">
+              <div id="dust-toolbar" class="dust-toolbar" hidden>
                 <div class="dust-legend"><span><i class="dust-legend-dot"></i>Anime</span><span><i class="dust-legend-dot is-selected"></i>Selected</span></div>
                 <button id="reset-magnets" class="small-button ghost" type="button">Reset positions</button>
               </div>
               <div id="recommendation-chart" class="recommendation-chart"></div>
               <p id="dust-layout-status" class="recommendation-chart-guide" role="status" hidden></p>
-              <button id="dust-selection" class="dust-selection" type="button" aria-controls="recommendation-detail" hidden></button>
+              <div id="dust-selection" class="dust-selection" hidden></div>
               <p id="recommendation-score-note" class="recommendation-score-note">Cosine similarity · higher means closer in the model’s text embedding space. A score of 0.8 does not mean an 80% match.</p>
             </article>
             <aside id="recommendation-detail" class="recommendation-detail" aria-label="Selected anime details"></aside>
@@ -273,7 +273,7 @@
           <div class="method-grid">
             <article><h3>One million comparisons</h3><p id="recommendation-method-data">1,000 popular AniList anime × 1,000 popular TMDB movies. The dust view uses the complete score matrix; the connection map shows each movie’s top and bottom matches, with the full ranking available below in pages of 10.</p></article>
             <article><h3>Story similarity</h3><p id="recommendation-method-model">Qwen3-Embedding-4B embeds titles, genres, tags, and synopses. Cosine similarity compares the normalized vectors; ratings and popularity do not affect the score.</p></article>
-            <article><h3>Reading the magnets</h3><p>Dots combine strong matches to each movie and the highest average scores across your movies. Target distance scales with √(2 − 2 × cosine), with a minimum clearance around magnet circles and captions. A shared grid keeps dots separated while minimizing distance error and prioritizing each dot’s movie score order. Moving magnets cannot change the scores. Competing targets and chart edges make distances approximate, particularly for small score differences; some three-movie score orders cannot fit every arrangement. Color identifies the closest movie by score; pink marks your selection. Hover or focus a dot for exact scores. Distances between anime carry no meaning.</p></article>
+            <article><h3>Reading the magnets</h3><p>Dots combine strong matches to each movie and the highest average scores across your movies. With multiple magnets, each dot stays closer to its higher-scoring movies, including when scores are zero or negative. Spacing respects this preference order. A single movie gathers a compact cloud through positive-score attraction. Moving magnets changes the layout, never the scores. Distances show each dot’s preference order across movies, not an exact cosine scale or a ranking of different anime. Some nearly collinear arrangements cannot show every preference; a message suggests spreading or resetting the magnets, while the highest-scoring movie stays nearest. Color identifies the highest-scoring movie; pink marks your selection. Click a dot to focus it; click elsewhere or reset to clear. Hover or focus for exact scores. Distances between anime carry no meaning.</p></article>
             <article><h3>A starting point</h3><p>These are text-based recommendations, not predictions of your enjoyment. Seasons, sequels, and the same animated film in both databases can appear separately. Genre labels are context, not an explanation of the model’s score.</p></article>
           </div>
         </details>
