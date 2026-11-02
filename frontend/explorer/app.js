@@ -39,7 +39,7 @@ function renderComparison() {
   container.innerHTML = `
     <div class="comparison-heading"><strong id="comparison-heading">Compare your shortlist</strong>
       <button type="button" class="small-button ghost" id="clear-shortlist">Clear shortlist</button></div>
-    <div class="comparison-scroll"><table class="comparison-table" aria-labelledby="comparison-heading">
+    <div class="comparison-scroll" tabindex="0" role="region" aria-label="Shortlist comparison, scroll horizontally for more titles"><table class="comparison-table" aria-labelledby="comparison-heading">
       <thead><tr><th scope="col">Metric</th>${selected.map((anime) => `<th scope="col">${escapeHTML(anime.title)}</th>`).join("")}</tr></thead>
       <tbody>${metrics.map((label, index) => `<tr><th scope="row">${label}</th>${values.map((rows) => `<td>${escapeHTML(rows[index])}</td>`).join("")}</tr>`).join("")}</tbody>
     </table></div>
@@ -357,9 +357,9 @@ function renderTablePagination(totalItems) {
     prev = page;
   }
 
-  const btnHtml = (page, label, extra = "") => {
+  const btnHtml = (page, label, extra = "", accessibleLabel = `Page ${page + 1}`) => {
     const disabled = (page < 0 || page >= totalPages) ? "disabled" : "";
-    return `<button class="page-btn${extra}" data-page="${page}" ${disabled}>${label}</button>`;
+    return `<button class="page-btn${extra}" data-page="${page}" aria-label="${accessibleLabel}"${page === current ? ' aria-current="page"' : ""} ${disabled}>${label}</button>`;
   };
 
   const pageButtons = items.map((item) => {
@@ -373,9 +373,9 @@ function renderTablePagination(totalItems) {
   });
 
   container.innerHTML = [
-    btnHtml(current - 1, "‹"),
+    btnHtml(current - 1, "‹", "", "Previous page"),
     ...pageButtons,
-    btnHtml(current + 1, "›")
+    btnHtml(current + 1, "›", "", "Next page")
   ].join("");
 }
 

@@ -296,7 +296,7 @@ function scopePage(storage = new Map(), chapter = 'content', query = '', storage
     state.data = {meta: {year_min: 1980, year_max: 2026}, anime: [
       {id: 1943, title: 'Paprika', year: 2006, average_score: 79, genres: ['Mystery'], studio_names: ['MADHOUSE'], format: 'MOVIE'},
       {id: 43, title: 'Ghost in the Shell', year: null, average_score: 80, genres: ['Sci-Fi'], studio_names: ['Production I.G'], format: 'MOVIE'},
-      {id: 1, title: 'Other', year: 2000, average_score: 85, genres: ['Mystery'], studio_names: ['MADHOUSE'], format: 'TV'}
+      {id: 999998, title: 'Other', year: 2000, average_score: 85, genres: ['Mystery'], studio_names: ['MADHOUSE'], format: 'TV'}
     ]};
     for (const [key, value] of Object.entries({searchInput:'', genreFilter:'All', studioFilter:'All', formatFilter:'All', yearFrom:'1980', yearTo:'2026', scoreFilter:'0'})) {
       elements[key] = {value, tagName: 'INPUT'};
@@ -576,4 +576,112 @@ test('Task 1 overview links confirm the displayed movie and use the same persist
       }
     }
   }
+});
+
+test('published example survives missing dashboard metadata, catalogue browsing, resuming, and direct entry', async () => {
+  const selected = recommendationPage();
+  await vm.runInContext('loadRecommendations()', selected.context);
+  continueJourney(selected);
+  const {storage} = selected;
+  const ids = storage.get('aniviz_cohort_ids');
+  const ranking = storage.get('aniviz_cohort_ranking');
+  assert.equal(JSON.parse(ids).length, 20);
+  // This dashboard fixture contains only two of the real published matches.
+  for (const chapter of ['content', 'creators', 'reception', 'explorer']) {
+    const matches = scopePage(storage, chapter);
+    assert.match(matches.node('.cohort-count').textContent, /Showing 2 of 20 matches.*0 matches hidden/);
+    assert.match(matches.node('.cohort-metadata').textContent, /18 matches are unavailable/);
+    vm.runInContext('elements.genreFilter.value = "Mystery"; applyFilters()', matches.context);
+    const catalogue = scopePage(storage, chapter, '?mode=catalogue');
+    vm.runInContext('elements.searchInput.value = "Other"; applyFilters()', catalogue.context);
+    const directCatalogue = scopePage(storage, chapter);
+    assert.match(directCatalogue.node('.cohort-count').textContent, /1 of 3 sampled catalogue anime/);
+    const resumed = scopePage(storage, chapter, '?mode=matches');
+    assert.match(resumed.node('.cohort-count').textContent, /Showing 1 of 20 matches.*1 match hidden/);
+    resumed.node('.cohort-reset').listeners.click();
+    assert.equal(storage.get('aniviz_cohort_ids'), ids);
+    assert.equal(storage.get('aniviz_cohort_ranking'), ranking);
+  }
+  const restored = recommendationPage(storage);
+  await vm.runInContext('loadRecommendations()', restored.context);
+  assert.equal(restored.node('#selected-movie-label').textContent, 'Your movie');
+  continueJourney(restored);
+  assert.equal(storage.get('aniviz_cohort_ids'), ids);
+  assert.equal(storage.get('aniviz_cohort_ranking'), ranking);
+});
+
+test('a failed context write or discarded scope change cannot navigate from a restored catalogue session', async () => {
+  for (const key of ['aniviz_seed_movie', 'aniviz_cohort_ids', 'aniviz_cohort_ranking', 'aniviz_cohort_scope']) {
+    const storage = scopeStorage();
+    storage.set('aniviz_cohort_scope', 'catalogue');
+    const page = recommendationPage(storage);
+    await vm.runInContext('loadRecommendations()', page.context);
+    page.context.sessionStorage.setItem = (name, value) => {
+      if (name === key) throw Error('Quota exceeded');
+      storage.set(name, value);
+    };
+    continueJourney(page);
+    assert.equal(page.context.destination, undefined, key);
+    assert.match(page.node('#recommendation-journey-summary').textContent, /could not save/);
+  }
+  const storage = scopeStorage();
+  storage.set('aniviz_cohort_scope', 'catalogue');
+  const page = recommendationPage(storage);
+  await vm.runInContext('loadRecommendations()', page.context);
+  page.context.sessionStorage.setItem = (key, value) => {
+    if (key !== 'aniviz_cohort_scope') storage.set(key, value);
+  };
+  continueJourney(page);
+  assert.equal(page.context.destination, undefined);
+  assert.equal(storage.get('aniviz_cohort_scope'), 'catalogue');
+});
+
+test('unavailable storage does not promise persistence in guided next-action descriptions', () => {
+  for (const chapter of ['content', 'creators', 'reception']) {
+    const page = scopePage(scopeStorage(), chapter, '?mode=matches', 'setItem');
+    assert.match(page.node('.cohort-filter-note').textContent, /Session storage is unavailable/);
+    assert.match(page.node('#journey-next').innerHTML, /may not carry to the next page/);
+    assert.doesNotMatch(page.node('#journey-next').innerHTML, /Your movie and filters carry with you/);
+    assert.match(page.node('.cohort-count').textContent, /Showing 2 of 3 matches/);
+  }
+});
+
+test('comparison retains hidden finalists and original evidence, clears by action, and resets on reload', () => {
+  const page = scopePage(scopeStorage(), 'explorer');
+  page.context.document.body.classList = {toggle() {}};
+  page.node('#comparison-footer').querySelector = page.node;
+  vm.runInContext(source('frontend/explorer/app.js'), page.context);
+  vm.runInContext(`
+    renderAnimeTable = () => {};
+    renderKPIs = () => {}; renderInsights = () => {};
+    shortlist.add('1943'); shortlist.add('43');
+    renderComparison();
+    elements.searchInput.value = 'no such anime'; applyFilters();
+    renderComparison();
+  `, page.context);
+  const footer = page.node('#comparison-footer');
+  assert.equal(footer.hidden, false);
+  assert.match(footer.innerHTML, /Paprika/);
+  assert.match(footer.innerHTML, /Ghost in the Shell/);
+  assert.match(footer.innerHTML, /0\.613/);
+  assert.match(footer.innerHTML, /3 \/ 1,000/);
+  assert.match(footer.innerHTML, /class="comparison-scroll" tabindex="0" role="region" aria-label="[^"]+"/);
+  assert.match(page.node('.cohort-count').textContent, /Showing 0 of 3 matches/);
+  page.node('#clear-shortlist').listeners.click();
+  assert.equal(footer.hidden, true);
+  assert.match(page.node('#shortlist-status').textContent, /0 of 3 shortlisted/);
+  const reloaded = scopePage(scopeStorage(), 'explorer');
+  vm.runInContext(source('frontend/explorer/app.js'), reloaded.context);
+  assert.equal(vm.runInContext('shortlist.size', reloaded.context), 0);
+});
+
+test('Explorer pagination names its actions and marks only the current page', () => {
+  const page = scopePage(scopeStorage(), 'explorer');
+  vm.runInContext(source('frontend/explorer/app.js'), page.context);
+  vm.runInContext('state.tablePage = 1; renderTablePagination(30)', page.context);
+  const html = page.node('#table-pagination').innerHTML;
+  assert.match(html, /aria-label="Previous page"/);
+  assert.match(html, /aria-label="Next page"/);
+  assert.match(html, /aria-label="Page 2" aria-current="page"/);
+  assert.equal((html.match(/aria-current=/g) || []).length, 1);
 });

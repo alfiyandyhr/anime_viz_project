@@ -9,6 +9,21 @@ from app import app, service, story_service
 
 
 class FrontendRoutesTests(unittest.TestCase):
+    def test_journey_and_catalogue_pages_serve_without_live_api_requests(self):
+        with app.test_client() as client, \
+                patch.object(service, "get_dashboard", side_effect=AssertionError("No dashboard request")), \
+                patch.object(story_service, "get_story", side_effect=AssertionError("No story request")):
+            for page in ["recommendations", "content", "creators", "reception", "explorer"]:
+                for query in ["", "?mode=matches", "?mode=catalogue"]:
+                    with self.subTest(page=page, query=query), \
+                            client.get(f"/frontend/{page}/index.html{query}") as response:
+                        self.assertEqual(response.status_code, 200)
+                        self.assertEqual(response.data, (ROOT / "frontend" / page / "index.html").read_bytes())
+                        self.assertIn(b'id="journey-overview"', response.data)
+            with client.get("/data.json") as response:
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data, (ROOT / "data.json").read_bytes())
+
     def test_recommendation_page_and_published_assets_need_no_upstream_requests(self):
         with app.test_client() as client, \
                 patch.object(service, "get_dashboard", side_effect=AssertionError("No dashboard request")), \

@@ -220,7 +220,9 @@ function renderJourneyGuidance() {
   if (next && nextSteps[chapter]) {
     const [page, label, description] = nextSteps[chapter];
     next.hidden = !visible;
-    next.innerHTML = `<p>${description}</p><a class="button button-primary" href="../${page}/index.html?mode=matches">${label}</a>`;
+    const note = state.scopePersistent ? description
+      : "Session storage is unavailable. You can explore this page, but your movie and filters may not carry to the next page.";
+    next.innerHTML = `<p>${note}</p><a class="button button-primary" href="../${page}/index.html?mode=matches">${label}</a>`;
   }
 }
 

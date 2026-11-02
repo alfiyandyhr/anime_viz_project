@@ -113,7 +113,11 @@ opens a fixed comparison footer with original similarity ranks and cosine scores
 format, year, episodes, estimated runtime, AniList score, and status. Similarity
 evidence is shown only when viewing movie matches; missing runtime values remain unknown.
 The shortlist lasts while the Explorer page stays open, including filtering,
-pagination, and switching views. Creators adds credited-title counts for the
+sorting, pagination, and resizing. Reloading Explorer, following a link to another
+page, or switching between catalogue and matches starts a new shortlist; it is not
+saved in session storage. Movie context and each mode's filters survive reloads
+in the same tab while session storage remains available. They are not an account,
+cross-device history, or durable saved collection. Creators adds credited-title counts for the
 original movie match set, explicitly labelled as unaffected by filters, and lets
 users select an anime to follow its sampled Japanese cast to other visible matches.
 Actor profiles label their credits as spanning all available movie matches. Catalogue mode retains the full network.
@@ -340,6 +344,21 @@ node --test tests/*.test.cjs
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 python3 -m unittest discover -s data/semantic_similarity/tests -p 'test_*.py' -v
 ```
+
+For the connected movie journey, run the focused checks:
+
+```bash
+node --test tests/cohort.test.cjs tests/frontend-integration.test.cjs
+python3 -m unittest discover -s tests -p 'test_frontend_routes.py' -v
+```
+
+The Node checks exercise example confirmation, movie changes, missing metadata,
+scope changes, independent filters, direct entry, interrupted storage writes,
+chart refresh dispatch, and comparison behaviour. Flask checks serve the journey
+and catalogue pages and published assets without live AniList or TMDB requests.
+Install `backend/requirements.txt` in your Python environment before running them.
+See [the journey verification walkthrough](tests/journey-verification.md) for
+desktop, mobile, keyboard, and session scenarios and the observed usability checks.
 
 Movie metadata comes from TMDB. This product uses the TMDB API but is not
 endorsed or certified by TMDB. The bundled approved TMDB logo by Travis Bell

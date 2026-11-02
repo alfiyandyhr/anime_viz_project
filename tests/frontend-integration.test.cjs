@@ -125,3 +125,52 @@ test("all four tasks and Explorer provide journey guidance alongside optional ra
     assert.match(html, /Dust &amp; Magnet — Optional exploration/);
   }
 });
+
+test("shared filter changes dispatch every page's charts and summaries with the same visible titles", () => {
+  const renderers = {
+    content: ['renderGenreChart', 'renderTimeline'],
+    creators: ['renderCohortStudios', 'renderStudioChart', 'renderHeatmap', 'renderNetwork'],
+    reception: ['renderKPIs', 'renderScatterplot'],
+    explorer: ['renderKPIs', 'renderInsights', 'renderAnimeTable', 'renderComparison']
+  };
+  for (const [page, names] of Object.entries(renderers)) {
+    const calls = [];
+    const context = vm.createContext({
+      URL, Intl, console,
+      document: {
+        currentScript: {src: 'https://example.com/frontend/common/app.js'},
+        querySelector: () => ({}), querySelectorAll: () => [], addEventListener() {}
+      },
+      sessionStorage: {setItem() {}},
+      record: name => calls.push([name, Array.from(vm.runInContext('state.filteredAnime', context), anime => anime.id)])
+    });
+    vm.runInContext(readFileSync(path.join(root, 'frontend/common/app.js'), 'utf8'), context);
+    vm.runInContext(readFileSync(path.join(root, `frontend/${page}/app.js`), 'utf8'), context);
+    vm.runInContext(`
+      state.data = {meta: {year_min: 1990, year_max: 2026}, anime: [
+        {id: 1, title: 'Match', year: 2000, average_score: 80, genres: ['Mystery'], studio_names: [], format: 'TV'},
+        {id: 2, title: 'Other match', year: 2001, average_score: 70, genres: ['Action'], studio_names: [], format: 'TV'},
+        {id: 3, title: 'Outside movie set', year: 2000, average_score: 85, genres: ['Mystery'], studio_names: [], format: 'TV'}
+      ]};
+      state.cohort_ids = new Set(['1', '2']);
+      for (const [key, value] of Object.entries({searchInput:'', genreFilter:'All', studioFilter:'All', formatFilter:'All', yearFrom:'1990', yearTo:'2026', scoreFilter:'0'})) elements[key] = {value};
+      renderFilterSummary = () => {};
+      ${names.map(name => `${name} = () => record('${name}');`).join('\n')}
+      applyFilters();
+      elements.genreFilter.value = 'Mystery'; applyFilters();
+      elements.searchInput.value = 'no such anime'; applyFilters();
+      resetFilters();
+    `, context);
+    assert.deepEqual(calls, [[1, 2], [1], [], [1, 2]].flatMap(ids => names.map(name => [name, ids])), page);
+  }
+});
+
+test('shared score sliders and horizontally scrolling Explorer tables have accessible names', () => {
+  for (const page of ['content', 'creators', 'reception', 'explorer']) {
+    const html = readFileSync(path.join(root, `frontend/${page}/index.html`), 'utf8');
+    // The explicit association avoids the nested output taking the implicit label.
+    assert.match(html, /<label class="range-control" for="score-filter">/);
+  }
+  const html = readFileSync(path.join(root, 'frontend/explorer/index.html'), 'utf8');
+  assert.match(html, /class="table-wrapper" tabindex="0" role="region" aria-label="[^"]+"/);
+});
