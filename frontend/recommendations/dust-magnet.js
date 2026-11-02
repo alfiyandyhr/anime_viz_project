@@ -265,7 +265,7 @@ function selectedMagnetMovies() {
 }
 
 function bindDustControls() {
-  document.addEventListener("click", (event) => {
+  document.querySelector("#recommendation-chart").addEventListener("click", (event) => {
     if (!event.target.closest(".dust-node")) clearDustSelection();
   });
   document.querySelector("#dust-limit").addEventListener("change", (event) => {
@@ -303,6 +303,11 @@ function renderDustRecommendations() {
   const movies = selectedMagnetMovies();
   const data = recommendationState.data;
   const container = document.querySelector("#recommendation-chart");
+  const legend = document.querySelector("#dust-legend");
+  legend.hidden = !movies.length;
+  legend.innerHTML = movies.map((movie, index) => `
+    <span title="Anime most similar to ${escapeAttribute(movie.title)}"><i class="dust-legend-dot" style="--magnet-color:${MAGNET_COLORS[index]}" aria-hidden="true"></i>M${index + 1} · ${escapeHTML(movie.title)}</span>`).join("")
+    + (movies.length ? `<span><i class="dust-legend-dot is-selected" aria-hidden="true"></i>Selected</span>` : "");
   stopDustChart();
   document.querySelector("#dust-layout-status").hidden = true;
   document.querySelector("#dust-layout-status").textContent = "";

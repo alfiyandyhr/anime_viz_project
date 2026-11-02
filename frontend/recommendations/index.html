@@ -70,13 +70,11 @@
           </span>
         </a>
 
-        <p class="rail-group">The four questions</p>
-
-        <a class="rail-link" data-goto="reception" href="../reception/index.html">
+        <a class="rail-link is-active" aria-current="page" data-goto="recommendations" href="../recommendations/index.html">
           <span class="idx">01</span>
           <span class="rail-text">
-            <strong>Reception</strong>
-            <small>Do the most-watched deserve their fame?</small>
+            <strong>Movie → Anime</strong>
+            <small>Love a movie? Find your first anime.</small>
           </span>
         </a>
 
@@ -95,16 +93,6 @@
             <small>Who makes the hits?</small>
           </span>
         </a>
-
-        <a class="rail-link is-active" aria-current="page" data-goto="recommendations" href="../recommendations/index.html">
-          <span class="idx">04</span>
-          <span class="rail-text">
-            <strong>Movie → Anime</strong>
-            <small>Love a movie? Find your first anime.</small>
-          </span>
-        </a>
-
-        <p class="rail-group">Then</p>
 
         <a class="rail-link" data-goto="explorer" href="../explorer/index.html">
           <span class="idx">✦</span>
@@ -205,7 +193,7 @@
 
       <section class="chapter is-active" id="chapter-recommendations" data-chapter="recommendations" aria-label="Movie to anime recommendations">
         <header class="chapter-head">
-          <p class="chapter-eyebrow">Chapter 04 · Movie → Anime</p>
+          <p class="chapter-eyebrow">Chapter 01 · Movie → Anime</p>
           <h2>Your favorite movies.<br><span class="grad">Your next anime.</span></h2>
           <p class="chapter-lede">Start with a movie you love and discover anime with similar stories. Compare the ranking, or explore up to three favorites with Dust &amp; magnets.</p>
         </header>
@@ -246,7 +234,7 @@
               </div>
               <p id="recommendation-chart-guide" class="recommendation-chart-guide"></p>
               <div id="dust-toolbar" class="dust-toolbar" hidden>
-                <div class="dust-legend"><span><i class="dust-legend-dot"></i>Anime</span><span><i class="dust-legend-dot is-selected"></i>Selected</span></div>
+                <div id="dust-legend" class="dust-legend" role="group" aria-label="Anime colors by highest-scoring movie" hidden></div>
                 <button id="reset-magnets" class="small-button ghost" type="button">Reset positions</button>
               </div>
               <div id="recommendation-chart" class="recommendation-chart"></div>

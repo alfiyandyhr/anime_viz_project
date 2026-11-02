@@ -1,6 +1,6 @@
 # AnIViz — Anime Industry Visualization
 
-A story-driven visualization of what makes anime resonate — reading through the most-followed titles on AniList in four chapters (Reception → Content → Creators → Movie → Anime), built with Python/Flask, AniList GraphQL API, and D3.js.
+A visual anime discovery tool that starts with a familiar movie, built with Python/Flask, AniList GraphQL API, and D3.js. The introduction leads to Movie → Anime or direct catalogue browsing. Story offers optional historical context; Content, Creators, and Explorer help inspect the anime catalogue.
 
 **Live site:** https://alfiyandyhr.github.io/anime_viz_project/
 
@@ -56,6 +56,12 @@ The root `index.html` redirects to the introduction and preserves existing
 chapter bookmarks such as `#creators`. Page navigation uses relative URLs for
 Flask and GitHub Pages. Filters persist across pages for the current browser
 session. The bundled dataset remains at the project root as `data.json`.
+
+The rail follows Introduction → Story → Movie → Anime → Content → Creators →
+Explorer. Explorer offers **Table** and **Score vs Popularity** tabs over the
+same filtered titles, with the KPI strip and insight cards visible in both
+views. Scatter bubbles open anime details and update with filters and window
+resizing. The former Reception page redirects to Explorer for old bookmarks.
 
 ---
 
@@ -187,7 +193,7 @@ python -m unittest discover -s tests -p 'test_*.py'
 node --test tests/*.test.cjs
 ```
 
-## Movie → Anime recommendations (chapter 04)
+## Movie → Anime recommendations
 
 Open **Movie → Anime** in the rail, or visit `frontend/recommendations/index.html` (the existing `#recommendations` bookmark also works). **Connection map** is the default view and the first view button. Switch to
 **Dust & magnets** to add one, two, or three favorite movies through search or
@@ -196,8 +202,9 @@ use arrow keys) to rearrange the field; **Reset positions** restores the layout.
 Hover or keyboard-focus an anime dot for its title and exact cosine score to
 each movie. Click or press Enter to update the details, storyline, genres, tags,
 and AniList link. The field starts with no anime selected and invites you to
-click a dot. Clicking anywhere outside a dot or using **Reset positions** clears
-the highlight, dashed connections, and anime details.
+click a dot. Clicking inside the playground outside a dot or using **Reset positions**
+clears the highlight, dashed connections, and anime details. Clicking outside the
+playground, including expanding all story tags, preserves the selection.
 
 The dust field defaults to **60 dots**, with 30 and 90 options. It reserves half
 the candidate budget equally for each movie's strongest matches, then fills
@@ -271,3 +278,15 @@ Movie metadata comes from TMDB. This product uses the TMDB API but is not
 endorsed or certified by TMDB. The bundled approved TMDB logo by Travis Bell
 is preserved from [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Tmdb.new.logo.svg)
 under its [CC BY-SA 4.0 license](https://creativecommons.org/licenses/by-sa/4.0/).
+
+## Supervisor design proposal
+
+`assest/main.tex` and `assest/aniviz_supervisor_proposal.pdf` contain a meeting
+proposal for a connected journey from a familiar movie to a first anime. The
+10-page proposal includes an audited dataset inventory, user tasks, three design
+directions with mock-ups, a storyboard, real ranking examples, evaluation plans,
+and a feedback worksheet. Proposed navigation, linked cohorts, studio/cast
+handoffs, filters, and shortlists remain design ideas.
+
+Rebuild with `pdflatex` twice using a temporary output directory, then copy only
+the PDF into `assest/` to keep compilation intermediates out of the project.

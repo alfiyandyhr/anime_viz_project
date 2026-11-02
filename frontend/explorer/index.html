@@ -69,13 +69,11 @@
           </span>
         </a>
 
-        <p class="rail-group">The four questions</p>
-
-        <a class="rail-link" data-goto="reception" href="../reception/index.html">
+        <a class="rail-link" data-goto="recommendations" href="../recommendations/index.html">
           <span class="idx">01</span>
           <span class="rail-text">
-            <strong>Reception</strong>
-            <small>Do the most-watched deserve their fame?</small>
+            <strong>Movie → Anime</strong>
+            <small>Love a movie? Find your first anime.</small>
           </span>
         </a>
 
@@ -94,16 +92,6 @@
             <small>Who makes the hits?</small>
           </span>
         </a>
-
-        <a class="rail-link" data-goto="recommendations" href="../recommendations/index.html">
-          <span class="idx">04</span>
-          <span class="rail-text">
-            <strong>Movie → Anime</strong>
-            <small>Love a movie? Find your first anime.</small>
-          </span>
-        </a>
-
-        <p class="rail-group">Then</p>
 
         <a class="rail-link is-active" aria-current="page" data-goto="explorer" href="../explorer/index.html">
           <span class="idx">✦</span>
@@ -213,11 +201,43 @@
           <p class="chapter-eyebrow">Explore · Details on demand</p>
           <h2>Dig into the data yourself</h2>
           <p class="chapter-lede">
-            The story argued that popularity, quality, content, and creators pull
-            in different directions. Here are the raw titles behind it — filter
-            above, sort below, and open any row for the full record.
+            Browse the catalogue and compare audience response. Filter above,
+            switch between the table and score vs. popularity chart, and open
+            any title for the full record.
           </p>
         </header>
+
+        <section class="kpi-grid" aria-label="The sample at a glance">
+          <article class="kpi-card">
+            <span>Visible anime</span>
+            <strong id="kpi-count">—</strong>
+            <small>after current filters</small>
+          </article>
+
+          <article class="kpi-card">
+            <span>Average score</span>
+            <strong id="kpi-score">—</strong>
+            <small>out of 100</small>
+          </article>
+
+          <article class="kpi-card">
+            <span>Total popularity</span>
+            <strong id="kpi-popularity">—</strong>
+            <small>combined list users</small>
+          </article>
+
+          <article class="kpi-card">
+            <span>Studios represented</span>
+            <strong id="kpi-studios">—</strong>
+            <small>primary studios</small>
+          </article>
+
+          <article class="kpi-card">
+            <span>Voice actors represented</span>
+            <strong id="kpi-actors">—</strong>
+            <small>Japanese main-role cast</small>
+          </article>
+        </section>
 
         <section class="insight-strip">
           <div class="mini-heading">
@@ -228,53 +248,81 @@
           <div id="insight-cards" class="insight-grid"></div>
         </section>
 
-        <div class="explorer-head">
-          <h3>Anime explorer</h3>
-          <div class="explorer-controls">
-            <label class="table-sort">
-              <span>Sort visible titles</span>
-              <select id="table-sort">
-                <option value="popularity">Popularity</option>
-                <option value="score">Average score</option>
-                <option value="favourites">Favourites</option>
-                <option value="year-desc">Newest release</option>
-                <option value="year-asc">Oldest release</option>
-                <option value="title">Title</option>
-              </select>
-            </label>
-            <label class="table-page-size">
-              <span>Show</span>
-              <select id="table-page-size">
-                <option value="10">10</option>
-                <option value="25" selected>25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-              </select>
-            </label>
+        <div class="chart-tabs" role="tablist" aria-label="Explorer view">
+          <button type="button" role="tab" id="tab-table" aria-controls="panel-table" aria-selected="true" tabindex="0">Table</button>
+          <button type="button" role="tab" id="tab-scatter" aria-controls="panel-scatter" aria-selected="false" tabindex="-1">Score vs Popularity</button>
+        </div>
+
+        <section id="panel-table" class="explorer-panel" role="tabpanel" aria-labelledby="tab-table" tabindex="0">
+          <div class="explorer-head">
+            <h3>Anime explorer</h3>
+            <div class="explorer-controls">
+              <label class="table-sort">
+                <span>Sort visible titles</span>
+                <select id="table-sort">
+                  <option value="popularity">Popularity</option>
+                  <option value="score">Average score</option>
+                  <option value="favourites">Favourites</option>
+                  <option value="year-desc">Newest release</option>
+                  <option value="year-asc">Oldest release</option>
+                  <option value="title">Title</option>
+                </select>
+              </label>
+              <label class="table-page-size">
+                <span>Show</span>
+                <select id="table-page-size">
+                  <option value="10" selected>10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </label>
+            </div>
           </div>
-        </div>
 
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Anime</th>
-                <th>Year</th>
-                <th>Format</th>
-                <th>Studio</th>
-                <th>Score</th>
-                <th>Popularity</th>
-                <th>Genres</th>
-              </tr>
-            </thead>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Anime</th>
+                  <th>Year</th>
+                  <th>Format</th>
+                  <th>Studio</th>
+                  <th>Score</th>
+                  <th>Popularity</th>
+                  <th>Genres</th>
+                </tr>
+              </thead>
 
-            <tbody id="anime-table-body"></tbody>
-          </table>
-        </div>
+              <tbody id="anime-table-body"></tbody>
+            </table>
+          </div>
 
-        <div id="table-pagination" class="table-pagination"></div>
+          <div id="table-pagination" class="table-pagination"></div>
 
-        <p id="table-note" class="table-note"></p>
+          <p id="table-note" class="table-note"></p>
+        </section>
+
+        <section id="panel-scatter" class="explorer-panel" role="tabpanel" aria-labelledby="tab-scatter" tabindex="0" hidden>
+          <article class="viz-card">
+            <div class="viz-header">
+              <div>
+                <p class="chart-kicker">Ratings and reach</p>
+                <h3>Score vs. popularity</h3>
+                <p>
+                  Position shows rating and audience size. Bubble area represents
+                  favourites; color represents primary genre. The dashed line is
+                  a linear trend fitted against log popularity. These measures
+                  describe audience response, not similarity or predicted enjoyment.
+                </p>
+              </div>
+
+              <span class="chart-badge">Log popularity axis</span>
+            </div>
+
+            <div id="scatter-chart" class="chart chart-large"></div>
+          </article>
+        </section>
 
         <details class="methodology">
           <summary>Methodology &amp; limitations</summary>

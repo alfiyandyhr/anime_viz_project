@@ -7,7 +7,7 @@ const state = {
   networkSimulation: null,
   networkTypes: new Set(["actor", "character", "work"]),
   tablePage: 0,
-  tablePageSize: 25
+  tablePageSize: 10
 };
 
 // Each page registers only the renderers and controls it owns.

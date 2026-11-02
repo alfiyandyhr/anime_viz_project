@@ -97,11 +97,11 @@
 .movie-magnet-chip button:hover { color: var(--text); background: var(--surface-light); }
 .magnet-empty-slot { color: var(--text-muted); font-size: .73rem; padding: 5px 0; }
 .movie-suggestions button:disabled { opacity: .4; cursor: default; }
-.dust-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 20px; }
-.dust-toolbar .small-button { min-height: 30px; font-size: .7rem; padding: 5px 9px; }
-.dust-legend { display: flex; align-items: center; gap: 16px; color: var(--text-muted); font-size: .7rem; }
-.dust-legend > span { display: inline-flex; align-items: center; gap: 6px; }
-.dust-legend-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); }
+.dust-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-top: 20px; }
+.dust-toolbar .small-button { flex-shrink: 0; min-height: 30px; font-size: .7rem; padding: 5px 9px; }
+.dust-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; min-width: 0; max-width: 100%; color: var(--text-muted); font-size: .7rem; }
+.dust-legend > span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.dust-legend-dot { flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--magnet-color, var(--cyan)); }
 .dust-legend-dot.is-selected { background: var(--pink); }
 .dust-map { border-radius: 14px; background: radial-gradient(ellipse at center, rgba(67,217,230,.025), transparent 70%); }
 .dust-node { cursor: pointer; outline: none; }

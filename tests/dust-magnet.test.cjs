@@ -2,12 +2,71 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const { createHash } = require("node:crypto");
+const vm = require("node:vm");
 const { getDustMatches, defaultMagnetPositions, dustAttraction, createDustNodes, stepDust, layoutDust } = require("../frontend/recommendations/dust-magnet.js");
 const data = JSON.parse(readFileSync(require.resolve("../data/movie_recommendations.json"), "utf8"));
 const binary = readFileSync(require.resolve("../data/movie_anime_scores.bin"));
 const view = new DataView(binary.buffer, binary.byteOffset, binary.byteLength);
 const scores = Float32Array.from({ length: binary.length / 4 }, (_, index) => view.getFloat32(index * 4, true));
 const favorites = ["Inception", "Interstellar", "The Matrix"].map((title) => data.movies.find((movie) => movie.title === title).id);
+
+test("dust selection resets only for non-dot clicks inside the playground", () => {
+  const element = (parent = null, isDust = false) => ({
+    parent, listeners: {},
+    addEventListener(type, handler) { (this.listeners[type] ??= []).push(handler); },
+    closest(selector) {
+      return selector === ".dust-node" && isDust ? this : parent?.closest(selector);
+    }
+  });
+  const document = element();
+  const playground = element(document);
+  const detail = element(document);
+  const allTags = element(detail);
+  const dot = element(playground, true);
+  const grain = element(dot);
+  const magnet = element(playground);
+  const controls = new Map([["#recommendation-chart", playground]]);
+  document.querySelector = (selector) => {
+    if (!controls.has(selector)) controls.set(selector, element(document));
+    return controls.get(selector);
+  };
+  let detailRenders = 0, highlights = 0, tooltipHides = 0;
+  const recommendationState = { viz: "magnets", animeId: "selected-anime" };
+  const context = vm.createContext({
+    document, recommendationState,
+    hideTooltip: () => tooltipHides++,
+    highlightRecommendation: () => highlights++,
+    recordDetailRender: () => detailRenders++
+  });
+  vm.runInContext(readFileSync(require.resolve("../frontend/recommendations/dust-magnet.js"), "utf8"), context);
+  vm.runInContext("renderDustDetail = recordDetailRender; bindDustControls();", context);
+  const click = (target) => {
+    for (let current = target; current; current = current.parent) {
+      for (const handler of current.listeners.click || []) handler({ target });
+    }
+  };
+
+  for (const target of [allTags, detail, document, document.querySelector("#dust-limit"), dot, grain]) {
+    click(target);
+    assert.equal(recommendationState.animeId, "selected-anime");
+  }
+  assert.equal(detailRenders, 0, "outside clicks preserve the focused anime details");
+  for (const target of [playground, magnet]) {
+    recommendationState.animeId = "selected-anime";
+    click(target);
+    assert.equal(recommendationState.animeId, null);
+  }
+  assert.equal(detailRenders, 2);
+  assert.equal(highlights, 2);
+  assert.equal(tooltipHides, 2);
+
+  click(playground);
+  assert.equal(detailRenders, 2, "empty selection needs no rerender");
+  recommendationState.viz = "connections";
+  recommendationState.animeId = "selected-anime";
+  click(playground);
+  assert.equal(recommendationState.animeId, "selected-anime");
+});
 
 test("complete web matrix matches its hash, dimensions, and every exported top/bottom score", () => {
   assert.equal(binary.length, data.movies.length * data.anime.length * 4);

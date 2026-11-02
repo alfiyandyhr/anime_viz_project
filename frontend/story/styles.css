@@ -109,10 +109,11 @@ body[data-chapter="story"] { --era-color: var(--purple); }
 .period-map-dot { fill: var(--era-color); }
 .period-map-title { fill: var(--text); font-size: 11px; }
 .period-map-score { fill: var(--text-muted); font-size: 9px; }
-.period-movie-row { cursor: pointer; }
+/* The SVG group includes the connector; keep its focus ring on the movie tile. */
+.period-movie-row { cursor: pointer; outline: none; }
 .period-movie-row:hover .period-map-target, .period-movie-row:focus .period-map-target { fill: rgba(157,123,255,.14); stroke: var(--era-color); }
 .period-movie-row:hover .period-map-line, .period-movie-row:focus .period-map-line { opacity: .9; }
-.period-movie-row:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.period-movie-row:focus-visible .period-map-target { stroke: var(--cyan); stroke-width: 2; }
 .story-movie-attribution img { width: 55px; vertical-align: middle; margin-right: 10px; }
 .story-ending { padding: 80px clamp(20px, 4vw, 70px); border: 1px solid var(--border); border-radius: 22px; background: radial-gradient(ellipse at 0% 100%, rgba(157,123,255,.12), transparent 70%), #101628; }
 .story-ending h2 { font-family: "Space Grotesk", sans-serif; font-size: clamp(2rem, 4vw, 3.7rem); line-height: 1.1; letter-spacing: -.05em; margin: 20px 0; }

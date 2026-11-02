@@ -55,3 +55,72 @@ test("pages with independent data initialize and resize without loading the dash
   assert.equal(renders, 2);
   assert.equal(dashboardRequests, 0);
 });
+
+test("Explorer tabs defer rendering until data arrives and refresh only the visible view", () => {
+  const nodes = new Map();
+  const node = selector => {
+    if (!nodes.has(selector)) nodes.set(selector, {
+      hidden: selector === "#panel-scatter",
+      attributes: {},
+      listeners: {},
+      addEventListener(event, callback) { this.listeners[event] = callback; },
+      setAttribute(name, value) { this.attributes[name] = value; },
+      focus() { this.focused = true; }
+    });
+    return nodes.get(selector);
+  };
+  const renders = [];
+  let controls;
+  const context = vm.createContext({
+    elements: {},
+    state: { data: null, filteredAnime: [], tablePage: 2 },
+    document: { querySelector: node },
+    registerPage: value => { controls = value; },
+    hideTooltip() {},
+    record: view => renders.push({ view, anime: [...context.state.filteredAnime] })
+  });
+  vm.runInContext(readFileSync(path.join(root, "frontend/explorer/app.js"), "utf8"), context);
+  vm.runInContext(`
+    renderKPIs = () => {};
+    renderInsights = () => {};
+    renderAnimeTable = () => record("table");
+    renderScatterplot = () => record("scatter");
+  `, context);
+  controls.bindControls();
+
+  node("#tab-scatter").listeners.click();
+  assert.deepEqual(renders, [], "a tab can be selected while the dashboard is still loading");
+  assert.equal(node("#panel-table").hidden, true);
+  assert.equal(node("#panel-scatter").hidden, false);
+
+  context.state.data = {};
+  context.state.filteredAnime = [{ id: 1 }, { id: 2 }];
+  controls.render();
+  context.state.filteredAnime = [{ id: 2 }];
+  controls.render(); // Shared filters and resize both call the page renderer.
+  assert.deepEqual(renders, [
+    { view: "scatter", anime: [{ id: 1 }, { id: 2 }] },
+    { view: "scatter", anime: [{ id: 2 }] }
+  ]);
+
+  const key = (selector, value) => {
+    let prevented = false;
+    node(selector).listeners.keydown({ key: value, preventDefault() { prevented = true; } });
+    assert.equal(prevented, true);
+  };
+  key("#tab-scatter", "ArrowLeft");
+  assert.deepEqual(renders.at(-1), { view: "table", anime: [{ id: 2 }] });
+  assert.equal(node("#panel-scatter").hidden, true);
+  assert.equal(node("#tab-table").attributes["aria-selected"], "true");
+  assert.equal(node("#tab-table").tabIndex, 0);
+  assert.equal(node("#tab-scatter").tabIndex, -1);
+  assert.equal(node("#tab-table").focused, true);
+  assert.equal(context.state.tablePage, 2, "switching views retains table pagination");
+
+  key("#tab-table", "End");
+  assert.equal(renders.at(-1).view, "scatter");
+  key("#tab-scatter", "Home");
+  assert.equal(renders.at(-1).view, "table");
+  key("#tab-table", "ArrowRight");
+  assert.equal(renders.at(-1).view, "scatter");
+});

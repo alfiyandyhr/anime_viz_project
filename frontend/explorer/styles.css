@@ -1,3 +1,90 @@
+/* KPI row */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 13px;
+}
+
+.kpi-card {
+  min-height: 140px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-medium);
+  background:
+    radial-gradient(circle at top right, rgba(157, 123, 255, 0.13), transparent 45%),
+    var(--surface);
+}
+
+.kpi-card span,
+.kpi-card small {
+  color: var(--text-muted);
+}
+
+.kpi-card span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.kpi-card strong {
+  margin: 6px 0 1px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(1.6rem, 2.6vw, 2.4rem);
+}
+
+.kpi-card small {
+  font-size: 0.72rem;
+}
+
+/* Explorer views share one filtered catalogue. */
+
+.explorer-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+
+.explorer-panel[hidden] {
+  display: none;
+}
+
+.chart-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chart-tabs [role="tab"] {
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  color: var(--text-soft);
+  background: transparent;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.chart-tabs [role="tab"]:hover,
+.chart-tabs [role="tab"][aria-selected="true"] {
+  border-color: var(--purple);
+  color: white;
+  background: rgba(157, 123, 255, 0.16);
+}
+
+.chart-tabs [role="tab"]:focus-visible,
+.explorer-panel:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 4px;
+}
+
 /* Insight strip (Explorer) */
 
 .insight-strip {
@@ -295,11 +382,12 @@ tbody tr:hover {
 
 
 @media (max-width: 1250px) {
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
   .insight-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 1000px) {
   .method-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 680px) {
-  .insight-grid, .method-grid { grid-template-columns: 1fr; }
+  .kpi-grid, .insight-grid, .method-grid { grid-template-columns: 1fr; }
 }
