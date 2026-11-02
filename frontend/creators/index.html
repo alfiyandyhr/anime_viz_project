@@ -43,7 +43,7 @@
 
   <div class="app-shell">
     <!-- ───────────────────────── Left rail ───────────────────────── -->
-    <aside class="rail" aria-label="Story navigation">
+    <aside class="rail" aria-label="Site navigation">
       <a class="brand" href="../intro/index.html" data-goto="intro">
         <span class="brand-mark">A</span>
         <span>
@@ -52,68 +52,76 @@
         </span>
       </a>
 
-      <nav class="rail-nav" aria-label="Chapters">
+      <nav class="rail-nav" aria-label="Movie journey, catalogue, and optional explorations">
         <a class="rail-link" data-goto="intro" href="../intro/index.html">
           <span class="idx">◆</span>
           <span class="rail-text">
             <strong>Introduction</strong>
-            <small>What makes anime resonate?</small>
+            <small>Start your movie-to-anime journey</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="story" href="../story/index.html">
+        <a class="rail-link catalogue-entry" aria-label="Browse full catalogue" href="../explorer/index.html?mode=catalogue">
+          <span class="idx">◇</span>
+          <span class="rail-text">
+            <strong>Browse full catalogue</strong>
+            <small>Explore all sampled anime</small>
+          </span>
+        </a>
+
+        <a class="rail-link" aria-label="Story — Optional exploration" data-goto="story" href="../story/index.html">
           <span class="idx">◷</span>
           <span class="rail-text">
             <strong>Story</strong>
-            <small>The evolution of anime · 1963 to today</small>
+            <small>Optional · Explore anime history</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="recommendations" href="../recommendations/index.html">
+        <a class="rail-link" aria-label="Task 1 — Movie → Anime" data-goto="recommendations" href="../recommendations/index.html">
           <span class="idx">01</span>
           <span class="rail-text">
             <strong>Movie → Anime</strong>
-            <small>Love a movie? Find your first anime.</small>
+            <small>Task 1 · Find your matches</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="content" href="../content/index.html">
+        <a class="rail-link" aria-label="Task 2 — Content" data-goto="content" href="../content/index.html">
           <span class="idx">02</span>
           <span class="rail-text">
             <strong>Content</strong>
-            <small>What stories rise, and when?</small>
+            <small>Task 2 · Explore stories and years</small>
           </span>
         </a>
 
-        <a class="rail-link is-active" aria-current="page" data-goto="creators" href="../creators/index.html">
+        <a class="rail-link is-active" aria-label="Task 3 — Creators" aria-current="page" data-goto="creators" href="../creators/index.html">
           <span class="idx">03</span>
           <span class="rail-text">
             <strong>Creators</strong>
-            <small>Who makes the hits?</small>
+            <small>Task 3 · Discover studios and cast</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="reception" href="../reception/index.html">
+        <a class="rail-link" aria-label="Task 4 — Reception" data-goto="reception" href="../reception/index.html">
           <span class="idx">04</span>
           <span class="rail-text">
             <strong>Reception</strong>
-            <small>Compare ratings and audience size</small>
+            <small>Task 4 · Compare audience reception</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="explorer" href="../explorer/index.html">
+        <a class="rail-link" aria-label="Explorer — Final comparison" data-goto="explorer" href="../explorer/index.html">
           <span class="idx">✦</span>
           <span class="rail-text">
             <strong>Explorer</strong>
-            <small>Dig into the data yourself</small>
+            <small>Finish · Compare your finalists</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="dust-magnet" href="../dust-magnet/index.html">
+        <a class="rail-link" aria-label="Dust &amp; Magnet — Optional exploration" data-goto="dust-magnet" href="../dust-magnet/index.html">
           <span class="idx">✧</span>
           <span class="rail-text">
             <strong>Dust &amp; Magnet</strong>
-            <small>Explore the pull of your favorite movies</small>
+            <small>Optional · Explore movie magnets</small>
           </span>
         </a>
       </nav>
@@ -206,28 +214,27 @@
         </div>
       </details>
 
-      <!-- ═══════════════════ Chapter 3: Creators ═════════════════════ -->
+      <!-- ═══════════════════ Task 3: Creators ═════════════════════ -->
       <section
         class="chapter is-active"
         id="chapter-creators"
         data-chapter="creators"
-        aria-label="Chapter 3 — Creators"
+        aria-label="Creators · Full catalogue"
       >
         <header class="chapter-head">
-          <p class="chapter-eyebrow">Chapter 03 · Creators</p>
-          <h2>Who makes the hits?</h2>
+          <p class="chapter-eyebrow">Creators · Full catalogue</p>
+          <h2>Discover studios and cast across the catalogue</h2>
           <p class="chapter-lede">
-            Behind every popular title is a studio and a cast. Some studios pair
-            huge reach with consistently strong scores; others specialize in a
-            genre. And the same Japanese voice actors recur again and again,
-            connecting the characters they play and the works they appear in.
+            Explore the studios and Japanese voice actors credited across the loaded anime catalogue. Filter titles and follow connections in the collaboration network to discover their creators.
           </p>
         </header>
+
+        <div id="journey-overview" class="journey-overview" hidden></div>
 
         <article class="viz-card" id="cohort-studios" hidden>
           <div class="viz-header"><div>
             <p class="chart-kicker">Follow the makers</p>
-            <h3>Studios in this cohort</h3>
+            <h3>Studios across your original matches</h3>
             <p id="cohort-studio-note"></p>
           </div></div>
           <div id="cohort-studio-bars" class="cohort-studio-bars"></div>
@@ -237,10 +244,11 @@
           <div class="viz-header">
             <div>
               <p class="chart-kicker">Production organizations</p>
-              <h3>Which studios pair reach with quality?</h3>
+              <h3>Which studios made the visible titles?</h3>
               <p>
-                Each studio sits at its average score; dot size shows how many
-                titles it has in view, color shows its dominant genre.
+                Each studio sits at the average AniList score of its visible
+                titles; dot size shows its title count and color its most common
+                genre in this selection. These are not industry-wide rankings.
               </p>
             </div>
           </div>
@@ -252,10 +260,11 @@
           <div class="viz-header">
             <div>
               <p class="chart-kicker">Specialization map</p>
-              <h3>Which studios specialize in which genres?</h3>
+              <h3>Which studio–genre connections appear in this selection?</h3>
               <p>
-                Darker cells indicate more titles connecting a studio to a genre.
-                Select a cell to cross-filter the whole story.
+                Darker cells indicate more currently visible titles connecting a
+                studio to a genre. Select a cell to filter the views. Counts
+                describe this selection, not a studio’s complete output.
               </p>
             </div>
           </div>
@@ -283,7 +292,7 @@
 
           <div id="cohort-cast-controls" class="cohort-cast-controls" hidden>
             <label><span>Follow an anime’s Japanese cast</span><select id="cohort-cast-anime"></select></label>
-            <p>Choose a title to follow its actors to other titles in this cohort. Select a name for details.</p>
+            <p>Choose a visible match to follow its actors to other visible matches for your movie. Actor details include credits across all available movie matches. Select a name for details.</p>
           </div>
 
           <div class="network-controls">
@@ -315,6 +324,7 @@
           <p id="network-summary" class="network-summary" role="status">Waiting for network data…</p>
           <div id="network-chart" class="network-chart"></div>
         </article>
+        <nav id="journey-next" class="journey-next" aria-label="Continue your movie journey" hidden></nav>
       </section>
 
     </main>

@@ -263,7 +263,7 @@
     $("#active-period").textContent = `${period.start}–${period.end}`;
     $("#active-year").textContent = store.year;
     $("#chapter-progress").style.width = `${100 * located.progress}%`;
-    $("#act-indicator").textContent = `ACT ${String(store.index).padStart(2, "0")} / ${String(periods.length - 1).padStart(2, "0")}`;
+    $("#act-indicator").textContent = `ERA ${String(store.index + 1).padStart(2, "0")} / ${String(periods.length).padStart(2, "0")}`;
     steps.forEach((step, i) => {
       step.classList.toggle("is-active", i === store.index);
       step.style.setProperty("--era-color", periods[i].color);

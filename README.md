@@ -59,28 +59,64 @@ chapter bookmarks such as `#creators`. Page navigation uses relative URLs for
 Flask and GitHub Pages. Filters persist across pages for the current browser
 session. The bundled dataset remains at the project root as `data.json`.
 
-The rail follows Introduction → Story → Movie → Anime → Content → Creators →
-Reception → Explorer → Dust & Magnet. Reception is task **04**, with the
+The four numbered tasks follow Movie → Anime (1) → Content (2) → Creators (3) →
+Reception (4): choose a movie, explore the stories in its matches, discover their
+studios and cast, then compare audience reception. Explorer is the unnumbered
+final comparison step for choosing a first anime. Story and Dust & Magnet are
+labelled optional explorations in every page's navigation. Reception has the
 **Score vs Popularity** chart for comparing audience ratings and reach. Bubbles
 open anime details and update with shared filters and window resizing. Explorer
 provides the catalogue table and first-watch shortlist comparison. Dust & Magnet
 is a separate playground outside the four numbered task views.
 
+Task 1, the movie-match views in Tasks 2–4, and Explorer share a compact journey
+overview. It highlights the current location without recording task completion;
+Explorer appears separately as the unnumbered final comparison. Descriptive next
+actions connect Content → Creators → Reception → Explorer while keeping the movie
+and its filters. In Task 1, opening another task from the overview confirms the
+displayed example or chosen movie using the same session-storage check as
+**Explore these 20 matches →**. Catalogue views hide this movie-journey guidance.
+In Explorer, use the **Shortlist** checkboxes to select 2–3 matches and compare
+similarity, format, runtime, and audience scores before choosing a first anime.
+
 Selecting a movie carries its **Top 20** into Content, Creators, Reception, and Explorer
-for the browser session. The context strip shows the seed movie, links back to
-movie search, and offers **Show full catalogue** or × to clear the cohort and
-reset filters. Dashboard filters narrow that cohort. A new movie clears the
-previous movie's filters. IDs are joined across snapshots; recommendations with
-no dashboard metadata remain in the cohort definition and are marked unavailable.
+for the browser session. The shared context strip shows the movie title and year,
+original match count, and how many matches are visible or hidden by filters.
+It stays visible when filters are collapsed and wraps long titles on small screens.
+Filters carry between these views and narrow the original movie matches; the
+strip's **Reset filters** restores available matches without clearing the movie.
+Recommendations missing dashboard metadata are counted separately from titles
+hidden by filters; they retain their original ranks and scores and are never
+replaced. The strip links back to movie search. **Browse full catalogue** in the
+navigation (or the introduction) explicitly opens catalogue mode using the same
+Content, Creators, Reception, and Explorer views and `data.json` sample. Catalogue
+headings and navigation describe browsing rather than numbered movie-match tasks;
+the strip prominently says **Browsing the full catalogue** and offers
+**Resume matches for [movie]** without discarding the movie or its original matches.
+
+Movie-match and catalogue filters persist independently in session storage.
+Switching modes restores that mode's filters; a reset affects only the current
+mode. Selecting a different movie activates its matches and clears the previous
+movie's filters while preserving catalogue filters. Selecting the same movie
+retains its match filters. Direct page entry restores the active session mode
+when a valid movie context exists; otherwise it opens an explicitly labelled
+catalogue with a link to Task 1. Explicit `?mode=catalogue` and `?mode=matches`
+navigation overrides the saved mode (matches require a valid saved movie).
+Older shared filters migrate once to their last active scope, so an old catalogue
+preference never produces movie-match headings over catalogue charts. Context and
+filters last only for the browser session. If session storage is unavailable,
+the context strip explains the persistence limit; Task 1 prevents continuation
+until its movie context can be saved.
 
 Explorer's **Shortlist** checkboxes compare up to three titles. Selecting two
 opens a fixed comparison footer with original similarity ranks and cosine scores,
 format, year, episodes, estimated runtime, AniList score, and status. Similarity
-evidence is shown only in cohort mode; missing runtime values remain unknown.
+evidence is shown only when viewing movie matches; missing runtime values remain unknown.
 The shortlist lasts while the Explorer page stays open, including filtering,
 pagination, and switching views. Creators adds credited-title counts for the
-whole cohort and lets users select an anime to follow its sampled Japanese cast
-to other filtered cohort titles. Catalogue mode retains the full network.
+original movie match set, explicitly labelled as unaffected by filters, and lets
+users select an anime to follow its sampled Japanese cast to other visible matches.
+Actor profiles label their credits as spanning all available movie matches. Catalogue mode retains the full network.
 Story includes a dismissible **Skip to Movie → Anime** banner.
 
 ---
@@ -131,7 +167,7 @@ GitHub Pages picks up the new data automatically after the push.
 ## Story — The Evolution of Anime
 
 Open **Story** from any page, or visit `http://localhost:5000/story` with Flask
-running. The page tells six connected chapters from 1963 to the current year.
+running. The page tells six connected eras from 1963 to the current year.
 Scrolling in either direction updates one sticky archive: an annual timeline,
 the year's Top 10 posters, and a period-level genre or main-studio ranking.
 The year selector jumps to a particular release year. Posters open accessible
@@ -161,15 +197,15 @@ can have multiple genres or credited main studios. Historical milestones link
 to primary sources in the narrative; the rankings are not evidence of those
 events' causes or effects.
 
-To add a historical chapter, add a `.story-step` section to
+To add a historical era, add a `.story-step` section to
 `frontend/story/index.html` with its start/end years, theme, and accent color,
 then add its link to `.era-nav`. Scroll and chart logic derive periods from
 these attributes. `data.js` contains independently testable sample and scroll
 transformations; `app.js` owns the D3 joins, controls, and data loading.
 
 The **Top anime of decade → movie** detours use only the whitespace after each
-chapter's historical text. They measure the available height and show as many
-complete connection maps as fit, without extending chapters or changing the
+era's historical text. They measure the available height and show as many
+complete connection maps as fit, without extending eras or changing the
 year picker and scroll progression. Small screens may show fewer maps or none.
 Anime are ordered by current AniList popularity within the period's annual
 Top 10 sample. Each map shows the three most similar movies from the same
@@ -216,6 +252,16 @@ node --test tests/*.test.cjs
 ## Movie → Anime recommendations
 
 Open **Movie → Anime** in the rail, or visit `frontend/recommendations/index.html` (the existing `#recommendations` bookmark also works). **Connection map** compares one movie and provides the full ranking below.
+In a fresh session, Inception is labelled as an **example**, with no movie chosen
+yet. Choose a movie through search or suggestions, or use **Explore these 20
+matches →** to confirm the displayed example and open Task 2. The movie title,
+year, and Top 20 count identify the set carried through Tasks 2–4 and Explorer.
+Continuation activates movie matches even if the session previously showed the
+full catalogue. Top/Bottom 5 or 10 changes only the map; the carried set always
+uses the published Top 20 and works before the full score matrix loads. If
+session storage cannot save the context, continuation stays on Task 1 and
+explains how to retry.
+
 Open **Dust & Magnet** below Explorer in the rail, or visit
 `frontend/dust-magnet/index.html`, to add one, two, or three favorite movies through search or
 suggestions. Remove a movie with its × button. Drag magnets (or focus one and
@@ -262,7 +308,7 @@ similarity, with 10 rows per page and Explorer-style page numbers and Previous/N
 controls. Select any ranked anime to read its details. Choosing a different movie
 resets the table to page 1 and starts a fresh one-movie selection.
 
-This chapter uses its own movie controls, independently of the dashboard’s
+This task uses its own movie controls, independently of the dashboard’s
 anime filters. It lazily loads `data/movie_recommendations.json` and works on
 GitHub Pages and the Flask server without an embedding model or API token.
 It preserves the computed ranking, including seasons and same-work overlaps;

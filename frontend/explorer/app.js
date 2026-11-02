@@ -32,7 +32,7 @@ function renderComparison() {
   container.hidden = selected.length < 2;
   document.body.classList.toggle("has-comparison", selected.length >= 2);
   document.querySelector("#shortlist-status").textContent =
-    `${selected.length} of 3 shortlisted. Select 2–3 titles to compare; selections stay when you filter or change pages.`;
+    `${selected.length} of 3 shortlisted. Select 2–3 titles to compare; selections stay when you filter or change table pages, while this Explorer page stays open.`;
   if (selected.length < 2) return;
   const values = selected.map(comparisonRows);
   const metrics = ["Similarity rank", "Cosine score", "Format / year", "Episodes", "Estimated total", "AniList score", "Status"];

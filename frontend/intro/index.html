@@ -43,7 +43,7 @@
 
   <div class="app-shell">
     <!-- ───────────────────────── Left rail ───────────────────────── -->
-    <aside class="rail" aria-label="Story navigation">
+    <aside class="rail" aria-label="Site navigation">
       <a class="brand" href="../intro/index.html" data-goto="intro">
         <span class="brand-mark">A</span>
         <span>
@@ -52,68 +52,76 @@
         </span>
       </a>
 
-      <nav class="rail-nav" aria-label="Chapters">
+      <nav class="rail-nav" aria-label="Movie journey, catalogue, and optional explorations">
         <a class="rail-link is-active" aria-current="page" data-goto="intro" href="../intro/index.html">
           <span class="idx">◆</span>
           <span class="rail-text">
             <strong>Introduction</strong>
-            <small>What makes anime resonate?</small>
+            <small>Start your movie-to-anime journey</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="story" href="../story/index.html">
+        <a class="rail-link catalogue-entry" aria-label="Browse full catalogue" href="../explorer/index.html?mode=catalogue">
+          <span class="idx">◇</span>
+          <span class="rail-text">
+            <strong>Browse full catalogue</strong>
+            <small>Explore all sampled anime</small>
+          </span>
+        </a>
+
+        <a class="rail-link" aria-label="Story — Optional exploration" data-goto="story" href="../story/index.html">
           <span class="idx">◷</span>
           <span class="rail-text">
             <strong>Story</strong>
-            <small>The evolution of anime · 1963 to today</small>
+            <small>Optional · Explore anime history</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="recommendations" href="../recommendations/index.html">
+        <a class="rail-link" aria-label="Task 1 — Movie → Anime" data-goto="recommendations" href="../recommendations/index.html">
           <span class="idx">01</span>
           <span class="rail-text">
             <strong>Movie → Anime</strong>
-            <small>Love a movie? Find your first anime.</small>
+            <small>Task 1 · Find your matches</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="content" href="../content/index.html">
+        <a class="rail-link" aria-label="Task 2 — Content" data-goto="content" href="../content/index.html">
           <span class="idx">02</span>
           <span class="rail-text">
             <strong>Content</strong>
-            <small>What stories rise, and when?</small>
+            <small>Task 2 · Explore stories and years</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="creators" href="../creators/index.html">
+        <a class="rail-link" aria-label="Task 3 — Creators" data-goto="creators" href="../creators/index.html">
           <span class="idx">03</span>
           <span class="rail-text">
             <strong>Creators</strong>
-            <small>Who makes the hits?</small>
+            <small>Task 3 · Discover studios and cast</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="reception" href="../reception/index.html">
+        <a class="rail-link" aria-label="Task 4 — Reception" data-goto="reception" href="../reception/index.html">
           <span class="idx">04</span>
           <span class="rail-text">
             <strong>Reception</strong>
-            <small>Compare ratings and audience size</small>
+            <small>Task 4 · Compare audience reception</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="explorer" href="../explorer/index.html">
+        <a class="rail-link" aria-label="Explorer — Final comparison" data-goto="explorer" href="../explorer/index.html">
           <span class="idx">✦</span>
           <span class="rail-text">
             <strong>Explorer</strong>
-            <small>Dig into the data yourself</small>
+            <small>Finish · Compare your finalists</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="dust-magnet" href="../dust-magnet/index.html">
+        <a class="rail-link" aria-label="Dust &amp; Magnet — Optional exploration" data-goto="dust-magnet" href="../dust-magnet/index.html">
           <span class="idx">✧</span>
           <span class="rail-text">
             <strong>Dust &amp; Magnet</strong>
-            <small>Explore the pull of your favorite movies</small>
+            <small>Optional · Explore movie magnets</small>
           </span>
         </a>
       </nav>
@@ -230,15 +238,15 @@
               <p>Discover anime with stories similar to a movie you love.</p>
             </div>
             <div class="cover-action">
-              <a class="button button-secondary" href="../explorer/index.html" data-goto="explorer">
-                Browse the catalogue →
+              <a class="button button-secondary" href="../explorer/index.html?mode=catalogue">
+                Browse full catalogue →
               </a>
               <p>Explore titles by genre, year, format, and audience response.</p>
             </div>
           </div>
 
           <p class="cover-context">
-            <a href="../story/index.html" data-goto="story">Story: how anime evolved →</a>
+            <a href="../story/index.html" data-goto="story">Optional Story: how anime evolved →</a>
           </p>
         </div>
       </section>

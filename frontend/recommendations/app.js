@@ -57,6 +57,13 @@ const recommendationDataUrl = typeof document === "undefined" ? null
 
 function bindRecommendationControls() {
   bindDustControls();
+  document.querySelector("#explore-matches")?.addEventListener("click", continueRecommendationJourney);
+  document.querySelector("#journey-overview")?.addEventListener("click", (event) => {
+    const link = event.target.closest("a[data-journey-destination]");
+    if (link) continueRecommendationJourney({
+      preventDefault: () => event.preventDefault(), currentTarget: link
+    });
+  });
   const search = document.querySelector("#movie-search");
   search.addEventListener("input", renderMovieSearchResults);
   search.addEventListener("keydown", (event) => {
@@ -230,29 +237,29 @@ function selectRecommendationMovie(id) {
   recommendationState.animeId = null;
   document.querySelector("#movie-search").value = "";
   document.querySelector("#movie-search-results").hidden = true;
-  renderRecommendations();
+  renderRecommendations(true);
 }
 
 function selectedRecommendationMovie() {
   return recommendationState.data?.movies.find((movie) => movie.id === recommendationState.movieId);
 }
 
-function saveRecommendationCohort() {
-  if (recommendationState.viz === "magnets" || !recommendationState.cohortSelected) return;
+function saveRecommendationCohort(activateMatches = false) {
+  if (recommendationState.viz === "magnets" || !recommendationState.cohortSelected) return false;
   const movie = selectedRecommendationMovie();
-  if (!movie) return;
+  if (!movie) return false;
   const data = recommendationState.data;
-  // Published top matches are available even while the full matrix is loading.
-  const ranking = getRecommendationRanking(data, recommendationState.scores, movie);
-  const matches = ranking.length ? ranking.slice(0, 20)
-    : movie.matches.slice(0, 20).map(([index, score], indexInRanking) => ({
-      anime: data.anime[index], score, rank: indexInRanking + 1
-    }));
+  // The published Top 20 defines the carried set independently of map cutoffs
+  // and matrix loading, including its original ranks and scores.
+  const matches = movie.matches.slice(0, 20).map(([index, score], indexInRanking) => ({
+    anime: data.anime[index], score, rank: indexInRanking + 1
+  }));
   try {
     const previous = readMovieCohort();
-    if (String(previous?.seed.tmdbId) !== String(movie.id)) {
+    migrateScopeFilters(previous);
+    const changed = String(previous?.seed.tmdbId) !== String(movie.id);
+    if (changed) {
       sessionStorage.removeItem(FILTER_STORAGE_KEY);
-      sessionStorage.removeItem(COHORT_SCOPE_STORAGE_KEY);
     }
     sessionStorage.setItem(SEED_MOVIE_STORAGE_KEY, JSON.stringify({
       tmdbId: movie.id, title: movie.title, year: movie.year
@@ -262,10 +269,46 @@ function saveRecommendationCohort() {
       tmdbId: movie.id, total: data.anime.length,
       matches: matches.map((match) => ({ id: String(match.anime.id), rank: match.rank, score: match.score }))
     }));
-  } catch (error) { /* Recommendations remain usable when storage is disabled. */ }
+    if (activateMatches || changed) sessionStorage.setItem(COHORT_SCOPE_STORAGE_KEY, "cohort");
+    const saved = readMovieCohort();
+    if (saved && (activateMatches || changed)) {
+      state.cohort = saved;
+      state.browseMode = saved.enabled ? "matches" : "catalogue";
+      state.cohort_ids = saved.enabled ? new Set(saved.ids) : null;
+      renderScopePageCopy();
+    }
+    return String(saved?.seed.tmdbId) === String(movie.id)
+      && saved.ids.length === matches.length
+      && matches.every((match, index) => saved.ids[index] === String(match.anime.id))
+      && (!activateMatches || saved.enabled);
+  } catch (error) {
+    return false;
+  }
 }
 
-function renderRecommendations() {
+function continueRecommendationJourney(event) {
+  event.preventDefault();
+  if (recommendationState.viz === "magnets" || !selectedRecommendationMovie()) return;
+  recommendationState.cohortSelected = true;
+  const saved = saveRecommendationCohort(true);
+  renderRecommendationJourney(saved);
+  if (saved) window.location.assign(event.currentTarget.href);
+}
+
+function renderRecommendationJourney(saved) {
+  const journey = document.querySelector("#recommendation-journey");
+  if (!journey) return; // The shared script also serves Dust & Magnet.
+  journey.hidden = false;
+  const chosen = recommendationState.cohortSelected;
+  document.querySelector("#selected-movie-label").textContent = chosen ? "Your movie" : "Example movie · not yet chosen";
+  document.querySelector("#recommendation-journey-summary").textContent = !chosen
+    ? "Previewing an example. Choose a movie above, or use “Explore these 20 matches” to choose this example. Its Top 20 anime matches will follow you through Tasks 2–4 and Explorer."
+    : saved
+      ? "Its Top 20 anime matches will follow you through Tasks 2–4 and Explorer. Continue to Task 2 to explore their stories and release years."
+      : "Your movie’s matches are available here, but browser session storage could not save them for the next task. Enable session storage and try “Explore these 20 matches” again to continue.";
+}
+
+function renderRecommendations(activateMatches = false) {
   stopDustChart();
   const data = recommendationState.data;
   if (!data) {
@@ -273,7 +316,7 @@ function renderRecommendations() {
     return;
   }
   const magnets = recommendationState.viz === "magnets";
-  saveRecommendationCohort();
+  const contextSaved = saveRecommendationCohort(activateMatches);
   document.querySelector("#movie-magnets").hidden = !magnets;
   document.querySelector("#dust-limit-control").hidden = !magnets;
   document.querySelector("#recommendation-limit-control").hidden = magnets;
@@ -299,12 +342,14 @@ function renderRecommendations() {
   const card = document.querySelector("#selected-movie");
   card.hidden = false;
   card.innerHTML = `
-    <div><p class="chart-kicker">You love</p><h3>${escapeHTML(movie.title)} <span>${movie.year || ""}</span></h3>
+    <div><p id="selected-movie-label" class="chart-kicker"></p><h3>${escapeHTML(movie.title)} <span>${movie.year ? `(${escapeHTML(movie.year)})` : "Year unknown"}</span></h3>
+    <p class="movie-match-count">Top ${movie.matches.slice(0, 20).length} anime matches</p>
     <div class="genre-list">${movie.genres.map((genre) => `<span class="tag">${escapeHTML(genre)}</span>`).join("")}</div>
     <p class="movie-synopsis">${escapeHTML(movie.synopsis || "No synopsis available for this movie.")}</p></div>
     <a class="small-button ghost" href="${escapeAttribute(movie.url)}" target="_blank" rel="noopener noreferrer">Movie on TMDB ↗</a>`;
+  renderRecommendationJourney(contextSaved);
   document.querySelectorAll("#movie-suggestions button").forEach((button) => {
-    button.setAttribute("aria-pressed", button.dataset.movieId === movie.id);
+    button.setAttribute("aria-pressed", recommendationState.cohortSelected && button.dataset.movieId === movie.id);
     button.disabled = false;
   });
   document.querySelector("#recommendation-chart-kicker").textContent = "Compare similarities & differences";
@@ -315,7 +360,7 @@ function renderRecommendations() {
     "Each line connects your movie to an anime. Thicker lines = higher similarity. Select a match to explore it."
     + " Cyan = top matches; gold = bottom matches. Pink marks your selection.";
   if (!document.querySelector("#movie-search").value) {
-    document.querySelector("#recommendation-status").textContent = `Comparing “${movie.title}” with ${numberFormatter.format(data.anime.length)} anime. The map shows the top ${count} and bottom ${count}; browse the full ranking below.`;
+    document.querySelector("#recommendation-status").textContent = `${recommendationState.cohortSelected ? "Your movie" : "Example preview"}: “${movie.title}”. Comparing with ${numberFormatter.format(data.anime.length)} anime. The map shows the top ${count} and bottom ${count}; the carried set is always the Top 20.`;
   }
   renderRecommendationTable();
   renderRecommendationChart(movie, matches);

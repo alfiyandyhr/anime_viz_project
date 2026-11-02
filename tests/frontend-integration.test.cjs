@@ -96,3 +96,32 @@ test("Reception renders audience context and Explorer renders the catalogue afte
   assert.match(explorer, /id="anime-table-body"/);
   assert.match(explorer, /id="comparison-footer"/);
 });
+
+test("catalogue entries explicitly activate catalogue mode on every page, including the introduction", () => {
+  for (const page of readdirSync(path.join(root, "frontend"))) {
+    const filename = path.join(root, "frontend", page, "index.html");
+    if (!existsSync(filename)) continue;
+    const html = readFileSync(filename, "utf8");
+    assert.match(html, /class="rail-link catalogue-entry"[^>]*href="\.\.\/explorer\/index\.html\?mode=catalogue"/, page);
+    if (page === "intro") {
+      assert.match(html, /class="button button-secondary" href="\.\.\/explorer\/index\.html\?mode=catalogue"[\s\S]*?Browse full catalogue →/);
+    }
+    if (["content", "creators", "reception", "explorer"].includes(page)) {
+      const header = html.match(/<header class="chapter-head">[\s\S]*?<\/header>/)[0];
+      assert.match(header, /Full catalogue/);
+      assert.doesNotMatch(header, /your matches|Task [234]|selected movie/);
+    }
+  }
+});
+
+test("all four tasks and Explorer provide journey guidance alongside optional rail explorations", () => {
+  for (const page of ['recommendations', 'content', 'creators', 'reception', 'explorer']) {
+    const html = readFileSync(path.join(root, `frontend/${page}/index.html`), 'utf8');
+    assert.match(html, /<\/header>\s*<div id="journey-overview"/, page);
+    if (['content', 'creators', 'reception'].includes(page)) {
+      assert.match(html, /id="journey-next"[^>]*aria-label="Continue your movie journey"/, page);
+    }
+    assert.match(html, /Story — Optional exploration/);
+    assert.match(html, /Dust &amp; Magnet — Optional exploration/);
+  }
+});

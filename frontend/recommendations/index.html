@@ -44,7 +44,7 @@
 
   <div class="app-shell">
     <!-- ───────────────────────── Left rail ───────────────────────── -->
-    <aside class="rail" aria-label="Story navigation">
+    <aside class="rail" aria-label="Site navigation">
       <a class="brand" href="../intro/index.html" data-goto="intro">
         <span class="brand-mark">A</span>
         <span>
@@ -53,68 +53,76 @@
         </span>
       </a>
 
-      <nav class="rail-nav" aria-label="Chapters">
+      <nav class="rail-nav" aria-label="Movie journey, catalogue, and optional explorations">
         <a class="rail-link" data-goto="intro" href="../intro/index.html">
           <span class="idx">◆</span>
           <span class="rail-text">
             <strong>Introduction</strong>
-            <small>What makes anime resonate?</small>
+            <small>Start your movie-to-anime journey</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="story" href="../story/index.html">
+        <a class="rail-link catalogue-entry" aria-label="Browse full catalogue" href="../explorer/index.html?mode=catalogue">
+          <span class="idx">◇</span>
+          <span class="rail-text">
+            <strong>Browse full catalogue</strong>
+            <small>Explore all sampled anime</small>
+          </span>
+        </a>
+
+        <a class="rail-link" aria-label="Story — Optional exploration" data-goto="story" href="../story/index.html">
           <span class="idx">◷</span>
           <span class="rail-text">
             <strong>Story</strong>
-            <small>The evolution of anime · 1963 to today</small>
+            <small>Optional · Explore anime history</small>
           </span>
         </a>
 
-        <a class="rail-link is-active" aria-current="page" data-goto="recommendations" href="../recommendations/index.html">
+        <a class="rail-link is-active" aria-label="Task 1 — Movie → Anime" aria-current="page" data-goto="recommendations" href="../recommendations/index.html">
           <span class="idx">01</span>
           <span class="rail-text">
             <strong>Movie → Anime</strong>
-            <small>Love a movie? Find your first anime.</small>
+            <small>Task 1 · Find your matches</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="content" href="../content/index.html">
+        <a class="rail-link" aria-label="Task 2 — Content" data-goto="content" href="../content/index.html">
           <span class="idx">02</span>
           <span class="rail-text">
             <strong>Content</strong>
-            <small>What stories rise, and when?</small>
+            <small>Task 2 · Explore stories and years</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="creators" href="../creators/index.html">
+        <a class="rail-link" aria-label="Task 3 — Creators" data-goto="creators" href="../creators/index.html">
           <span class="idx">03</span>
           <span class="rail-text">
             <strong>Creators</strong>
-            <small>Who makes the hits?</small>
+            <small>Task 3 · Discover studios and cast</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="reception" href="../reception/index.html">
+        <a class="rail-link" aria-label="Task 4 — Reception" data-goto="reception" href="../reception/index.html">
           <span class="idx">04</span>
           <span class="rail-text">
             <strong>Reception</strong>
-            <small>Compare ratings and audience size</small>
+            <small>Task 4 · Compare audience reception</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="explorer" href="../explorer/index.html">
+        <a class="rail-link" aria-label="Explorer — Final comparison" data-goto="explorer" href="../explorer/index.html">
           <span class="idx">✦</span>
           <span class="rail-text">
             <strong>Explorer</strong>
-            <small>Dig into the data yourself</small>
+            <small>Finish · Compare your finalists</small>
           </span>
         </a>
 
-        <a class="rail-link" data-goto="dust-magnet" href="../dust-magnet/index.html">
+        <a class="rail-link" aria-label="Dust &amp; Magnet — Optional exploration" data-goto="dust-magnet" href="../dust-magnet/index.html">
           <span class="idx">✧</span>
           <span class="rail-text">
             <strong>Dust &amp; Magnet</strong>
-            <small>Explore the pull of your favorite movies</small>
+            <small>Optional · Explore movie magnets</small>
           </span>
         </a>
       </nav>
@@ -207,12 +215,19 @@
         </div>
       </details>
 
-      <section class="chapter is-active" id="chapter-recommendations" data-chapter="recommendations" aria-label="Movie to anime recommendations">
+      <section class="chapter is-active" id="chapter-recommendations" data-chapter="recommendations" aria-label="Task 1 — Movie → Anime">
         <header class="chapter-head">
-          <p class="chapter-eyebrow">Chapter 01 · Movie → Anime</p>
-          <h2>Your favorite movies.<br><span class="grad">Your next anime.</span></h2>
-          <p class="chapter-lede">Start with a movie you love and discover anime with similar stories. Compare the connection map and browse the full ranking.</p>
+          <p class="chapter-eyebrow">Task 1 · Movie → Anime</p>
+          <h2>Choose a movie to find your anime matches</h2>
+          <p class="chapter-lede">
+            Choose a familiar movie to find its Top 20 anime matches by story
+            similarity. Explore the connection map and full ranking here, then
+            use Content, Creators, and Reception to understand those matches
+            before comparing finalists in Explorer.
+          </p>
         </header>
+
+        <div id="journey-overview" class="journey-overview" hidden></div>
 
         <article class="recommendation-picker">
           <div class="recommendation-controls">
@@ -224,7 +239,7 @@
               <select id="dust-limit"><option value="30">30 · quiet</option><option value="60" selected>60 · balanced</option><option value="90">90 · explore</option></select>
             </label>
             <label id="recommendation-limit-control" for="recommendation-limit"><span>Map matches</span>
-              <select id="recommendation-limit">
+              <select id="recommendation-limit" aria-describedby="recommendation-map-scope">
                 <option value="5" selected>Top &amp; Bottom 5</option><option value="10">Top &amp; Bottom 10</option>
               </select>
             </label>
@@ -237,6 +252,14 @@
         </article>
 
         <article id="selected-movie" class="selected-movie" hidden></article>
+
+        <aside id="recommendation-journey" class="recommendation-journey" aria-label="Continue your movie journey" hidden>
+          <div>
+            <p id="recommendation-journey-summary" role="status" aria-live="polite"></p>
+            <p id="recommendation-map-scope">Top/Bottom 5 or 10 controls only the map display. The set carried to Tasks 2–4 and Explorer always contains the movie’s Top 20 anime matches.</p>
+          </div>
+          <a id="explore-matches" class="button button-primary" href="../content/index.html" aria-describedby="recommendation-journey-summary">Explore these 20 matches →</a>
+        </aside>
 
         <div id="recommendation-content" hidden>
           <div class="recommendation-workspace">
