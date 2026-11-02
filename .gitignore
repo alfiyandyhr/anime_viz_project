@@ -15,3 +15,6 @@ node_modules/
 data/anilist_story_cache.json
 .env.local
 data/semantic_similarity/output/
+
+# Keep local asset documents out of version control.
+/assets/
