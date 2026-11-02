@@ -93,6 +93,14 @@
           </span>
         </a>
 
+        <a class="rail-link" data-goto="reception" href="../reception/index.html">
+          <span class="idx">04</span>
+          <span class="rail-text">
+            <strong>Reception</strong>
+            <small>Compare ratings and audience size</small>
+          </span>
+        </a>
+
         <a class="rail-link is-active" aria-current="page" data-goto="explorer" href="../explorer/index.html">
           <span class="idx">✦</span>
           <span class="rail-text">
@@ -209,9 +217,9 @@
           <p class="chapter-eyebrow">Explore · Details on demand</p>
           <h2>Dig into the data yourself</h2>
           <p class="chapter-lede">
-            Browse the catalogue and compare audience response. Filter above,
-            switch between the table and score vs. popularity chart, and open
-            any title for the full record.
+            Browse the catalogue, open any title for its full record, and shortlist
+            2–3 anime to compare format, length, and audience scores. Use the
+            filters above to narrow your first-watch choices.
           </p>
         </header>
 
@@ -256,12 +264,7 @@
           <div id="insight-cards" class="insight-grid"></div>
         </section>
 
-        <div class="chart-tabs" role="tablist" aria-label="Explorer view">
-          <button type="button" role="tab" id="tab-table" aria-controls="panel-table" aria-selected="true" tabindex="0">Table</button>
-          <button type="button" role="tab" id="tab-scatter" aria-controls="panel-scatter" aria-selected="false" tabindex="-1">Score vs Popularity</button>
-        </div>
-
-        <section id="panel-table" class="explorer-panel" role="tabpanel" aria-labelledby="tab-table" tabindex="0">
+        <section class="explorer-panel" aria-label="Anime explorer">
           <div class="explorer-head">
             <h3>Anime explorer</h3>
             <div class="explorer-controls">
@@ -312,27 +315,6 @@
 
           <p id="table-note" class="table-note"></p>
           <p id="shortlist-status" class="table-note" role="status">Select 2–3 titles to compare.</p>
-        </section>
-
-        <section id="panel-scatter" class="explorer-panel" role="tabpanel" aria-labelledby="tab-scatter" tabindex="0" hidden>
-          <article class="viz-card">
-            <div class="viz-header">
-              <div>
-                <p class="chart-kicker">Ratings and reach</p>
-                <h3>Score vs. popularity</h3>
-                <p>
-                  Position shows rating and audience size. Bubble area represents
-                  favourites; color represents primary genre. The dashed line is
-                  a linear trend fitted against log popularity. These measures
-                  describe audience response, not similarity or predicted enjoyment.
-                </p>
-              </div>
-
-              <span class="chart-badge">Log popularity axis</span>
-            </div>
-
-            <div id="scatter-chart" class="chart chart-large"></div>
-          </article>
         </section>
 
         <details class="methodology">

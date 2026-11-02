@@ -1,6 +1,6 @@
 # AnIViz — Anime Industry Visualization
 
-A visual anime discovery tool that starts with a familiar movie, built with Python/Flask, AniList GraphQL API, and D3.js. The introduction leads to Movie → Anime or direct catalogue browsing. Story offers optional historical context; Content, Creators, and Explorer help inspect the anime catalogue.
+A visual anime discovery tool that starts with a familiar movie, built with Python/Flask, AniList GraphQL API, and D3.js. The introduction leads to Movie → Anime or direct catalogue browsing. Story offers optional historical context; Content, Creators, Reception, and Explorer help inspect the anime catalogue.
 
 **Live site:** https://alfiyandyhr.github.io/anime_viz_project/
 
@@ -60,13 +60,13 @@ Flask and GitHub Pages. Filters persist across pages for the current browser
 session. The bundled dataset remains at the project root as `data.json`.
 
 The rail follows Introduction → Story → Movie → Anime → Content → Creators →
-Explorer → Dust & Magnet. Dust & Magnet is a separate playground outside the
-three numbered task views. Explorer offers **Table** and **Score vs Popularity** tabs over the
-same filtered titles, with the KPI strip and insight cards visible in both
-views. Scatter bubbles open anime details and update with filters and window
-resizing. The former Reception page redirects to Explorer for old bookmarks.
+Reception → Explorer → Dust & Magnet. Reception is task **04**, with the
+**Score vs Popularity** chart for comparing audience ratings and reach. Bubbles
+open anime details and update with shared filters and window resizing. Explorer
+provides the catalogue table and first-watch shortlist comparison. Dust & Magnet
+is a separate playground outside the four numbered task views.
 
-Selecting a movie carries its **Top 20** into Content, Creators, and Explorer
+Selecting a movie carries its **Top 20** into Content, Creators, Reception, and Explorer
 for the browser session. The context strip shows the seed movie, links back to
 movie search, and offers **Show full catalogue** or × to clear the cohort and
 reset filters. Dashboard filters narrow that cohort. A new movie clears the

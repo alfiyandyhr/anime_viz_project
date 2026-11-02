@@ -52,7 +52,7 @@ function cohortAnime() {
 }
 
 function restoreMovieCohort() {
-  if (!["content", "creators", "explorer"].includes(document.body.dataset.chapter)) return;
+  if (!["content", "creators", "reception", "explorer"].includes(document.body.dataset.chapter)) return;
   state.cohort = readMovieCohort();
   if (!state.cohort) return;
   state.cohort_ids = state.cohort.enabled ? new Set(state.cohort.ids) : null;

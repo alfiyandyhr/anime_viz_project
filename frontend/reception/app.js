@@ -40,6 +40,15 @@ function renderScatterplot() {
     && Number.isFinite(item.average_score)
   ));
 
+  const correlation = calculateCorrelation(
+    data.map((item) => [Math.log10(item.popularity), item.average_score])
+  );
+  document.querySelector("#reception-correlation").textContent =
+    correlation === null ? "N/A" : `r = ${correlation.toFixed(2)}`;
+  document.querySelector("#reception-correlation-note").textContent =
+    `Score vs. log₁₀ popularity · ${numberFormatter.format(data.length)} scored ${data.length === 1 ? "title" : "titles"}`
+    + (correlation === null ? " · Requires at least three titles and variation in both measures." : "");
+
   clearChart(container);
 
   if (!data.length) {
@@ -233,99 +242,6 @@ function renderGenreLegend(svg, data, width, height, margin) {
   });
 }
 
-// Chapter 1 verdict: answers "are the most popular also the highest rated?"
-// by comparing the two title extremes and reporting the score–popularity
-// correlation across the filtered sample.
-function renderReceptionCallout() {
-  const container = document.querySelector("#reception-callout");
-
-  if (!container) {
-    return;
-  }
-
-  const anime = state.filteredAnime;
-
-  if (!anime.length) {
-    container.innerHTML = `
-      <article class="callout-card">
-        <strong>No titles match the current filters.</strong>
-        <p>Broaden the filters above to continue the story.</p>
-      </article>
-    `;
-    return;
-  }
-
-  const mostPopular = d3.greatest(anime, (item) => item.popularity || 0);
-
-  const scored = anime.filter((item) => Number.isFinite(item.average_score));
-  const highestRated = d3.greatest(scored, (item) => item.average_score);
-
-  const correlation = calculateCorrelation(
-    anime
-      .filter((item) => (
-        item.popularity > 0
-        && Number.isFinite(item.average_score)
-      ))
-      .map((item) => [
-        Math.log10(item.popularity),
-        item.average_score
-      ])
-  );
-
-  const sameTitle = mostPopular
-    && highestRated
-    && mostPopular.id === highestRated.id;
-
-  let verdict;
-  if (correlation === null) {
-    verdict = "Not enough scored titles to judge.";
-  } else if (Math.abs(correlation) < 0.2) {
-    verdict = "Barely — fame and quality track each other only weakly here.";
-  } else if (correlation >= 0.2) {
-    verdict = "Somewhat — more popular titles do tend to score higher.";
-  } else {
-    verdict = "Inversely — more popular titles tend to score a little lower.";
-  }
-
-  container.innerHTML = `
-    <article class="callout-card accent">
-      <span>Score–popularity correlation</span>
-      <strong>${correlation === null ? "N/A" : `r = ${correlation.toFixed(2)}`}</strong>
-      <p>${escapeHTML(verdict)}</p>
-    </article>
-
-    <article class="callout-card">
-      <span>Most popular</span>
-      <strong>${escapeHTML(mostPopular?.title || "N/A")}</strong>
-      <p>${formatNumber(mostPopular?.popularity)} list users${
-        mostPopular && Number.isFinite(mostPopular.average_score)
-          ? ` · ${mostPopular.average_score}/100`
-          : ""
-      }</p>
-    </article>
-
-    <article class="callout-card">
-      <span>Highest rated</span>
-      <strong>${escapeHTML(highestRated?.title || "N/A")}</strong>
-      <p>${
-        highestRated
-          ? `${highestRated.average_score}/100 · ${formatNumber(highestRated.popularity)} list users`
-          : "No scored titles"
-      }</p>
-    </article>
-
-    <article class="callout-card">
-      <span>The verdict</span>
-      <strong>${sameTitle ? "Same title tops both" : "Crowd favourite ≠ top rated"}</strong>
-      <p>${
-        sameTitle
-          ? "The most-followed title is also the highest-scored under these filters."
-          : "The most-watched anime and the best-scored anime are different titles."
-      }</p>
-    </article>
-  `;
-}
-
 function linearRegression(points) {
   if (points.length < 2) {
     return null;
@@ -357,7 +273,6 @@ function linearRegression(points) {
 registerPage({
   render() {
     renderKPIs();
-    renderReceptionCallout();
     renderScatterplot();
   }
 });

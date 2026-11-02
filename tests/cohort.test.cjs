@@ -129,3 +129,14 @@ test('cast paths deduplicate actors by ID and include only direct shared cohort 
   assert.deepEqual(Array.from(paths[0].works, work => work.id), [2]);
   assert.equal(build({id:4}, [other]).length, 0);
 });
+
+test('Reception restores the movie cohort before applying shared filters', () => {
+  const context = dashboard(savedCohort());
+  let inserted = false;
+  context.document.body = { dataset: { chapter: 'reception' } };
+  context.document.createElement = () => ({});
+  context.document.querySelector = () => ({ insertAdjacentElement() { inserted = true; } });
+  vm.runInContext('renderCohortContext = () => {}; restoreMovieCohort()', context);
+  assert.equal(inserted, true);
+  assert.deepEqual(Array.from(vm.runInContext('state.cohort_ids', context)), ['1943', '43']);
+});
