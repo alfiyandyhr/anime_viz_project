@@ -104,6 +104,14 @@
             <small>Dig into the data yourself</small>
           </span>
         </a>
+
+        <a class="rail-link" data-goto="dust-magnet" href="../dust-magnet/index.html">
+          <span class="idx">✧</span>
+          <span class="rail-text">
+            <strong>Dust &amp; Magnet</strong>
+            <small>Explore the pull of your favorite movies</small>
+          </span>
+        </a>
       </nav>
 
       <div class="rail-foot">
@@ -118,6 +126,12 @@
     </aside>
 
     <main class="stage story-stage" id="story-main">
+      <aside class="movie-search-banner" aria-label="Continue to movie search">
+        <span>Already know a movie you love?</span>
+        <a href="../recommendations/index.html">Skip to Movie → Anime →</a>
+        <button type="button" aria-label="Dismiss movie search banner"
+          onclick="this.closest('.movie-search-banner').hidden = true">×</button>
+      </aside>
       <header class="story-cover">
         <div class="hero-covers" id="hero-covers" aria-hidden="true"></div>
         <div class="cover-grain" aria-hidden="true"></div>

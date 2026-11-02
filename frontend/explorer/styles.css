@@ -391,3 +391,31 @@ tbody tr:hover {
 @media (max-width: 680px) {
   .kpi-grid, .insight-grid, .method-grid { grid-template-columns: 1fr; }
 }
+
+.shortlist-checkbox { width: 18px; height: 18px; min-height: 18px; padding: 0; accent-color: var(--purple); cursor: pointer; }
+.shortlist-checkbox:disabled { cursor: default; opacity: .35; }
+.comparison-footer {
+  position: fixed;
+  z-index: 40;
+  left: max(calc(var(--rail-width) + 20px), calc((100vw - 1650px) / 2 + var(--rail-width) + 20px));
+  right: max(20px, calc((100vw - 1650px) / 2 + 20px));
+  bottom: 12px;
+  max-height: 46vh;
+  overflow: auto;
+  padding: 14px 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: #11172b;
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, .4);
+}
+.comparison-footer[hidden] { display: none; }
+.comparison-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+.comparison-scroll { overflow-x: auto; }
+.comparison-table { min-width: 600px; table-layout: fixed; }
+.comparison-table th, .comparison-table td { position: static; padding: 6px 10px; font-size: .74rem; text-transform: none; letter-spacing: normal; overflow-wrap: anywhere; }
+.comparison-table th:first-child { width: 130px; }
+.comparison-table tbody tr { cursor: default; }
+.comparison-footer p { margin: 8px 0 0; color: var(--text-muted); font-size: .67rem; }
+.has-comparison .stage { padding-bottom: 430px; }
+@media (max-width: 1000px) { .comparison-footer { left: 16px; right: 16px; } }
+@media (max-width: 680px) { .comparison-footer { padding: 10px; bottom: 6px; } }

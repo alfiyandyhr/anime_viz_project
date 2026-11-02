@@ -53,6 +53,12 @@ def recommendations_page():
     return redirect(url_for("static", filename="recommendations/index.html"))
 
 
+@app.get("/dust-magnet")
+@app.get("/dust-magnet/")
+def dust_magnet_page():
+    return redirect(url_for("static", filename="dust-magnet/index.html"))
+
+
 @app.get("/story.json")
 def static_story_data():
     return send_from_directory(PROJECT_ROOT, "story.json")

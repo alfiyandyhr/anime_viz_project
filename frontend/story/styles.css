@@ -193,3 +193,34 @@ body[data-chapter="story"] { --era-color: var(--purple); }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+.movie-search-banner {
+  position: fixed;
+  z-index: 45;
+  top: 0;
+  left: max(var(--rail-width), calc((100vw - 1650px) / 2 + var(--rail-width)));
+  right: max(0px, calc((100vw - 1650px) / 2));
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 44px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--border);
+  background: #11172b;
+  color: var(--text-muted);
+  font-size: .76rem;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+.movie-search-banner[hidden] { display: none; }
+.movie-search-banner a { color: var(--cyan); }
+.movie-search-banner button { margin-left: auto; flex: none; width: 32px; height: 32px; border: 0; background: transparent; color: var(--text-soft); font-size: 1.2rem; }
+.story-stage:has(.movie-search-banner:not([hidden])) { padding-top: 64px; }
+body:has(.movie-search-banner:not([hidden])) .sticky-stage { top: 60px; }
+@media (max-width: 1000px) { .movie-search-banner { left: 0; right: 0; top: 83px; } }
+@media (max-width: 1000px) { body:has(.movie-search-banner:not([hidden])) .sticky-stage { top: max(139px, var(--story-sticky-top, 139px)); } }
+@media (max-width: 680px) {
+  .movie-search-banner { gap: 10px; padding-inline: 12px; font-size: .68rem; }
+  .movie-search-banner span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .movie-search-banner a { flex: none; }
+}

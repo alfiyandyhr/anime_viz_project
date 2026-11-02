@@ -6,6 +6,87 @@ Object.assign(elements, {
   networkSummary: document.querySelector("#network-summary")
 });
 
+let cohortCastAnimeId = null;
+
+function renderCohortStudios() {
+  const section = document.querySelector("#cohort-studios");
+  section.hidden = !isCohortActive();
+  if (section.hidden) return;
+  const anime = cohortAnime();
+  const denominator = state.cohort.ids.length;
+  const counts = new Map();
+  anime.forEach((work) => {
+    new Set(work.studio_names || []).forEach((name) => counts.set(name, (counts.get(name) || 0) + 1));
+  });
+  const studios = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  document.querySelector("#cohort-studio-note").textContent =
+    `Credits across all ${denominator} cohort titles; co-productions count for each studio. Select a studio to filter the charts and cast below.`;
+  const container = document.querySelector("#cohort-studio-bars");
+  container.innerHTML = studios.length ? studios.map(([name, count]) => `
+    <button type="button" class="cohort-studio-bar" data-cohort-studio="${escapeAttribute(name)}"
+      aria-pressed="${elements.studioFilter.value === name}">
+      <span>${escapeHTML(name)}</span>
+      <span class="cohort-studio-track" aria-hidden="true"><span style="width: ${count / denominator * 100}%"></span></span>
+      <strong>${count} of ${denominator} in cohort</strong>
+    </button>`).join("") : "<p>No studio credits are available for this cohort.</p>";
+  container.querySelectorAll("[data-cohort-studio]").forEach((button) => {
+    button.addEventListener("click", () => {
+      elements.studioFilter.value = elements.studioFilter.value === button.dataset.cohortStudio
+        ? "All" : button.dataset.cohortStudio;
+      applyFilters();
+    });
+  });
+}
+
+function buildCohortCastPaths(selected, anime) {
+  const actors = new Map();
+  (selected.voice_actors || []).forEach((actor) => {
+    const id = String(actor.id);
+    if (!actors.has(id)) actors.set(id, { ...actor, characters: new Set(), works: [] });
+    (actor.characters || []).forEach((name) => actors.get(id).characters.add(name));
+  });
+  actors.forEach((actor, id) => {
+    actor.works = anime.filter((work) => String(work.id) !== String(selected.id)
+      && (work.voice_actors || []).some((cast) => String(cast.id) === id));
+  });
+  return [...actors.values()];
+}
+
+function renderCohortCast(container) {
+  const anime = [...state.filteredAnime].sort((a, b) =>
+    state.cohort.ids.indexOf(String(a.id)) - state.cohort.ids.indexOf(String(b.id)));
+  const select = document.querySelector("#cohort-cast-anime");
+  if (!anime.some((work) => String(work.id) === cohortCastAnimeId)) cohortCastAnimeId = String(anime[0]?.id || "");
+  select.innerHTML = anime.map((work) => `<option value="${escapeAttribute(work.id)}">${escapeHTML(work.title)}</option>`).join("");
+  select.value = cohortCastAnimeId;
+  select.disabled = !anime.length;
+  if (!anime.length) {
+    elements.networkSummary.textContent = "No cohort titles match the filters.";
+    renderEmpty(container, "Broaden or reset the filters to follow a cohort title’s cast.");
+    return;
+  }
+  const selected = anime.find((work) => String(work.id) === cohortCastAnimeId);
+  const paths = buildCohortCastPaths(selected, anime);
+  elements.networkSummary.textContent = `${selected.title} → ${paths.length} sampled Japanese voice actors → other anime in the filtered cohort. Main-role credits only.`;
+  container.innerHTML = paths.length ? `<ul class="cohort-cast-paths">${paths.map((actor) => `
+    <li class="cohort-cast-path">
+      <button type="button" data-cast-work="${escapeAttribute(selected.id)}">${escapeHTML(selected.title)}</button>
+      <span aria-hidden="true">→</span>
+      <div><button type="button" data-cast-actor="${escapeAttribute(actor.id)}">${escapeHTML(actor.name)}</button>
+        <small>${escapeHTML([...actor.characters].join(", ") || "Character unavailable")}</small></div>
+      <span aria-hidden="true">→</span>
+      <div class="cohort-cast-matches">${actor.works.length ? actor.works.map((work) => `
+        <button type="button" data-cast-work="${escapeAttribute(work.id)}">${escapeHTML(work.title)}</button>`).join("")
+        : "<small>No other credited title in this cohort view.</small>"}</div>
+    </li>`).join("")}</ul>` : "<p class=\"empty-state\">No sampled cast credits are available for this title.</p>";
+  container.querySelectorAll("[data-cast-work]").forEach((button) => {
+    button.addEventListener("click", () => openAnimeDetail(anime.find((work) => String(work.id) === button.dataset.castWork)));
+  });
+  container.querySelectorAll("[data-cast-actor]").forEach((button) => {
+    button.addEventListener("click", () => openVoiceActorDetail({ id: `actor:${button.dataset.castActor}`, degree: paths.find((actor) => String(actor.id) === button.dataset.castActor).works.length + 1 }));
+  });
+}
+
 function renderStudioChart() {
   const container = document.querySelector("#studio-chart");
   clearChart(container);
@@ -371,6 +452,16 @@ function renderNetwork() {
   hideTooltip();
   clearChart(container);
 
+  const cohortActive = isCohortActive();
+  document.querySelector("#cohort-cast-controls").hidden = !cohortActive;
+  document.querySelector(".network-controls").hidden = cohortActive;
+  document.querySelector("#network-description").hidden = cohortActive;
+  container.classList.toggle("is-cohort-cast", cohortActive);
+  if (cohortActive) {
+    renderCohortCast(container);
+    return;
+  }
+
   const { nodes, links, sampledWorkCount, matchingWorkCount } =
     buildCollaborationNetwork(
       state.filteredAnime,
@@ -587,7 +678,8 @@ function buildVoiceActorProfile(actorId, anime) {
 }
 
 function openVoiceActorDetail(node) {
-  const profile = buildVoiceActorProfile(node.id.slice("actor:".length), state.data.anime);
+  const profile = buildVoiceActorProfile(node.id.slice("actor:".length),
+    isCohortActive() ? cohortAnime() : state.data.anime);
   if (!profile) {
     return;
   }
@@ -631,7 +723,7 @@ function openVoiceActorDetail(node) {
       <section class="detail-section">
         <h3>Filmography &amp; characters</h3>
         <p class="actor-profile-note">
-          Japanese main roles across the loaded anime sample.
+          Japanese main roles across ${isCohortActive() ? "the movie cohort" : "the loaded anime sample"}.
           Select a work to view its details.
         </p>
         <div class="actor-filmography">
@@ -660,6 +752,10 @@ function openVoiceActorDetail(node) {
 
 registerPage({
   bindControls() {
+    document.querySelector("#cohort-cast-anime").addEventListener("change", (event) => {
+      cohortCastAnimeId = event.target.value;
+      renderNetwork();
+    });
     elements.networkSearch.addEventListener("input", debounce(renderNetwork, 200));
     elements.networkTypeButtons.forEach((button) => {
       button.addEventListener("click", () => {
@@ -682,6 +778,7 @@ registerPage({
     });
   },
   render() {
+    renderCohortStudios();
     renderStudioChart();
     renderHeatmap();
     renderNetwork();

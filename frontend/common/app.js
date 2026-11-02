@@ -7,13 +7,91 @@ const state = {
   networkSimulation: null,
   networkTypes: new Set(["actor", "character", "work"]),
   tablePage: 0,
-  tablePageSize: 10
+  tablePageSize: 10,
+  cohort: null,
+  cohort_ids: null
 };
 
 // Each page registers only the renderers and controls it owns.
 let pageControls = {};
 const dataUrl = new URL("../../data.json", document.currentScript.src);
 const FILTER_STORAGE_KEY = "aniviz-filters";
+const SEED_MOVIE_STORAGE_KEY = "aniviz_seed_movie";
+const COHORT_IDS_STORAGE_KEY = "aniviz_cohort_ids";
+const COHORT_RANKING_STORAGE_KEY = "aniviz_cohort_ranking";
+const COHORT_SCOPE_STORAGE_KEY = "aniviz_cohort_scope";
+
+function readMovieCohort() {
+  try {
+    const seed = JSON.parse(sessionStorage.getItem(SEED_MOVIE_STORAGE_KEY) || "null");
+    const ids = JSON.parse(sessionStorage.getItem(COHORT_IDS_STORAGE_KEY) || "null");
+    if (!seed || typeof seed.title !== "string" || !seed.tmdbId
+      || !Array.isArray(ids) || !ids.length
+      || !ids.every((id) => /^\d+$/.test(String(id)))) return null;
+    let ranking = null;
+    try {
+      ranking = JSON.parse(sessionStorage.getItem(COHORT_RANKING_STORAGE_KEY) || "null");
+    } catch (error) { /* IDs still provide scope if optional scores are missing. */ }
+    return {
+      seed, ids: [...new Set(ids.map(String))].slice(0, 20),
+      ranking: String(ranking?.tmdbId) === String(seed.tmdbId) ? ranking : null,
+      enabled: sessionStorage.getItem(COHORT_SCOPE_STORAGE_KEY) !== "catalogue"
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+function isCohortActive() {
+  return Boolean(state.cohort && state.cohort_ids);
+}
+
+function cohortAnime() {
+  const ids = new Set(state.cohort?.ids || []);
+  return state.data.anime.filter((anime) => ids.has(String(anime.id)));
+}
+
+function restoreMovieCohort() {
+  if (!["content", "creators", "explorer"].includes(document.body.dataset.chapter)) return;
+  state.cohort = readMovieCohort();
+  if (!state.cohort) return;
+  state.cohort_ids = state.cohort.enabled ? new Set(state.cohort.ids) : null;
+  const strip = document.createElement("div");
+  strip.id = "cohort-context";
+  strip.className = "cohort-context";
+  document.querySelector("#filterbar").insertAdjacentElement("afterend", strip);
+  renderCohortContext();
+}
+
+function renderCohortContext() {
+  const strip = document.querySelector("#cohort-context");
+  if (!strip || !state.cohort) return;
+  const { seed, ids } = state.cohort;
+  const missing = ids.length - cohortAnime().length;
+  strip.innerHTML = `
+    <span class="cohort-label" title="${missing ? `${missing} recommendation(s) have no catalogue metadata.` : "Movie recommendations carried across views"}">
+      Cohort: Top ${ids.length} for ${escapeHTML(seed.title)}${seed.year ? ` (${escapeHTML(seed.year)})` : ""}${missing ? ` · ${missing} unavailable` : ""}
+    </span>
+    <a href="../recommendations/index.html">Change movie</a>
+    <label class="cohort-toggle"><input id="cohort-full-catalogue" type="checkbox" ${isCohortActive() ? "" : "checked"}> Show full catalogue</label>
+    <button type="button" class="cohort-dismiss" aria-label="Clear movie cohort">×</button>`;
+  strip.querySelector("#cohort-full-catalogue").addEventListener("change", (event) => {
+    state.cohort.enabled = !event.target.checked;
+    state.cohort_ids = state.cohort.enabled ? new Set(ids) : null;
+    try { sessionStorage.setItem(COHORT_SCOPE_STORAGE_KEY, state.cohort.enabled ? "cohort" : "catalogue"); } catch (error) { /* Scope still works locally. */ }
+    applyFilters();
+  });
+  strip.querySelector("button").addEventListener("click", () => {
+    for (const key of [SEED_MOVIE_STORAGE_KEY, COHORT_IDS_STORAGE_KEY,
+      COHORT_RANKING_STORAGE_KEY, COHORT_SCOPE_STORAGE_KEY]) {
+      try { sessionStorage.removeItem(key); } catch (error) { /* Clear local state too. */ }
+    }
+    state.cohort = null;
+    state.cohort_ids = null;
+    strip.remove();
+    resetFilters();
+  });
+}
 
 function registerPage(controls) {
   pageControls = controls;
@@ -147,6 +225,7 @@ async function loadDashboard() {
 
     populateControls();
     restoreFilters();
+    restoreMovieCohort();
 
     elements.scoreOutput.value = elements.scoreFilter.value;
 
@@ -288,7 +367,8 @@ function applyFilters() {
       );
 
     return (
-      (!search || haystack.includes(search))
+      (!state.cohort_ids || state.cohort_ids.has(String(anime.id)))
+      && (!search || haystack.includes(search))
       && (selectedGenre === "All" || anime.genres.includes(selectedGenre))
       && (
         selectedStudio === "All"

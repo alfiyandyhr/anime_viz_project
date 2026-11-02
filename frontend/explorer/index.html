@@ -100,6 +100,14 @@
             <small>Dig into the data yourself</small>
           </span>
         </a>
+
+        <a class="rail-link" data-goto="dust-magnet" href="../dust-magnet/index.html">
+          <span class="idx">✧</span>
+          <span class="rail-text">
+            <strong>Dust &amp; Magnet</strong>
+            <small>Explore the pull of your favorite movies</small>
+          </span>
+        </a>
       </nav>
 
       <div class="rail-foot">
@@ -284,6 +292,8 @@
             <table>
               <thead>
                 <tr>
+                  <th scope="col">Shortlist</th>
+                  <th scope="col">Ranking</th>
                   <th>Anime</th>
                   <th>Year</th>
                   <th>Format</th>
@@ -301,6 +311,7 @@
           <div id="table-pagination" class="table-pagination"></div>
 
           <p id="table-note" class="table-note"></p>
+          <p id="shortlist-status" class="table-note" role="status">Select 2–3 titles to compare.</p>
         </section>
 
         <section id="panel-scatter" class="explorer-panel" role="tabpanel" aria-labelledby="tab-scatter" tabindex="0" hidden>
@@ -390,6 +401,7 @@
           <p>Educational data-visualization project using AniList and D3.js.</p>
         </div>
       </section>
+      <aside id="comparison-footer" class="comparison-footer" aria-label="Shortlist comparison" hidden></aside>
     </main>
   </div>
 

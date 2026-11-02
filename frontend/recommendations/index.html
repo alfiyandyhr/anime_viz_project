@@ -101,6 +101,14 @@
             <small>Dig into the data yourself</small>
           </span>
         </a>
+
+        <a class="rail-link" data-goto="dust-magnet" href="../dust-magnet/index.html">
+          <span class="idx">✧</span>
+          <span class="rail-text">
+            <strong>Dust &amp; Magnet</strong>
+            <small>Explore the pull of your favorite movies</small>
+          </span>
+        </a>
       </nav>
 
       <div class="rail-foot">
@@ -195,7 +203,7 @@
         <header class="chapter-head">
           <p class="chapter-eyebrow">Chapter 01 · Movie → Anime</p>
           <h2>Your favorite movies.<br><span class="grad">Your next anime.</span></h2>
-          <p class="chapter-lede">Start with a movie you love and discover anime with similar stories. Compare the ranking, or explore up to three favorites with Dust &amp; magnets.</p>
+          <p class="chapter-lede">Start with a movie you love and discover anime with similar stories. Compare the connection map and browse the full ranking.</p>
         </header>
 
         <article class="recommendation-picker">
@@ -228,10 +236,6 @@
               <div class="chart-heading">
                 <div><p id="recommendation-chart-kicker" class="chart-kicker">A constellation of your taste</p><h3 id="recommendation-chart-title">Follow the pull of a familiar story.</h3></div>
               </div>
-              <div class="recommendation-chart-tabs" role="group" aria-label="Visualization style">
-                <button type="button" data-recommendation-viz="connections" aria-pressed="true">Connection map</button>
-                <button type="button" data-recommendation-viz="magnets" aria-pressed="false">Dust &amp; magnets</button>
-              </div>
               <p id="recommendation-chart-guide" class="recommendation-chart-guide"></p>
               <div id="dust-toolbar" class="dust-toolbar" hidden>
                 <div id="dust-legend" class="dust-legend" role="group" aria-label="Anime colors by highest-scoring movie" hidden></div>
@@ -259,9 +263,8 @@
         <details class="methodology">
           <summary>How these recommendations work</summary>
           <div class="method-grid">
-            <article><h3>One million comparisons</h3><p id="recommendation-method-data">1,000 popular AniList anime × 1,000 popular TMDB movies. The dust view uses the complete score matrix; the connection map shows each movie’s top and bottom matches, with the full ranking available below in pages of 10.</p></article>
+            <article><h3>One million comparisons</h3><p id="recommendation-method-data">1,000 popular AniList anime × 1,000 popular TMDB movies. The connection map shows each movie’s top and bottom matches, with the full ranking available below in pages of 10.</p></article>
             <article><h3>Story similarity</h3><p id="recommendation-method-model">Qwen3-Embedding-4B embeds titles, genres, tags, and synopses. Cosine similarity compares the normalized vectors; ratings and popularity do not affect the score.</p></article>
-            <article><h3>Reading the magnets</h3><p>Dots combine strong matches to each movie and the highest average scores across your movies. With multiple magnets, each dot stays closer to its higher-scoring movies, including when scores are zero or negative. Spacing respects this preference order. A single movie gathers a compact cloud through positive-score attraction. Moving magnets changes the layout, never the scores. Distances show each dot’s preference order across movies, not an exact cosine scale or a ranking of different anime. Some nearly collinear arrangements cannot show every preference; a message suggests spreading or resetting the magnets, while the highest-scoring movie stays nearest. Color identifies the highest-scoring movie; pink marks your selection. Click a dot to focus it; click elsewhere or reset to clear. Hover or focus for exact scores. Distances between anime carry no meaning.</p></article>
             <article><h3>A starting point</h3><p>These are text-based recommendations, not predictions of your enjoyment. Seasons, sequels, and the same animated film in both databases can appear separately. Genre labels are context, not an explanation of the model’s score.</p></article>
           </div>
         </details>

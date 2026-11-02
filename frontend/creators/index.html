@@ -100,6 +100,14 @@
             <small>Dig into the data yourself</small>
           </span>
         </a>
+
+        <a class="rail-link" data-goto="dust-magnet" href="../dust-magnet/index.html">
+          <span class="idx">✧</span>
+          <span class="rail-text">
+            <strong>Dust &amp; Magnet</strong>
+            <small>Explore the pull of your favorite movies</small>
+          </span>
+        </a>
       </nav>
 
       <div class="rail-foot">
@@ -208,6 +216,15 @@
           </p>
         </header>
 
+        <article class="viz-card" id="cohort-studios" hidden>
+          <div class="viz-header"><div>
+            <p class="chart-kicker">Follow the makers</p>
+            <h3>Studios in this cohort</h3>
+            <p id="cohort-studio-note"></p>
+          </div></div>
+          <div id="cohort-studio-bars" class="cohort-studio-bars"></div>
+        </article>
+
         <article class="viz-card">
           <div class="viz-header">
             <div>
@@ -243,7 +260,7 @@
             <div>
               <p class="chart-kicker">Collaboration structure</p>
               <h3>How do voice actors, characters, and works connect?</h3>
-              <p>
+              <p id="network-description">
                 Links connect Japanese voice actors to their characters and
                 anime works, and each work to its characters. Actors who share
                 an anime are linked, as are characters in the same anime.
@@ -254,6 +271,11 @@
                 for anime details in the right-hand panel.
               </p>
             </div>
+          </div>
+
+          <div id="cohort-cast-controls" class="cohort-cast-controls" hidden>
+            <label><span>Follow an anime’s Japanese cast</span><select id="cohort-cast-anime"></select></label>
+            <p>Choose a title to follow its actors to other titles in this cohort. Select a name for details.</p>
           </div>
 
           <div class="network-controls">

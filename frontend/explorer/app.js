@@ -13,6 +13,55 @@ Object.assign(elements, {
 });
 
 let activeExplorerView = "table";
+const shortlist = new Set();
+
+function comparisonRows(anime) {
+  const ranking = isCohortActive() ? state.cohort.ranking : null;
+  const match = ranking?.matches?.find((item) => String(item.id) === String(anime.id));
+  const episodes = Number.isFinite(anime.episodes) && anime.episodes > 0 ? anime.episodes : null;
+  const duration = Number.isFinite(anime.duration) && anime.duration > 0 ? anime.duration : null;
+  return [
+    match ? `${match.rank} / ${numberFormatter.format(ranking.total)}` : "–",
+    Number.isFinite(match?.score) ? match.score.toFixed(3) : "–",
+    `${humanize(anime.format)} / ${anime.year || "Unknown"}`,
+    episodes ? `${episodes}${duration ? ` × ${duration} min` : ""}` : "Unknown",
+    episodes && duration ? `${formatNumber(episodes * duration)} min` : "Unknown",
+    Number.isFinite(anime.average_score) ? `${anime.average_score} / 100` : "Unknown",
+    anime.status ? humanize(anime.status) : "Unknown"
+  ];
+}
+
+function renderComparison() {
+  const container = document.querySelector("#comparison-footer");
+  const selected = state.data.anime.filter((anime) => shortlist.has(String(anime.id)));
+  container.hidden = selected.length < 2;
+  document.body.classList.toggle("has-comparison", selected.length >= 2);
+  document.querySelector("#shortlist-status").textContent =
+    `${selected.length} of 3 shortlisted. Select 2–3 titles to compare; selections stay when you filter or change pages.`;
+  if (selected.length < 2) return;
+  const values = selected.map(comparisonRows);
+  const metrics = ["Similarity rank", "Cosine score", "Format / year", "Episodes", "Estimated total", "AniList score", "Status"];
+  container.innerHTML = `
+    <div class="comparison-heading"><strong id="comparison-heading">Compare your shortlist</strong>
+      <button type="button" class="small-button ghost" id="clear-shortlist">Clear shortlist</button></div>
+    <div class="comparison-scroll"><table class="comparison-table" aria-labelledby="comparison-heading">
+      <thead><tr><th scope="col">Metric</th>${selected.map((anime) => `<th scope="col">${escapeHTML(anime.title)}</th>`).join("")}</tr></thead>
+      <tbody>${metrics.map((label, index) => `<tr><th scope="row">${label}</th>${values.map((rows) => `<td>${escapeHTML(rows[index])}</td>`).join("")}</tr>`).join("")}</tbody>
+    </table></div>
+    <p>Runtime estimates use episodes × minutes per episode. Missing values remain unknown.</p>`;
+  container.querySelector("#clear-shortlist").addEventListener("click", () => {
+    shortlist.clear();
+    renderAnimeTable();
+    renderComparison();
+  });
+}
+
+function updateShortlistInputs() {
+  elements.tableBody.querySelectorAll("[data-shortlist-id]").forEach((input) => {
+    input.checked = shortlist.has(input.dataset.shortlistId);
+    input.disabled = shortlist.size >= 3 && !input.checked;
+  });
+}
 
 function setExplorerView(view) {
   activeExplorerView = view;
@@ -451,9 +500,14 @@ function renderAnimeTable() {
 
   const pageStart = state.tablePage * pageSize;
   const displayed = sorted.slice(pageStart, pageStart + pageSize);
+  const cohortRanks = new Map(isCohortActive()
+    ? state.cohort.ids.map((id, index) => [String(id), index + 1]) : []);
 
-  elements.tableBody.innerHTML = displayed.map((anime) => `
+  elements.tableBody.innerHTML = displayed.map((anime, index) => `
     <tr data-anime-id="${anime.id}" tabindex="0">
+      <td><input type="checkbox" class="shortlist-checkbox" data-shortlist-id="${anime.id}"
+        aria-label="Shortlist ${escapeAttribute(anime.title)}"></td>
+      <td title="${isCohortActive() ? "Original movie similarity rank" : "Position in the current sort order"}">${cohortRanks.get(String(anime.id)) ?? pageStart + index + 1}</td>
       <td>
         <div class="anime-cell">
           <img
@@ -498,14 +552,19 @@ function renderAnimeTable() {
       }
     };
 
-    row.addEventListener("click", openRow);
+    row.addEventListener("click", (event) => {
+      if (!event.target.closest("input")) openRow();
+    });
 
     row.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
+      if (event.target === row && (event.key === "Enter" || event.key === " ")) {
+        event.preventDefault();
         openRow();
       }
     });
   });
+
+  updateShortlistInputs();
 
   renderTablePagination(sorted.length);
 
@@ -576,6 +635,14 @@ function renderTablePagination(totalItems) {
 
 registerPage({
   bindControls() {
+    elements.tableBody.addEventListener("change", (event) => {
+      const input = event.target.closest("[data-shortlist-id]");
+      if (!input) return;
+      if (!input.checked) shortlist.delete(input.dataset.shortlistId);
+      else if (shortlist.size < 3) shortlist.add(input.dataset.shortlistId);
+      updateShortlistInputs();
+      renderComparison();
+    });
     const tabs = [elements.tableTab, elements.scatterTab];
     tabs.forEach((tab, index) => {
       tab.addEventListener("click", () => setExplorerView(index === 0 ? "table" : "scatter"));
@@ -612,5 +679,6 @@ registerPage({
     renderKPIs();
     renderInsights();
     renderExplorerView();
+    renderComparison();
   }
 });

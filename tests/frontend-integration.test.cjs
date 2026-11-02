@@ -18,12 +18,14 @@ test("legacy recommendation bookmarks preserve the deployment prefix and query",
   }
 });
 
-test("every frontend page links to recommendations and resolves its local resources", () => {
+test("every frontend page links to recommendations and the separate dust playground, and resolves local resources", () => {
   for (const page of readdirSync(path.join(root, "frontend"))) {
     const filename = path.join(root, "frontend", page, "index.html");
     if (!existsSync(filename)) continue;
     const html = readFileSync(filename, "utf8");
     assert.match(html, /href="\.\.\/recommendations\/index\.html"/, page);
+    assert.match(html, /data-goto="explorer"[\s\S]*?<\/a>\s*<a class="rail-link[^"]*"[^>]*data-goto="dust-magnet" href="\.\.\/dust-magnet\/index\.html"/, page);
+    assert.doesNotMatch(html, /data-recommendation-viz="magnets"/, page);
     for (const [, resource] of html.matchAll(/(?:src|href)="([^"#]+)"/g)) {
       if (/^(?:https?:|mailto:|data:)/.test(resource)) continue;
       assert.ok(existsSync(path.resolve(path.dirname(filename), resource.split(/[?#]/)[0])), `${page}: ${resource}`);
@@ -85,6 +87,7 @@ test("Explorer tabs defer rendering until data arrives and refresh only the visi
     renderInsights = () => {};
     renderAnimeTable = () => record("table");
     renderScatterplot = () => record("scatter");
+    renderComparison = () => {};
   `, context);
   controls.bindControls();
 

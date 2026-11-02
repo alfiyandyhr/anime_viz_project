@@ -39,6 +39,8 @@ frontend/
 │   ├── styles.css
 │   ├── app.js
 │   └── dust-magnet.js
+├── dust-magnet/
+│   └── index.html
 ├── explorer/
 │   ├── index.html
 │   ├── styles.css
@@ -58,10 +60,28 @@ Flask and GitHub Pages. Filters persist across pages for the current browser
 session. The bundled dataset remains at the project root as `data.json`.
 
 The rail follows Introduction → Story → Movie → Anime → Content → Creators →
-Explorer. Explorer offers **Table** and **Score vs Popularity** tabs over the
+Explorer → Dust & Magnet. Dust & Magnet is a separate playground outside the
+three numbered task views. Explorer offers **Table** and **Score vs Popularity** tabs over the
 same filtered titles, with the KPI strip and insight cards visible in both
 views. Scatter bubbles open anime details and update with filters and window
 resizing. The former Reception page redirects to Explorer for old bookmarks.
+
+Selecting a movie carries its **Top 20** into Content, Creators, and Explorer
+for the browser session. The context strip shows the seed movie, links back to
+movie search, and offers **Show full catalogue** or × to clear the cohort and
+reset filters. Dashboard filters narrow that cohort. A new movie clears the
+previous movie's filters. IDs are joined across snapshots; recommendations with
+no dashboard metadata remain in the cohort definition and are marked unavailable.
+
+Explorer's **Shortlist** checkboxes compare up to three titles. Selecting two
+opens a fixed comparison footer with original similarity ranks and cosine scores,
+format, year, episodes, estimated runtime, AniList score, and status. Similarity
+evidence is shown only in cohort mode; missing runtime values remain unknown.
+The shortlist lasts while the Explorer page stays open, including filtering,
+pagination, and switching views. Creators adds credited-title counts for the
+whole cohort and lets users select an anime to follow its sampled Japanese cast
+to other filtered cohort titles. Catalogue mode retains the full network.
+Story includes a dismissible **Skip to Movie → Anime** banner.
 
 ---
 
@@ -195,8 +215,9 @@ node --test tests/*.test.cjs
 
 ## Movie → Anime recommendations
 
-Open **Movie → Anime** in the rail, or visit `frontend/recommendations/index.html` (the existing `#recommendations` bookmark also works). **Connection map** is the default view and the first view button. Switch to
-**Dust & magnets** to add one, two, or three favorite movies through search or
+Open **Movie → Anime** in the rail, or visit `frontend/recommendations/index.html` (the existing `#recommendations` bookmark also works). **Connection map** compares one movie and provides the full ranking below.
+Open **Dust & Magnet** below Explorer in the rail, or visit
+`frontend/dust-magnet/index.html`, to add one, two, or three favorite movies through search or
 suggestions. Remove a movie with its × button. Drag magnets (or focus one and
 use arrow keys) to rearrange the field; **Reset positions** restores the layout.
 Hover or keyboard-focus an anime dot for its title and exact cosine score to
@@ -225,7 +246,7 @@ Damping and fixed time substeps animate movement while retaining particle
 identities and momentum. Dragging or resizing projects dots into their valid
 score regions immediately, then they settle around their new targets. Motion
 settles when idle; reduced-motion preferences use settled positions. Switching
-views stops the animation. Magnets stay separated and inside the chart.
+pages stops the animation. Magnets stay separated and inside the chart.
 
 Distances encode each dot's **preference order across movies**, rather than an
 exact cosine scale or a ranking of different anime. Some nearly collinear
@@ -281,12 +302,10 @@ under its [CC BY-SA 4.0 license](https://creativecommons.org/licenses/by-sa/4.0/
 
 ## Supervisor design proposal
 
-`assest/main.tex` and `assest/aniviz_supervisor_proposal.pdf` contain a meeting
+`assets/aniviz_supervisor_proposal.pdf` contains a meeting
 proposal for a connected journey from a familiar movie to a first anime. The
 10-page proposal includes an audited dataset inventory, user tasks, three design
 directions with mock-ups, a storyboard, real ranking examples, evaluation plans,
-and a feedback worksheet. Proposed navigation, linked cohorts, studio/cast
-handoffs, filters, and shortlists remain design ideas.
-
-Rebuild with `pdflatex` twice using a temporary output directory, then copy only
-the PDF into `assest/` to keep compilation intermediates out of the project.
+and a feedback worksheet. The navigation, linked movie cohort, studio/cast
+exploration, and comparison shortlist are implemented. Multi-movie weighted
+ranking, saved shortlists, and franchise detection remain outside this pass.

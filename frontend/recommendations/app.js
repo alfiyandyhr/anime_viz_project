@@ -2,9 +2,11 @@
 
 const recommendationState = {
   data: null, loading: false, error: null, movieId: null,
-  animeId: null, limit: 5, viz: "connections", movieIds: [], dustLimit: 60,
+  animeId: null, limit: 5,
+  viz: typeof document !== "undefined" && document.body?.dataset.chapter === "dust-magnet" ? "magnets" : "connections",
+  movieIds: [], dustLimit: 60,
   scores: null, scoresLoading: false, scoresError: null, magnetPositions: {},
-  ranking: [], tablePage: 0
+  ranking: [], tablePage: 0, cohortSelected: false
 };
 
 function normalizeMovieSearch(value) {
@@ -70,16 +72,6 @@ function bindRecommendationControls() {
     recommendationState.limit = Number(event.target.value);
     renderRecommendations();
   });
-  document.querySelectorAll("[data-recommendation-viz]").forEach((button) => {
-    button.addEventListener("click", () => {
-      hideTooltip();
-      if (button.dataset.recommendationViz === "magnets" && recommendationState.viz !== "magnets") {
-        recommendationState.animeId = null;
-      }
-      recommendationState.viz = button.dataset.recommendationViz;
-      renderRecommendations();
-    });
-  });
   for (const id of ["#movie-search-results", "#movie-suggestions"]) {
     document.querySelector(id).addEventListener("click", (event) => {
       const button = event.target.closest("[data-movie-id]");
@@ -136,7 +128,10 @@ async function loadRecommendations() {
     document.querySelector("#footer-generated").textContent = `Generated ${formatDate(data.meta.generated_at)}`;
     document.querySelector("#footer-cache").textContent = "Data mode: published similarity snapshot";
     document.querySelector("#movie-search").disabled = false;
-    const initial = data.movies.find((movie) => movie.title === "Inception") || data.movies[0];
+    const saved = readMovieCohort();
+    const restored = data.movies.find((movie) => String(movie.id) === String(saved?.seed.tmdbId));
+    const initial = restored || data.movies.find((movie) => movie.title === "Inception") || data.movies[0];
+    recommendationState.cohortSelected = Boolean(restored);
     recommendationState.movieId = initial.id;
     recommendationState.movieIds = [initial.id];
     document.querySelector("#movie-suggestions").innerHTML = `<span>Try a favorite</span>` +
@@ -144,7 +139,7 @@ async function loadRecommendations() {
         .map((title) => data.movies.find((movie) => movie.title === title)).filter(Boolean)
         .map((movie) => `<button type="button" data-movie-id="${escapeAttribute(movie.id)}">${escapeHTML(movie.title)}</button>`).join("");
     document.querySelector("#recommendation-method-data").textContent =
-      `${numberFormatter.format(data.meta.anime_count)} AniList anime × ${numberFormatter.format(data.meta.movie_count)} TMDB movies: ${numberFormatter.format(data.meta.pair_count)} pairs. Combine up to three movies in the dust view, or compare the top and bottom 5 or 10 for one movie in the connection map. Browse the full ranking below the map, 10 anime per page. Ranks span all ${numberFormatter.format(data.anime.length)} anime, with score ties resolved by anime record order. Bottom matches show contrasting stories. Computed ${formatDate(data.meta.generated_at)}.`;
+      `${numberFormatter.format(data.meta.anime_count)} AniList anime × ${numberFormatter.format(data.meta.movie_count)} TMDB movies: ${numberFormatter.format(data.meta.pair_count)} pairs. ${recommendationState.viz === "magnets" ? "Combine up to three movies using the complete score matrix. Dots combine strong matches to each movie and shared favorites." : `Compare the top and bottom 5 or 10 for one movie in the connection map. Browse the full ranking below the map, 10 anime per page. Ranks span all ${numberFormatter.format(data.anime.length)} anime, with score ties resolved by anime record order. Bottom matches show contrasting stories.`} Computed ${formatDate(data.meta.generated_at)}.`;
     document.querySelector("#recommendation-method-model").textContent =
       `${data.meta.model} embeds titles, genres, tags, and synopses. Cosine similarity compares normalized vectors; ratings and popularity do not affect the score.`;
   } catch (error) {
@@ -230,6 +225,7 @@ function selectRecommendationMovie(id) {
     recommendationState.movieIds = [id];
   }
   recommendationState.movieId = id;
+  recommendationState.cohortSelected = true;
   recommendationState.tablePage = 0;
   recommendationState.animeId = null;
   document.querySelector("#movie-search").value = "";
@@ -241,6 +237,34 @@ function selectedRecommendationMovie() {
   return recommendationState.data?.movies.find((movie) => movie.id === recommendationState.movieId);
 }
 
+function saveRecommendationCohort() {
+  if (recommendationState.viz === "magnets" || !recommendationState.cohortSelected) return;
+  const movie = selectedRecommendationMovie();
+  if (!movie) return;
+  const data = recommendationState.data;
+  // Published top matches are available even while the full matrix is loading.
+  const ranking = getRecommendationRanking(data, recommendationState.scores, movie);
+  const matches = ranking.length ? ranking.slice(0, 20)
+    : movie.matches.slice(0, 20).map(([index, score], indexInRanking) => ({
+      anime: data.anime[index], score, rank: indexInRanking + 1
+    }));
+  try {
+    const previous = readMovieCohort();
+    if (String(previous?.seed.tmdbId) !== String(movie.id)) {
+      sessionStorage.removeItem(FILTER_STORAGE_KEY);
+      sessionStorage.removeItem(COHORT_SCOPE_STORAGE_KEY);
+    }
+    sessionStorage.setItem(SEED_MOVIE_STORAGE_KEY, JSON.stringify({
+      tmdbId: movie.id, title: movie.title, year: movie.year
+    }));
+    sessionStorage.setItem(COHORT_IDS_STORAGE_KEY, JSON.stringify(matches.map((match) => String(match.anime.id))));
+    sessionStorage.setItem(COHORT_RANKING_STORAGE_KEY, JSON.stringify({
+      tmdbId: movie.id, total: data.anime.length,
+      matches: matches.map((match) => ({ id: String(match.anime.id), rank: match.rank, score: match.score }))
+    }));
+  } catch (error) { /* Recommendations remain usable when storage is disabled. */ }
+}
+
 function renderRecommendations() {
   stopDustChart();
   const data = recommendationState.data;
@@ -249,6 +273,7 @@ function renderRecommendations() {
     return;
   }
   const magnets = recommendationState.viz === "magnets";
+  saveRecommendationCohort();
   document.querySelector("#movie-magnets").hidden = !magnets;
   document.querySelector("#dust-limit-control").hidden = !magnets;
   document.querySelector("#recommendation-limit-control").hidden = magnets;
@@ -260,9 +285,6 @@ function renderRecommendations() {
   document.querySelector("#recommendation-table-pagination").hidden = magnets;
   document.querySelector("#movie-search-label").textContent = magnets ? "Add a movie magnet · up to 3" : "Find a movie in the sample";
   document.querySelector("#selected-movie").hidden = magnets;
-  document.querySelectorAll("[data-recommendation-viz]").forEach((button) => {
-    button.setAttribute("aria-pressed", button.dataset.recommendationViz === recommendationState.viz);
-  });
   hideTooltip();
   if (magnets) { renderDustRecommendations(); return; }
   const movie = selectedRecommendationMovie();
@@ -284,9 +306,6 @@ function renderRecommendations() {
   document.querySelectorAll("#movie-suggestions button").forEach((button) => {
     button.setAttribute("aria-pressed", button.dataset.movieId === movie.id);
     button.disabled = false;
-  });
-  document.querySelectorAll("[data-recommendation-viz]").forEach((button) => {
-    button.setAttribute("aria-pressed", button.dataset.recommendationViz === recommendationState.viz);
   });
   document.querySelector("#recommendation-chart-kicker").textContent = "Compare similarities & differences";
   document.querySelector("#recommendation-score-note").textContent = "Cosine similarity · higher means closer in the model’s text embedding space. A score of 0.8 does not mean an 80% match.";

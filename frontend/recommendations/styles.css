@@ -411,4 +411,5 @@ tbody tr:hover {
   .method-grid { grid-template-columns: 1fr; }
 }
 
-body[data-chapter="recommendations"] .filterbar { display: none; }
+body[data-chapter="recommendations"] .filterbar,
+body[data-chapter="dust-magnet"] .filterbar { display: none; }

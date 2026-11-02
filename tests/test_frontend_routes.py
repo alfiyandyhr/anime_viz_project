@@ -13,7 +13,7 @@ class FrontendRoutesTests(unittest.TestCase):
         with app.test_client() as client, \
                 patch.object(service, "get_dashboard", side_effect=AssertionError("No dashboard request")), \
                 patch.object(story_service, "get_story", side_effect=AssertionError("No story request")):
-            for url in ["/recommendations", "/recommendations/"]:
+            for url in ["/recommendations", "/recommendations/", "/dust-magnet", "/dust-magnet/"]:
                 with client.get(url, follow_redirects=True) as response:
                     self.assertEqual(response.status_code, 200)
                     self.assertIn(b'id="movie-search"', response.data)

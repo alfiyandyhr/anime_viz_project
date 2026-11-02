@@ -97,3 +97,40 @@
 @media (max-width: 680px) {
   .network-chart { min-height: 560px; }
 }
+
+#cohort-studios[hidden], .network-controls[hidden], .cohort-cast-controls[hidden] { display: none; }
+.cohort-studio-bars { display: grid; gap: 8px; }
+.cohort-studio-bar {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(80px, 2fr) 140px;
+  align-items: center;
+  gap: 16px;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-soft);
+  background: transparent;
+  text-align: left;
+  font-size: .8rem;
+}
+.cohort-studio-bar:hover, .cohort-studio-bar[aria-pressed="true"] { border-color: var(--purple); background: rgba(157,123,255,.08); }
+.cohort-studio-track { height: 12px; border-radius: 3px; background: rgba(255,255,255,.04); }
+.cohort-studio-track > span { display: block; height: 100%; border-radius: inherit; background: var(--cyan); }
+.cohort-studio-bar strong { font-size: .73rem; font-weight: 500; }
+.cohort-cast-controls label { display: block; max-width: 440px; }
+.cohort-cast-controls p { color: var(--text-muted); font-size: .8rem; }
+.network-chart.is-cohort-cast { min-height: 0; background: var(--bg-soft); padding: 16px; }
+.cohort-cast-paths { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.cohort-cast-path { display: grid; grid-template-columns: minmax(0,1fr) 16px minmax(0,1fr) 16px minmax(0,1.4fr); gap: 12px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.cohort-cast-path:last-child { border: 0; }
+.cohort-cast-path button { border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); padding: 9px; border-radius: 8px; text-align: left; font: inherit; font-size: .8rem; overflow-wrap: anywhere; }
+.cohort-cast-path button:hover { border-color: var(--cyan); }
+.cohort-cast-path small { display: block; color: var(--text-muted); margin-top: 5px; font-size: .72rem; }
+.cohort-cast-matches { display: grid; gap: 6px; }
+@media (max-width: 680px) {
+  .cohort-studio-bar { grid-template-columns: minmax(90px,1fr) minmax(50px,1fr); gap: 8px; }
+  .cohort-studio-bar strong { grid-column: 1 / -1; }
+  .cohort-cast-path { grid-template-columns: minmax(0,1fr) 12px minmax(0,1fr); gap: 8px; }
+  .cohort-cast-path > button { grid-column: 1 / -1; }
+  .cohort-cast-path > span:first-of-type { display: none; }
+}
