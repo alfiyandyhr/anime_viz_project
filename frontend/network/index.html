@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <meta
+    name="description"
+    content="AnIViz — a story-driven visualization of what makes anime resonate: reception, content, and the creators behind popular titles."
+  >
+
+  <title>AnIViz — Network</title>
+
+  <link
+    rel="preconnect"
+    href="https://fonts.googleapis.com"
+  >
+  <link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin
+  >
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap"
+    rel="stylesheet"
+  >
+
+  <link rel="stylesheet" href="../common/styles.css">
+  <link rel="stylesheet" href="../creators/styles.css">
+
+  <script src="../common/navigation.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script src="../common/data-loader.js" defer></script>
+  <script src="../common/chart-data.js" defer></script>
+  <script src="../common/charts.js" defer></script>
+  <script src="../common/explorer-table.js" defer></script>
+  <script src="../common/app.js" defer></script>
+  <script src="scope.js" defer></script>
+  <script src="../common/collaboration-network.js" defer></script>
+  <script src="app.js" defer></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body data-chapter="network">
+
+  <div class="app-shell">
+    <!-- Shared view navigation -->
+    <header class="site-header">
+      <a class="brand" href="../dust-magnet/index.html" aria-label="AnIViz home">AnIViz</a>
+      <details class="view-menu" data-view-menu>
+        <summary aria-controls="view-destinations">Network</summary>
+        <nav id="view-destinations" aria-label="Views">
+          <a href="../dust-magnet/index.html">Dust &amp; Magnet</a>
+          <a href="../story/index.html">History</a>
+          <a href="../network/index.html" aria-current="page">Network</a>
+          <a href="../explorer/index.html?mode=catalogue">Full Catalogue</a>
+        </nav>
+      </details>
+    </header>
+
+    <!-- ───────────────────────── Main stage ───────────────────────── -->
+    <main class="stage">
+      <!-- Network -->
+      <section
+        class="chapter is-active"
+        id="chapter-network"
+        data-chapter="network"
+        aria-label="Network"
+      >
+        <article class="viz-card">
+          <div class="network-controls">
+            <h1>Network</h1>
+            <label><span>Scope</span><select id="network-scope"><option value="dust">Current dust</option><option value="catalogue">Catalogue</option></select></label>
+            <label class="network-find"><span>Find actor, character, or work</span><input id="network-search" type="search" placeholder="Name or anime title"></label>
+            <details class="network-options"><summary>Node types &amp; data</summary>
+              <div class="network-type-buttons" role="group" aria-label="Show node types">
+                <button type="button" data-network-type="actor" aria-pressed="true">Voice actors</button>
+                <button type="button" data-network-type="character" aria-pressed="true">Characters</button>
+                <button type="button" data-network-type="work" aria-pressed="true">Works</button>
+              </div>
+              <p>Up to 35 matching works, ordered by AniList list users. Credits sample up to 12 main characters per work, with Japanese voice actors. Node size and opacity encode connections in view; link width encodes shared-work count, capped at five works. Exact totals remain in the evidence.</p>
+              <p>Actor pairs share credited works; character pairs appear in the same work. Each character identity belongs to one work. Co-credits do not establish personal relationships.</p>
+            </details>
+          </div>
+          <p id="network-description" class="network-summary">Japanese sampled credits · links: roles / shared works · drag, zoom, select.</p>
+          <div class="network-legend" aria-label="Node colors"><span class="actor">● Voice actor</span><span class="character">● Character</span><span class="work">● Work</span></div>
+          <p id="network-summary" class="network-summary" role="status">Waiting for network data…</p>
+          <div id="network-chart" class="network-chart"></div>
+        </article>
+      </section>
+
+      <details class="methodology"><summary>About / Data</summary><div class="about-content"><p>Graph: sampled Japanese main-role voice credits from <a href="https://anilist.co/" target="_blank" rel="noopener noreferrer">AniList</a>. Current dust follows the saved displayed set; Catalogue uses the loaded sample. Scope and search affect this graph only.</p><div class="data-freshness"><span id="footer-generated">Data not loaded</span> · <span id="footer-cache"></span></div></div></details>
+    <footer class="data-footer">
+        <div class="data-status" role="status" aria-live="polite">
+          <span id="status-dot" class="status-dot loading"></span>
+          <span id="data-status">Loading anime data…</span>
+        </div>
+        <span class="source-credit">AniList × Python × D3.js</span>
+      </footer>
+    </main>
+  </div>
+
+  <!-- ───────────────────────── Overlays ───────────────────────── -->
+  <aside
+    id="detail-drawer"
+    class="detail-drawer"
+    aria-hidden="true"
+    aria-label="Anime details"
+  >
+    <button
+      id="close-drawer"
+      class="drawer-close"
+      type="button"
+      aria-label="Close details"
+    >
+      ×
+    </button>
+
+    <div id="drawer-content"></div>
+  </aside>
+
+  <div id="drawer-overlay" class="drawer-overlay"></div>
+
+  <div
+    id="tooltip"
+    class="tooltip"
+    role="tooltip"
+    aria-hidden="true"
+  ></div>
+</body>
+</html>

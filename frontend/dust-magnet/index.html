@@ -32,260 +32,207 @@
   <link rel="stylesheet" href="../common/styles.css">
   <link rel="stylesheet" href="../recommendations/styles.css">
 
+  <script src="../common/navigation.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script src="../common/data-loader.js" defer></script>
+  <script src="../common/chart-data.js" defer></script>
+  <script src="../common/charts.js" defer></script>
+  <script src="../common/explorer-table.js" defer></script>
+  <script src="../common/chart-composition.js" defer></script>
+  <script src="../common/dust-context.js" defer></script>
+  <script src="../common/dust-details.js" defer></script>
   <script src="../common/app.js" defer></script>
   <script src="../recommendations/app.js" defer></script>
   <script src="../recommendations/dust-magnet.js" defer></script>
+  <script src="../common/dust-main.js" defer></script>
 </head>
 
 <body data-chapter="dust-magnet">
-  <div class="ambient ambient-one"></div>
-  <div class="ambient ambient-two"></div>
 
   <div class="app-shell">
-    <!-- ───────────────────────── Left rail ───────────────────────── -->
-    <aside class="rail" aria-label="Site navigation">
-      <a class="brand" href="../intro/index.html" data-goto="intro">
-        <span class="brand-mark">A</span>
-        <span>
-          <strong>AnIViz</strong>
-          <small>Anime Industry Visualization</small>
-        </span>
-      </a>
-
-      <nav class="rail-nav" aria-label="Movie journey, catalogue, and optional explorations">
-        <a class="rail-link" data-goto="intro" href="../intro/index.html">
-          <span class="idx">◆</span>
-          <span class="rail-text">
-            <strong>Introduction</strong>
-            <small>Start your movie-to-anime journey</small>
-          </span>
-        </a>
-
-        <a class="rail-link catalogue-entry" aria-label="Browse full catalogue" href="../explorer/index.html?mode=catalogue">
-          <span class="idx">◇</span>
-          <span class="rail-text">
-            <strong>Browse full catalogue</strong>
-            <small>Explore all sampled anime</small>
-          </span>
-        </a>
-
-        <a class="rail-link" aria-label="Story — Optional exploration" data-goto="story" href="../story/index.html">
-          <span class="idx">◷</span>
-          <span class="rail-text">
-            <strong>Story</strong>
-            <small>Optional · Explore anime history</small>
-          </span>
-        </a>
-
-        <a class="rail-link" aria-label="Task 1 — Movie → Anime" data-goto="recommendations" href="../recommendations/index.html">
-          <span class="idx">01</span>
-          <span class="rail-text">
-            <strong>Movie → Anime</strong>
-            <small>Task 1 · Find your matches</small>
-          </span>
-        </a>
-
-        <a class="rail-link" aria-label="Task 2 — Content" data-goto="content" href="../content/index.html">
-          <span class="idx">02</span>
-          <span class="rail-text">
-            <strong>Content</strong>
-            <small>Task 2 · Explore stories and years</small>
-          </span>
-        </a>
-
-        <a class="rail-link" aria-label="Task 3 — Creators" data-goto="creators" href="../creators/index.html">
-          <span class="idx">03</span>
-          <span class="rail-text">
-            <strong>Creators</strong>
-            <small>Task 3 · Discover studios and cast</small>
-          </span>
-        </a>
-
-        <a class="rail-link" aria-label="Task 4 — Reception" data-goto="reception" href="../reception/index.html">
-          <span class="idx">04</span>
-          <span class="rail-text">
-            <strong>Reception</strong>
-            <small>Task 4 · Compare audience reception</small>
-          </span>
-        </a>
-
-        <a class="rail-link" aria-label="Explorer — Final comparison" data-goto="explorer" href="../explorer/index.html">
-          <span class="idx">✦</span>
-          <span class="rail-text">
-            <strong>Explorer</strong>
-            <small>Finish · Compare your finalists</small>
-          </span>
-        </a>
-
-        <a class="rail-link is-active" aria-label="Dust &amp; Magnet — Optional exploration" aria-current="page" data-goto="dust-magnet" href="../dust-magnet/index.html">
-          <span class="idx">✧</span>
-          <span class="rail-text">
-            <strong>Dust &amp; Magnet</strong>
-            <small>Optional · Explore movie magnets</small>
-          </span>
-        </a>
-      </nav>
-
-      <div class="rail-foot">
-        <div class="rail-status" role="status" aria-live="polite">
-          <span id="status-dot" class="status-dot loading"></span>
-          <span id="data-status">Loading anime data…</span>
-        </div>
-        <span id="footer-generated">Data not loaded</span>
-        <span id="footer-cache"></span>
-        <span class="rail-credit">AniList × TMDB × D3.js</span>
-      </div>
-    </aside>
+    <!-- Shared view navigation -->
+    <header class="site-header">
+      <a class="brand" href="../dust-magnet/index.html" aria-label="AnIViz home">AnIViz</a>
+      <details class="view-menu" data-view-menu>
+        <summary aria-controls="view-destinations">Dust &amp; Magnet</summary>
+        <nav id="view-destinations" aria-label="Views">
+          <a href="../dust-magnet/index.html" aria-current="page">Dust &amp; Magnet</a>
+          <a href="../story/index.html">History</a>
+          <a href="../network/index.html">Network</a>
+          <a href="../explorer/index.html?mode=catalogue">Full Catalogue</a>
+        </nav>
+      </details>
+    </header>
 
     <!-- ───────────────────────── Main stage ───────────────────────── -->
     <main class="stage">
-      <!-- Persistent, collapsible cross-filter bar (hidden on the intro) -->
-      <details class="filterbar" id="filterbar" open>
-        <summary>
-          <span class="filterbar-title">
-            <strong>Filters</strong>
-            <span id="filter-summary">Waiting for data…</span>
-          </span>
-          <span class="filterbar-hint">click to collapse</span>
-        </summary>
+      <!-- View controls -->
 
-        <div class="filter-grid">
-          <label>
-            <span>Search titles, studios, or actors</span>
-            <input
-              id="search-input"
-              type="search"
-              placeholder="e.g. Attack on Titan"
-            >
-          </label>
-
-          <label>
-            <span>Genre</span>
-            <select id="genre-filter">
-              <option value="All">All genres</option>
-            </select>
-          </label>
-
-          <label>
-            <span>Studio</span>
-            <select id="studio-filter">
-              <option value="All">All studios</option>
-            </select>
-          </label>
-
-          <label>
-            <span>Format</span>
-            <select id="format-filter">
-              <option value="All">All formats</option>
-            </select>
-          </label>
-
-          <label>
-            <span>From year</span>
-            <select id="year-from"></select>
-          </label>
-
-          <label>
-            <span>To year</span>
-            <select id="year-to"></select>
-          </label>
-
-          <label class="range-control" for="score-filter">
-            <span>
-              Minimum score:
-              <output id="score-output">0</output>
-            </span>
-
-            <input
-              id="score-filter"
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              value="0"
-            >
-          </label>
-
-          <div class="filter-reset">
-            <button id="reset-filters" class="small-button ghost" type="button">
-              Reset filters
-            </button>
-          </div>
-        </div>
-      </details>
-
-      <section class="chapter is-active" id="chapter-dust-magnet" data-chapter="dust-magnet" aria-label="Dust &amp; Magnet — Optional exploration">
-        <header class="chapter-head">
-          <p class="chapter-eyebrow">Optional exploration · Dust &amp; Magnet</p>
-          <h2>Your favorite movies.<br><span class="grad">A constellation of anime.</span></h2>
-          <p class="chapter-lede">Add up to three movies you love. Move their magnets and discover the anime drawn to their stories.</p>
-        </header>
+      <section class="chapter is-active" id="chapter-dust-magnet" data-chapter="dust-magnet" aria-label="Dust &amp; Magnet">
+        <h1 class="sr-only">Dust &amp; Magnet</h1>
 
         <article class="recommendation-picker">
           <div class="recommendation-controls">
             <label class="movie-search-label" for="movie-search">
-              <span id="movie-search-label">Add a movie magnet · up to 3</span>
-              <input id="movie-search" type="search" placeholder="Try Inception, Interstellar, or The Matrix" autocomplete="off" aria-controls="movie-search-results" disabled>
+              <span id="movie-search-label" class="sr-only">Add a movie magnet · up to 3</span>
+              <input id="movie-search" type="search" placeholder="Add movie magnet… (up to 3)" autocomplete="off" aria-controls="movie-search-results" disabled>
             </label>
-            <label id="dust-limit-control" for="dust-limit"><span>Anime dots</span>
-              <select id="dust-limit"><option value="30">30 · quiet</option><option value="60" selected>60 · balanced</option><option value="90">90 · explore</option></select>
-            </label>
-            <label id="recommendation-limit-control" for="recommendation-limit" hidden><span>Map matches</span>
-              <select id="recommendation-limit">
-                <option value="5" selected>Top &amp; Bottom 5</option><option value="10">Top &amp; Bottom 10</option>
-              </select>
-            </label>
+
           </div>
           <div id="movie-magnets" class="movie-magnets" aria-label="Your movie magnets" hidden></div>
+          <details class="field-options" data-field-options>
+            <summary>Field options</summary>
+            <div class="field-options-panel">
+              <label id="dust-limit-control" for="dust-limit">
+                <span>Anime dots</span>
+                <select id="dust-limit">
+                  <option value="30">30 · quiet</option>
+                  <option value="60" selected>60 · balanced</option>
+                  <option value="90">90 · explore</option>
+                </select>
+              </label>
+              <button id="reset-magnets" class="small-button ghost" type="button">Reset positions</button>
+              <div id="movie-suggestions" class="movie-suggestions" aria-label="Movies to try"></div>
+              <details class="filterbar" id="filterbar">
+                <summary>
+                  <span class="filterbar-title">
+                    <strong>Filter anime</strong>
+                    <span id="filter-summary">Waiting for data…</span>
+                  </span>
+
+                </summary>
+
+                <div class="filter-grid">
+                  <label>
+                    <span>Search titles, studios, or actors</span>
+                    <input
+                      id="search-input"
+                      type="search"
+                      placeholder="e.g. Attack on Titan"
+                    >
+                  </label>
+
+                  <label>
+                    <span>Genre</span>
+                    <select id="genre-filter">
+                      <option value="All">All genres</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    <span>Studio</span>
+                    <select id="studio-filter">
+                      <option value="All">All studios</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    <span>Format</span>
+                    <select id="format-filter">
+                      <option value="All">All formats</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    <span>From year</span>
+                    <select id="year-from"></select>
+                  </label>
+
+                  <label>
+                    <span>To year</span>
+                    <select id="year-to"></select>
+                  </label>
+
+                  <label class="range-control" for="score-filter">
+                    <span>
+                      Minimum score:
+                      <output id="score-output">0</output>
+                    </span>
+
+                    <input
+                      id="score-filter"
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value="0"
+                    >
+                  </label>
+
+                  <div class="filter-reset">
+                    <button id="reset-filters" class="small-button ghost" type="button">
+                      Reset filters
+                    </button>
+                  </div>
+                </div>
+              </details>
+            </div>
+          </details>
           <div id="movie-search-results" class="movie-search-results" aria-label="Movie search results" hidden></div>
-          <div id="movie-suggestions" class="movie-suggestions" aria-label="Movies to try"></div>
+
           <p id="recommendation-status" class="recommendation-status" role="status" aria-live="polite">Loading movie–anime similarities…</p>
           <button id="recommendation-retry" class="small-button ghost" type="button" hidden>Retry loading</button>
         </article>
-
-        <article id="selected-movie" class="selected-movie" hidden></article>
 
         <div id="recommendation-content" hidden>
           <div class="recommendation-workspace">
             <article class="chart-card recommendation-chart-card">
               <div class="chart-heading">
-                <div><p id="recommendation-chart-kicker" class="chart-kicker">A constellation of your taste</p><h3 id="recommendation-chart-title">Follow the pull of a familiar story.</h3></div>
+                <div><p id="recommendation-chart-kicker" class="chart-kicker">Dust &amp; Magnet</p><h3 id="recommendation-chart-title">Anime shown</h3></div>
               </div>
               <p id="recommendation-chart-guide" class="recommendation-chart-guide"></p>
               <div id="dust-toolbar" class="dust-toolbar" hidden>
+                <p data-dust-scope role="status" aria-live="polite"></p>
                 <div id="dust-legend" class="dust-legend" role="group" aria-label="Anime colors by highest-scoring movie" hidden></div>
-                <button id="reset-magnets" class="small-button ghost" type="button">Reset positions</button>
+
               </div>
+              <p data-dust-notice role="status" aria-live="polite"></p>
+              <div data-dust-chips aria-label="Active dust filters"></div>
               <div id="recommendation-chart" class="recommendation-chart"></div>
               <p id="dust-layout-status" class="recommendation-chart-guide" role="status" hidden></p>
-              <div id="dust-selection" class="dust-selection" hidden></div>
-              <p id="recommendation-score-note" class="recommendation-score-note">Cosine similarity · higher means closer in the model’s text embedding space. A score of 0.8 does not mean an 80% match.</p>
+              <p id="recommendation-score-note" class="recommendation-score-note">Select up to 3 dots · distance: preference order · cosine ≠ percentage.</p>
             </article>
-            <aside id="recommendation-detail" class="recommendation-detail" aria-label="Selected anime details"></aside>
+            <div id="dust-selection" class="dust-selection" role="status" aria-live="polite" hidden></div>
+            <aside id="recommendation-detail" class="recommendation-detail" aria-label="Selected anime details" hidden></aside>
           </div>
 
-          <div id="recommendation-table-heading" class="explorer-head" hidden><h3 id="recommendation-table-title">Full anime ranking</h3><p id="recommendation-table-note" class="table-note" role="status"></p></div>
-          <div id="recommendation-table-wrapper" class="table-wrapper recommendation-table-wrapper" hidden>
-            <table>
-              <caption id="recommendation-table-caption" class="sr-only">Anime ranked by semantic similarity to the selected movie</caption>
-              <thead><tr><th scope="col">Rank</th><th scope="col">Anime</th><th scope="col">Similarity</th><th scope="col">Format</th><th scope="col">Year</th><th scope="col">Genres</th></tr></thead>
-              <tbody id="recommendation-table-body"></tbody>
-            </table>
-          </div>
-          <nav id="recommendation-table-pagination" class="table-pagination" aria-label="Anime ranking pages" hidden></nav>
         </div>
 
+        <section id="dust-analysis" aria-label="Displayed dust analysis">
+
+          <article class="chart-card"><h3>Similarity connections</h3>
+            <p data-coverage="connections"></p><div class="dust-linked-chart" role="region" tabindex="0" aria-label="Similarity connections, scroll horizontally" data-dust-chart="connections"></div></article>
+          <article class="chart-card"><h3>Full anime ranking</h3>
+            <p data-dust-ranking-note></p>
+            <label>Rank by <select data-dust-ranking-sort><option value="average">Average similarity</option></select></label>
+            <div class="table-wrapper" role="region" tabindex="0" aria-label="Full similarity ranking, scroll horizontally">
+              <table><thead data-dust-ranking-head></thead><tbody data-dust-ranking-body></tbody></table>
+            </div><nav data-dust-ranking-pages aria-label="Full similarity ranking pages"></nav>
+          </article>
+          <article class="chart-card" id="content"><h3>Genres</h3>
+            <label>Metric <select data-dust-genre-metric><option value="count">Titles</option><option value="score">Average score</option><option value="popularity">Popularity</option></select></label>
+            <p data-coverage="genres"></p><div class="dust-linked-chart" data-dust-chart="genres"></div></article>
+          <article class="chart-card"><h3>Release years</h3>
+            <p data-coverage="years"></p><div class="dust-linked-chart" data-dust-chart="years"></div></article>
+          <article class="chart-card" id="creators"><h3>Studios</h3>
+            <p data-coverage="studios"></p><div class="dust-linked-chart" data-dust-chart="studios"></div></article>
+          <article class="chart-card"><h3>Studio × genre</h3>
+            <p data-coverage="heatmap"></p><div class="dust-linked-chart" role="region" tabindex="0" aria-label="Studio genre chart, scroll horizontally" data-dust-chart="heatmap"></div></article>
+          <article class="chart-card" id="reception"><h3>Score vs. popularity</h3>
+            <p data-coverage="reception"></p><div class="dust-linked-chart" data-dust-chart="reception"></div></article>
+        </section>
+
         <details class="methodology">
-          <summary>How these recommendations work</summary>
+          <summary>About / Data</summary>
           <div class="method-grid">
             <article><h3>One million comparisons</h3><p id="recommendation-method-data">1,000 popular AniList anime × 1,000 popular TMDB movies. The dust field combines the strongest matches to each movie and shared favorites using the complete score matrix.</p></article>
             <article><h3>Story similarity</h3><p id="recommendation-method-model">Qwen3-Embedding-4B embeds titles, genres, tags, and synopses. Cosine similarity compares the normalized vectors; ratings and popularity do not affect the score.</p></article>
 
-            <article><h3>Reading the magnets</h3><p>Dots combine strong matches to each movie and the highest average scores across your movies. With multiple magnets, each dot stays closer to its higher-scoring movies, including when scores are zero or negative. Spacing respects this preference order. A single movie gathers a compact cloud through positive-score attraction. Moving magnets changes the layout, never the scores. Distances show each dot’s preference order across movies, not an exact cosine scale or a ranking of different anime. Some nearly collinear arrangements cannot show every preference; a message suggests spreading or resetting the magnets, while the highest-scoring movie stays nearest. Color identifies the highest-scoring movie; pink marks your selection. Click a dot to focus it; click elsewhere or reset to clear. Hover or focus for exact scores. Distances between anime carry no meaning.</p></article>
+            <article><h3>Reading the magnets</h3><p>Dots combine strong matches to each movie and the highest average scores across your movies. With multiple magnets, each dot stays closer to its higher-scoring movies, including when scores are zero or negative. Spacing respects this preference order. A single movie gathers a compact cloud through positive-score attraction. Moving magnets changes the layout, never the scores. Distances show each dot’s preference order across movies, not an exact cosine scale or a ranking of different anime. Some nearly collinear arrangements cannot show every preference; a message suggests spreading or resetting the magnets, while the highest-scoring movie stays nearest. Color identifies the highest-scoring movie; white outlines mark selected anime. Click or press Enter/Space on up to three dots to compare them below; select again to remove. Use Clear selection to remove all titles. Reset positions keeps selection. Hover or focus for exact scores. Distances between anime carry no meaning.</p></article>
+            <article><h3>Reading the charts</h3><p>Popularity counts AniList list users. The catalogue is a popularity-sorted sample. A title can have multiple genres and studios, so counts overlap. Reception marker size shows favourites; unknown favourites use a minimum marker. Missing metric values are excluded only from the relevant chart.</p></article>
             <article><h3>A starting point</h3><p>These are text-based recommendations, not predictions of your enjoyment. Seasons, sequels, and the same animated film in both databases can appear separately. Genre labels are context, not an explanation of the model’s score.</p></article>
           </div>
-        </details>
+        <div class="data-freshness"><span id="footer-generated">Data not loaded</span> · <span id="footer-cache"></span></div></details>
         <div class="stage-foot recommendation-credits">
           <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer" aria-label="The Movie Database">
             <img src="../../assets/tmdb-logo.svg" alt="TMDB" width="72" height="52">
@@ -294,6 +241,13 @@
         </div>
       </section>
 
+    <footer class="data-footer">
+        <div class="data-status" role="status" aria-live="polite">
+          <span id="status-dot" class="status-dot loading"></span>
+          <span id="data-status">Loading anime data…</span>
+        </div>
+        <span class="source-credit">AniList × TMDB × D3.js</span>
+      </footer>
     </main>
   </div>
 

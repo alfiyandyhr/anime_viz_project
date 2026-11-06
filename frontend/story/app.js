@@ -39,7 +39,7 @@
   async function loadData() {
     $("#retry-data").hidden = true;
     $("#story-load").hidden = false;
-    $("#story-load span").textContent = "Opening the archive… You can start reading while the data loads.";
+    $("#story-load span").textContent = "Loading annual archive…";
     status("Loading annual AniList rankings…", "loading");
     let payload;
     let source;
@@ -74,25 +74,16 @@
       $("#snapshot-description").textContent = `${source}. Retrieved ${date}. First-release years ${payload.meta.start_year}–${payload.meta.end_year}. ${payload.meta.end_year} is provisional. ${payload.meta.warning || ""}`;
       const archiveBehind = payload.meta.end_year < new Date().getFullYear();
       const warning = payload.meta.warning || (archiveBehind ? `This snapshot ends in ${payload.meta.end_year}; newer years are not yet available.` : "");
-      $("#story-load span").textContent = warning || `${source} · retrieved ${date} · current-year rankings are provisional.`;
+      $("#story-load span").textContent = warning;
+      $("#story-load").hidden = !warning;
       buildTimeline();
-      buildHero();
       syncScroll(true);
-      StoryConnections.load({ archive: payload, periods, openAnime: openDetail, openMovie: openMovieDetail });
     } catch (error) {
       status("Archive temporarily unavailable", "error");
       $("#story-load span").textContent = "The annual archive could not be loaded. The historical story is still available. Try again to load its visualizations.";
       $("#retry-data").hidden = false;
       renderUnavailable("The annual archive is unavailable.");
     }
-  }
-
-  function buildHero() {
-    const targetYears = [1963, 1988, 1995, 2001, 2013, 2020];
-    const works = targetYears.map(year => store.data.years.find(row => row.year === year)?.anime[0]).filter(Boolean);
-    d3.select("#hero-covers").selectAll("img").data(works, work => work.id).join("img")
-      .attr("src", imageUrl).attr("alt", "").attr("loading", "lazy")
-      .on("error", function() { this.hidden = true; });
   }
 
   function buildTimeline() {
@@ -177,7 +168,7 @@
     const summary = store.summaries[store.index];
     renderRankingChart("genres", summary);
     renderRankingChart("studios", summary);
-    $("#ranking-caption").textContent = `Share of ${summary?.anime.length || 0} selected titles. Genre and studio shares can overlap; unknown main-studio credits excluded.`;
+    $("#ranking-caption").textContent = `Share of ${summary?.anime.length || 0} sampled titles · genres / studios can overlap · unknown studios excluded.`;
     const info = `${summary?.anime.length || 0} titles · ${summary?.availableYears || 0} first-release years`;
     const gaps = summary?.missing.length ? ` · ${summary.missing.length} years unavailable` : "";
     const stale = summary?.stale.length ? ` · ${summary.stale.length} cached years not refreshed` : "";
@@ -242,7 +233,7 @@
   function syncScroll(force = false) {
     store.frame = 0;
     const panel = $("#visual-stage");
-    const rail = $(".rail");
+    const rail = $(".site-header");
     document.body.style.setProperty("--story-sticky-top", `${rail.getBoundingClientRect().height + 10}px`);
     document.body.style.setProperty("--story-scroll-offset", `${panel.offsetHeight + rail.getBoundingClientRect().height + 24}px`);
     // Use the same line for chapter activation, year progress, and year jumps.
@@ -307,12 +298,6 @@
     $("#anime-dialog").showModal();
   }
 
-  function openMovieDetail(movie, anime, match) {
-    const url = safeURL(movie.url);
-    $("#dialog-content").innerHTML = `<p class="chart-kicker">From ${escapeHTML(anime.title)} → movie</p><h2 id="dialog-title">${escapeHTML(movie.title)}</h2><p class="dialog-description">${movie.year || "Year unknown"} · ${escapeHTML((movie.genres || []).join(" · "))}</p><div class="detail-stats"><div class="detail-stat"><span>Cosine similarity</span><strong>${match.score.toFixed(3)}</strong></div><div class="detail-stat"><span>Movie ranking</span><strong>Top ${anime.matches.indexOf(match) + 1} / 1,000</strong></div></div><p class="dialog-description">${escapeHTML(movie.synopsis || "No synopsis available.")}</p><p class="dialog-caveat">Compared by story text with Qwen3-Embedding-4B. A score of 0.8 does not mean an 80% match. Similarity does not establish historical influence.</p>${url ? `<a class="button button-primary" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">View on TMDB ↗</a>` : ""}`;
-    $("#anime-dialog").showModal();
-  }
-
   $("#close-dialog").addEventListener("click", () => $("#anime-dialog").close());
   $("#anime-dialog").addEventListener("click", event => {
     if (event.target === event.currentTarget) {
@@ -335,7 +320,7 @@
     });
   });
   window.addEventListener("scroll", requestSync, { passive: true });
-  window.addEventListener("resize", () => { hideTooltip(); StoryConnections.layout(); syncScroll(true); });
+  window.addEventListener("resize", () => { hideTooltip(); syncScroll(true); });
   motion.addEventListener("change", () => syncScroll(true));
   syncScroll();
   loadData();

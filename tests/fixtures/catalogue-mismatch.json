@@ -1,0 +1,15 @@
+{
+  "note": "Reduced fixture of the published 997/1000 join: string recommendation IDs, numeric dashboard IDs, and the actual three unmatched IDs on each side.",
+  "recommendations": [
+    {"id":"1943","title":"Paprika","genres":["Mystery"],"year":2006},
+    {"id":"195516","title":"The Apothecary Diaries Season 3","genres":["Drama"]},
+    {"id":"195604","title":"Black Clover Season 2","genres":["Action"]},
+    {"id":"175872","title":"The Brilliant Healer's New Life in the Shadows","genres":["Fantasy"]}
+  ],
+  "metadata": [
+    {"id":1943,"title":"Paprika","genres":["Mystery"],"studio_names":["MADHOUSE"],"year":2006,"average_score":79,"popularity":100,"episodes":1,"duration":90},
+    {"id":4063,"title":"Sekirei","average_score":66},
+    {"id":20494,"title":"Noragami OVA","average_score":74},
+    {"id":228,"title":"Hell Girl","average_score":73}
+  ]
+}

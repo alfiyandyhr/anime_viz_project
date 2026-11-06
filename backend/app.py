@@ -1,4 +1,5 @@
 from pathlib import Path
+from urllib.parse import urlencode
 import os
 
 from flask import Flask, jsonify, redirect, request, send_from_directory, url_for
@@ -47,27 +48,30 @@ def tmdb_logo():
     return send_from_directory(PROJECT_ROOT / "assets", "tmdb-logo.svg")
 
 
-@app.get("/recommendations")
-@app.get("/recommendations/")
-def recommendations_page():
-    return redirect(url_for("static", filename="recommendations/index.html"))
-
-
-@app.get("/dust-magnet")
-@app.get("/dust-magnet/")
-def dust_magnet_page():
-    return redirect(url_for("static", filename="dust-magnet/index.html"))
+# Keep legacy paths as small HTML redirects so browser fragments (including
+# Creators' graph bookmarks) survive. Assets remain relative on static hosting.
+@app.get("/<view>")
+@app.get("/<view>/")
+def frontend_view(view):
+    pages = {
+        "intro": "intro", "recommendations": "recommendations", "dust-magnet": "dust-magnet",
+        "content": "content", "creators": "creators", "reception": "reception",
+        "network": "network", "story": "story", "history": "story",
+        "explorer": "explorer", "catalogue": "explorer",
+    }
+    if view not in pages:
+        from flask import abort
+        abort(404)
+    query = request.args.to_dict(flat=False)
+    if pages[view] == "explorer":
+        query["mode"] = ["catalogue"]
+    suffix = urlencode(query, doseq=True)
+    return redirect(url_for("static", filename=f"{pages[view]}/index.html") + (f"?{suffix}" if suffix else ""))
 
 
 @app.get("/story.json")
 def static_story_data():
     return send_from_directory(PROJECT_ROOT, "story.json")
-
-
-@app.get("/story")
-@app.get("/story/")
-def story_page():
-    return redirect(url_for("static", filename="story/index.html"))
 
 
 @app.get("/api/story")

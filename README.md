@@ -1,129 +1,100 @@
 # AnIViz — Anime Industry Visualization
 
-A visual anime discovery tool that starts with a familiar movie, built with Python/Flask, AniList GraphQL API, and D3.js. The introduction leads to Movie → Anime or direct catalogue browsing. Story offers optional historical context; Content, Creators, Reception, and Explorer help inspect the anime catalogue.
+A visual anime discovery tool that starts with familiar movies, built with Python/Flask, AniList GraphQL API, and D3.js. Dust & Magnet opens directly, with linked anime analysis below the field. One compact view dropdown connects Dust & Magnet, History, Network, and Full Catalogue.
 
 **Live site:** https://alfiyandyhr.github.io/anime_viz_project/
 
 ---
 
+## Four views
+
+The root URL opens **Dust & Magnet** with an **Example** Inception magnet.
+Search for movies to add up to three magnets; remove any movie directly with ×.
+The compact dropdown contains exactly four destinations:
+
+| View | Data and interactions |
+| --- | --- |
+| Dust & Magnet | Movie magnets and 30/60/90 anime dots. Scroll through Similarity connections → Full anime ranking → Genres / Release years → Studios / Studio × genre → Score vs. popularity. All charts are available without selecting a title. |
+| History | Six eras, annual Top 10 posters, sticky timeline and period rankings from an independent historical dataset. Popularity is current AniList list popularity, not historical audience figures. |
+| Network | Actor/character/work collaboration graph, defaulting to Current dust when a saved dust context exists, otherwise Catalogue. A local selector switches scopes without changing other views. The 35-work display cap and sampled Japanese cast credits are disclosed. |
+| Full Catalogue | The loaded 1,000-title metadata sample, with its own search, filters, sorting, pagination, details and automatic shortlist comparison. Saved movies never narrow its scope. |
+
+Movie search, removable magnet chips and **Field options** sit above the field.
+Options contain suggestions, dot count, Reset positions and main-view filters.
+Genre, studio, year and heatmap marks filter the **same displayed dusts** across
+the field, connection map and supporting charts. Filters narrow the original
+candidates without refilling them; removable chips and Reset filters undo them.
+The full similarity ranking covers every recommendation record, marks displayed
+rows, and sorts by any active movie or their arithmetic mean. Sorting and magnet
+dragging preserve membership, scores and selection. Removing the sorted movie
+returns the ranking to average similarity. Cosine scores are not percentages;
+field distances encode each anime's preference order across movies.
+
+Click/tap or Enter/Space toggles a dust title. One selection shows details;
+two or three automatically compare metadata, runtime, ratings and every active
+movie's similarity on shared scales, directly below the field. A fourth is declined
+with a brief notice. Background clicks, dragging and Reset positions preserve
+selection. Explicit Remove / Clear controls clear it. Overview charts keep their
+full displayed scope and highlight selected contributions. A ranking row outside
+the field opens separate evidence without joining the comparison. Catalogue
+shortlists are independent and remain in memory for that page visit.
+
+## Routes and session state
+
+Native links and the keyboard-accessible dropdown support browser Back/Forward.
+All assets and redirects are relative to the deployment root, including GitHub
+Pages' `/anime_viz_project/` prefix. Root and legacy redirect pages include a
+relative no-JavaScript fallback link and refresh (the charts themselves need JS).
+
+| Legacy URL or root bookmark | Destination |
+| --- | --- |
+| Introduction, Movie → Anime, `#recommendations`, `#dust-magnet` | Dust & Magnet |
+| Content, `#content` | Main view's Genres section |
+| Creators, `#creators` | Main view's Studios section |
+| Creators `#network`, `#network-chart`, `#tab-network`, `#collaboration`, `#collaboration-structure` | Network |
+| Reception, `#reception` | Main view's Score vs. popularity section |
+| Story, `#story`, `#history` | History |
+| Explorer, `#explorer`, `#catalogue` | Full Catalogue |
+
+Old `?mode=matches` and `?mode=catalogue` URLs resolve to the destination's new
+scope. Full Catalogue always uses catalogue scope. Graph links translate those
+modes to local `scope=dust` / `scope=catalogue`; unavailable dust falls back to
+Catalogue. Other query parameters are preserved. Flask also serves `/history`
+and `/catalogue`, plus the legacy clean paths with or without trailing slashes.
+
+Versioned `aniviz-dust-session-v1` session storage preserves ordered movies,
+filters, dot count, ranking sort, selection, magnet/particle positions and scroll.
+A supported saved session takes priority, including an explicitly empty movie
+set. Without one, a resolvable legacy `aniviz_seed_movie.tmdbId` becomes one
+magnet; the current algorithm recomputes 60 candidates from the complete matrix.
+Old Top-20 IDs, ranks, filters and selection are never imported as dust membership.
+Unresolvable seeds fall back to the labelled example. Legacy keys are left intact;
+new main-view actions write only the versioned dust session. Catalogue filters
+use `aniviz-catalogue-filters`; History's annual data and Network's local controls
+stay independent. Storage failure permits in-memory use with one concise notice.
+Explicit section links take priority over saved scroll on entry; reload and
+Back/Forward restore the saved location, including anchored URLs.
+
 ## Frontend structure
 
-Each page has its own HTML, CSS, and JavaScript. Shared styles, data loading,
-filters, tooltips, and detail drawers live in `frontend/common/`.
+`frontend/dust-magnet/index.html`, `frontend/story/`, `frontend/network/` and
+`frontend/explorer/` are the four view entry points. Introduction, Recommendations,
+Content, Creators and Reception HTML files are compatibility redirects. The
+recommendation engine and dust geometry remain in `frontend/recommendations/`.
+Shared modules in `frontend/common/` own navigation, independent data loading,
+the ID join and dust context, reusable chart instances, lazy composition,
+inline details/comparison and the extracted collaboration graph.
 
-```text
-frontend/
-├── common/
-│   ├── app.js
-│   ├── api.js
-│   ├── styles.css
-│   └── redirect.js
-├── intro/
-│   ├── index.html
-│   ├── styles.css
-│   └── app.js
-├── reception/
-│   ├── index.html
-│   ├── styles.css
-│   └── app.js
-├── content/
-│   ├── index.html
-│   ├── styles.css
-│   └── app.js
-├── creators/
-│   ├── index.html
-│   ├── styles.css
-│   └── app.js
-├── recommendations/
-│   ├── index.html
-│   ├── styles.css
-│   ├── app.js
-│   └── dust-magnet.js
-├── dust-magnet/
-│   └── index.html
-├── explorer/
-│   ├── index.html
-│   ├── styles.css
-│   └── app.js
-└── story/
-    ├── index.html
-    ├── styles.css
-    ├── data.js
-    ├── connections-data.js
-    ├── connections.js
-    └── app.js
-```
+Recommendation IDs are strings and metadata IDs are normalized before joining.
+The published datasets each contain 1,000 records, with 997 IDs in common; all
+recommendation records remain available even when richer metadata is missing.
+Unknown values stay unknown, with metric-specific coverage. Metadata failure
+leaves dust and similarity evidence usable; matrix failure offers Retry without
+invented scores. Detailed methods, data freshness and credits sit in About / Data.
 
-The root `index.html` redirects to the introduction and preserves existing
-chapter bookmarks such as `#creators`. Page navigation uses relative URLs for
-Flask and GitHub Pages. Filters persist across pages for the current browser
-session. The bundled dataset remains at the project root as `data.json`.
-
-The four numbered tasks follow Movie → Anime (1) → Content (2) → Creators (3) →
-Reception (4): choose a movie, explore the stories in its matches, discover their
-studios and cast, then compare audience reception. Explorer is the unnumbered
-final comparison step for choosing a first anime. Story and Dust & Magnet are
-labelled optional explorations in every page's navigation. Reception has the
-**Score vs Popularity** chart for comparing audience ratings and reach. Bubbles
-open anime details and update with shared filters and window resizing. Explorer
-provides the catalogue table and first-watch shortlist comparison. Dust & Magnet
-is a separate playground outside the four numbered task views.
-
-Task 1, the movie-match views in Tasks 2–4, and Explorer share a compact journey
-overview. It highlights the current location without recording task completion;
-Explorer appears separately as the unnumbered final comparison. Descriptive next
-actions connect Content → Creators → Reception → Explorer while keeping the movie
-and its filters. In Task 1, opening another task from the overview confirms the
-displayed example or chosen movie using the same session-storage check as
-**Explore these 20 matches →**. Catalogue views hide this movie-journey guidance.
-In Explorer, use the **Shortlist** checkboxes to select 2–3 matches and compare
-similarity, format, runtime, and audience scores before choosing a first anime.
-
-Selecting a movie carries its **Top 20** into Content, Creators, Reception, and Explorer
-for the browser session. The shared context strip shows the movie title and year,
-original match count, and how many matches are visible or hidden by filters.
-It stays visible when filters are collapsed and wraps long titles on small screens.
-Filters carry between these views and narrow the original movie matches; the
-strip's **Reset filters** restores available matches without clearing the movie.
-Recommendations missing dashboard metadata are counted separately from titles
-hidden by filters; they retain their original ranks and scores and are never
-replaced. The strip links back to movie search. **Browse full catalogue** in the
-navigation (or the introduction) explicitly opens catalogue mode using the same
-Content, Creators, Reception, and Explorer views and `data.json` sample. Catalogue
-headings and navigation describe browsing rather than numbered movie-match tasks;
-the strip prominently says **Browsing the full catalogue** and offers
-**Resume matches for [movie]** without discarding the movie or its original matches.
-
-Movie-match and catalogue filters persist independently in session storage.
-Switching modes restores that mode's filters; a reset affects only the current
-mode. Selecting a different movie activates its matches and clears the previous
-movie's filters while preserving catalogue filters. Selecting the same movie
-retains its match filters. Direct page entry restores the active session mode
-when a valid movie context exists; otherwise it opens an explicitly labelled
-catalogue with a link to Task 1. Explicit `?mode=catalogue` and `?mode=matches`
-navigation overrides the saved mode (matches require a valid saved movie).
-Older shared filters migrate once to their last active scope, so an old catalogue
-preference never produces movie-match headings over catalogue charts. Context and
-filters last only for the browser session. If session storage is unavailable,
-the context strip explains the persistence limit; Task 1 prevents continuation
-until its movie context can be saved.
-
-Explorer's **Shortlist** checkboxes compare up to three titles. Selecting two
-opens a fixed comparison footer with original similarity ranks and cosine scores,
-format, year, episodes, estimated runtime, AniList score, and status. Similarity
-evidence is shown only when viewing movie matches; missing runtime values remain unknown.
-The shortlist lasts while the Explorer page stays open, including filtering,
-sorting, pagination, and resizing. Reloading Explorer, following a link to another
-page, or switching between catalogue and matches starts a new shortlist; it is not
-saved in session storage. Movie context and each mode's filters survive reloads
-in the same tab while session storage remains available. They are not an account,
-cross-device history, or durable saved collection. Creators adds credited-title counts for the
-original movie match set, explicitly labelled as unaffected by filters, and lets
-users select an anime to follow its sampled Japanese cast to other visible matches.
-Actor profiles label their credits as spanning all available movie matches. Catalogue mode retains the full network.
-Story includes a dismissible **Skip to Movie → Anime** banner.
-
----
+See [the shared interfaces](frontend/common/README.md) and
+[the verification guide](tests/journey-verification.md) for contracts, checks,
+observed outcomes and limitations.
 
 ## Configuration
 
@@ -168,9 +139,9 @@ git push
 
 GitHub Pages picks up the new data automatically after the push.
 
-## Story — The Evolution of Anime
+## History — The Evolution of Anime
 
-Open **Story** from any page, or visit `http://localhost:5000/story` with Flask
+Choose **History** from the view dropdown, or visit `http://localhost:5000/story` with Flask
 running. The page tells six connected eras from 1963 to the current year.
 Scrolling in either direction updates one sticky archive: an annual timeline,
 the year's Top 10 posters, and a period-level genre or main-studio ranking.
@@ -207,13 +178,9 @@ then add its link to `.era-nav`. Scroll and chart logic derive periods from
 these attributes. `data.js` contains independently testable sample and scroll
 transformations; `app.js` owns the D3 joins, controls, and data loading.
 
-The **Top anime of decade → movie** detours use only the whitespace after each
-era's historical text. They measure the available height and show as many
-complete connection maps as fit, without extending eras or changing the
-year picker and scroll progression. Small screens may show fewer maps or none.
-Anime are ordered by current AniList popularity within the period's annual
-Top 10 sample. Each map shows the three most similar movies from the same
-1,000-movie corpus as Movie → Anime; select an anime or movie for its details.
+History no longer loads movie detours. The optional historical similarity export
+and its independent data checks remain available for research; they do not scope
+the historical archive or restart a numbered task workflow.
 
 Regenerate the separate published snapshot after updating `story.json`:
 
@@ -253,35 +220,24 @@ python -m unittest discover -s tests -p 'test_*.py'
 node --test tests/*.test.cjs
 ```
 
-## Movie → Anime recommendations
+## Dust & Magnet recommendations
 
-Open **Movie → Anime** in the rail, or visit `frontend/recommendations/index.html` (the existing `#recommendations` bookmark also works). **Connection map** compares one movie and provides the full ranking below.
-In a fresh session, Inception is labelled as an **example**, with no movie chosen
-yet. Choose a movie through search or suggestions, or use **Explore these 20
-matches →** to confirm the displayed example and open Task 2. The movie title,
-year, and Top 20 count identify the set carried through Tasks 2–4 and Explorer.
-Continuation activates movie matches even if the session previously showed the
-full catalogue. Top/Bottom 5 or 10 changes only the map; the carried set always
-uses the published Top 20 and works before the full score matrix loads. If
-session storage cannot save the context, continuation stays on Task 1 and
-explains how to retry.
-
-Open **Dust & Magnet** below Explorer in the rail, or visit
-`frontend/dust-magnet/index.html`, to add one, two, or three favorite movies through search or
-suggestions. Remove a movie with its × button. Drag magnets (or focus one and
-use arrow keys) to rearrange the field; **Reset positions** restores the layout.
-Hover or keyboard-focus an anime dot for its title and exact cosine score to
-each movie. Click or press Enter to update the details, storyline, genres, tags,
-and AniList link. The field starts with no anime selected and invites you to
-click a dot. Clicking inside the playground outside a dot or using **Reset positions**
-clears the highlight, dashed connections, and anime details. Clicking outside the
-playground, including expanding all story tags, preserves the selection.
+Open the root URL, choose **Dust & Magnet** in the dropdown, or visit
+`frontend/dust-magnet/index.html`. Search for up to three favorite movies and
+remove a magnet with its × button. **Field options** contains suggestions, the
+30/60/90 dot choices, filters, and **Reset positions**. Drag magnets, or focus
+one and use arrow keys, to rearrange the field. Hover or keyboard-focus an anime
+for its title and exact cosine scores. Click or press Enter to show its details
+below the field. Enter/Space or another click toggles selection; two or three
+selected titles compare automatically. Clear selection and individual removal
+controls appear in the inline details. Background clicks, dragging and resetting
+positions preserve selection. All linked charts remain available by scrolling.
 
 The dust field defaults to **60 dots**, with 30 and 90 options. It reserves half
 the candidate budget equally for each movie's strongest matches, then fills
 remaining slots with the highest mean cosine scores, deduplicating overlap.
 All candidates use the complete matrix. Color identifies the highest-scoring
-movie; pink marks the selected anime. Only the selected dot shows connections;
+movie; white outlines mark selected anime. Selected dots show connections;
 hover and keyboard focus show score tooltips without selecting an anime.
 
 With two or three magnets, each dot is closer to its higher-scoring movies.
@@ -306,17 +262,13 @@ suggests spreading the magnets or resetting their positions. Anime-to-anime
 distances carry no meaning. Exact scores remain in tooltips and details. Moving
 magnets does not change the candidate set, scores, or rank.
 
-**Connection map** compares one movie’s **Top & Bottom 5** or **Top & Bottom 10**,
-including global ranks. Below the map, **Full anime ranking** lists all anime by
-similarity, with 10 rows per page and Explorer-style page numbers and Previous/Next
-controls. Select any ranked anime to read its details. Choosing a different movie
-resets the table to page 1 and starts a fresh one-movie selection.
-
-This task uses its own movie controls, independently of the dashboard’s
-anime filters. It lazily loads `data/movie_recommendations.json` and works on
-GitHub Pages and the Flask server without an embedding model or API token.
-It preserves the computed ranking, including seasons and same-work overlaps;
-scores are semantic proximity, not percentages or predictions of enjoyment.
+The connection map and linked content, creator, and reception charts summarize
+the displayed dusts. The separately labelled **Full anime ranking** uses the
+complete recommendation corpus and supports sorting by each active movie or
+average similarity. Neither ranking sorts nor magnet movement alter the displayed
+anime membership. The view lazily loads the published similarity JSON and binary
+matrix, without an embedding model or API token. Similarity measures semantic
+proximity, not a percentage or a prediction of enjoyment.
 
 After computing a new completed similarity run, regenerate the web bundle:
 
@@ -345,17 +297,16 @@ python3 -m unittest discover -s tests -p 'test_*.py' -v
 python3 -m unittest discover -s data/semantic_similarity/tests -p 'test_*.py' -v
 ```
 
-For the connected movie journey, run the focused checks:
+For shared context, navigation, and route checks:
 
 ```bash
 node --test tests/cohort.test.cjs tests/frontend-integration.test.cjs
 python3 -m unittest discover -s tests -p 'test_frontend_routes.py' -v
 ```
 
-The Node checks exercise example confirmation, movie changes, missing metadata,
-scope changes, independent filters, direct entry, interrupted storage writes,
-chart refresh dispatch, and comparison behaviour. Flask checks serve the journey
-and catalogue pages and published assets without live AniList or TMDB requests.
+The Node checks cover navigation, movie changes, missing metadata, independent
+filters, storage failures, chart updates, and comparison behaviour. Flask checks
+serve the views and published assets without live AniList or TMDB requests.
 Install `backend/requirements.txt` in your Python environment before running them.
 See [the journey verification walkthrough](tests/journey-verification.md) for
 desktop, mobile, keyboard, and session scenarios and the observed usability checks.
@@ -371,6 +322,6 @@ under its [CC BY-SA 4.0 license](https://creativecommons.org/licenses/by-sa/4.0/
 proposal for a connected journey from a familiar movie to a first anime. The
 10-page proposal includes an audited dataset inventory, user tasks, three design
 directions with mock-ups, a storyboard, real ranking examples, evaluation plans,
-and a feedback worksheet. The navigation, linked movie cohort, studio/cast
-exploration, and comparison shortlist are implemented. Multi-movie weighted
+and a feedback worksheet. The four-view navigation, shared displayed-dust analysis, studio/cast
+exploration, and automatic inline comparisons are implemented. Multi-movie weighted
 ranking, saved shortlists, and franchise detection remain outside this pass.

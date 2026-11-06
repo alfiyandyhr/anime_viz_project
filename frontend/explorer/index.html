@@ -13,7 +13,7 @@
     content="AnIViz — a story-driven visualization of what makes anime resonate: reception, content, and the creators behind popular titles."
   >
 
-  <title>AnIViz — Explorer</title>
+  <title>AnIViz — Full Catalogue</title>
 
   <link
     rel="preconnect"
@@ -32,125 +32,38 @@
   <link rel="stylesheet" href="../common/styles.css">
   <link rel="stylesheet" href="styles.css">
 
+  <script src="../common/navigation.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script src="../common/data-loader.js" defer></script>
+  <script src="../common/chart-data.js" defer></script>
+  <script src="../common/charts.js" defer></script>
+  <script src="../common/explorer-table.js" defer></script>
   <script src="../common/app.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 
 <body data-chapter="explorer">
-  <div class="ambient ambient-one"></div>
-  <div class="ambient ambient-two"></div>
 
   <div class="app-shell">
-    <!-- ───────────────────────── Left rail ───────────────────────── -->
-    <aside class="rail" aria-label="Site navigation">
-      <a class="brand" href="../intro/index.html" data-goto="intro">
-        <span class="brand-mark">A</span>
-        <span>
-          <strong>AnIViz</strong>
-          <small>Anime Industry Visualization</small>
-        </span>
-      </a>
-
-      <nav class="rail-nav" aria-label="Movie journey, catalogue, and optional explorations">
-        <a class="rail-link" data-goto="intro" href="../intro/index.html">
-          <span class="idx">◆</span>
-          <span class="rail-text">
-            <strong>Introduction</strong>
-            <small>Start your movie-to-anime journey</small>
-          </span>
-        </a>
-
-        <a class="rail-link catalogue-entry" aria-label="Browse full catalogue" href="../explorer/index.html?mode=catalogue">
-          <span class="idx">◇</span>
-          <span class="rail-text">
-            <strong>Browse full catalogue</strong>
-            <small>Explore all sampled anime</small>
-          </span>
-        </a>
-
-        <a class="rail-link" aria-label="Story — Optional exploration" data-goto="story" href="../story/index.html">
-          <span class="idx">◷</span>
-          <span class="rail-text">
-            <strong>Story</strong>
-            <small>Optional · Explore anime history</small>
-          </span>
-        </a>
-
-        <a class="rail-link" aria-label="Task 1 — Movie → Anime" data-goto="recommendations" href="../recommendations/index.html">
-          <span class="idx">01</span>
-          <span class="rail-text">
-            <strong>Movie → Anime</strong>
-            <small>Task 1 · Find your matches</small>
-          </span>
-        </a>
-
-        <a class="rail-link" aria-label="Task 2 — Content" data-goto="content" href="../content/index.html">
-          <span class="idx">02</span>
-          <span class="rail-text">
-            <strong>Content</strong>
-            <small>Task 2 · Explore stories and years</small>
-          </span>
-        </a>
-
-        <a class="rail-link" aria-label="Task 3 — Creators" data-goto="creators" href="../creators/index.html">
-          <span class="idx">03</span>
-          <span class="rail-text">
-            <strong>Creators</strong>
-            <small>Task 3 · Discover studios and cast</small>
-          </span>
-        </a>
-
-        <a class="rail-link" aria-label="Task 4 — Reception" data-goto="reception" href="../reception/index.html">
-          <span class="idx">04</span>
-          <span class="rail-text">
-            <strong>Reception</strong>
-            <small>Task 4 · Compare audience reception</small>
-          </span>
-        </a>
-
-        <a class="rail-link is-active" aria-label="Explorer — Final comparison" aria-current="page" data-goto="explorer" href="../explorer/index.html">
-          <span class="idx">✦</span>
-          <span class="rail-text">
-            <strong>Explorer</strong>
-            <small>Finish · Compare your finalists</small>
-          </span>
-        </a>
-
-        <a class="rail-link" aria-label="Dust &amp; Magnet — Optional exploration" data-goto="dust-magnet" href="../dust-magnet/index.html">
-          <span class="idx">✧</span>
-          <span class="rail-text">
-            <strong>Dust &amp; Magnet</strong>
-            <small>Optional · Explore movie magnets</small>
-          </span>
-        </a>
-      </nav>
-
-      <div class="rail-foot">
-        <div class="rail-status" role="status" aria-live="polite">
-          <span id="status-dot" class="status-dot loading"></span>
-          <span id="data-status">Loading anime data…</span>
-        </div>
-        <span id="footer-generated">Data not loaded</span>
-        <span id="footer-cache"></span>
-        <span class="rail-credit">AniList × Python × D3.js</span>
-      </div>
-    </aside>
+    <!-- Shared view navigation -->
+    <header class="site-header">
+      <a class="brand" href="../dust-magnet/index.html" aria-label="AnIViz home">AnIViz</a>
+      <details class="view-menu" data-view-menu>
+        <summary aria-controls="view-destinations">Full Catalogue</summary>
+        <nav id="view-destinations" aria-label="Views">
+          <a href="../dust-magnet/index.html">Dust &amp; Magnet</a>
+          <a href="../story/index.html">History</a>
+          <a href="../network/index.html">Network</a>
+          <a href="../explorer/index.html?mode=catalogue" aria-current="page">Full Catalogue</a>
+        </nav>
+      </details>
+    </header>
 
     <!-- ───────────────────────── Main stage ───────────────────────── -->
     <main class="stage">
-      <!-- Persistent, collapsible cross-filter bar (hidden on the intro) -->
-      <details class="filterbar" id="filterbar" open>
-        <summary>
-          <span class="filterbar-title">
-            <strong>Filters</strong>
-            <span id="filter-summary">Waiting for data…</span>
-          </span>
-          <span class="filterbar-hint">click to collapse</span>
-        </summary>
-
-        <div class="filter-grid">
-          <label>
+      <!-- View controls -->
+      <div class="catalogue-tools">
+          <label class="catalogue-search">
             <span>Search titles, studios, or actors</span>
             <input
               id="search-input"
@@ -158,6 +71,16 @@
               placeholder="e.g. Attack on Titan"
             >
           </label>
+      <details class="filterbar" id="filterbar">
+        <summary>
+          <span class="filterbar-title">
+            <strong>Filters</strong>
+            <span id="filter-summary">Waiting for data…</span>
+          </span>
+        </summary>
+
+        <div class="filter-grid">
+
 
           <label>
             <span>Genre</span>
@@ -213,71 +136,21 @@
           </div>
         </div>
       </details>
+      </div>
 
       <!-- ═══════════════════ Chapter: Explorer ═══════════════════════ -->
       <section
         class="chapter is-active"
         id="chapter-explorer"
         data-chapter="explorer"
-        aria-label="Explorer · Full catalogue"
+        aria-label="Full Catalogue"
       >
-        <header class="chapter-head">
-          <p class="chapter-eyebrow">Explorer · Full catalogue</p>
-          <h2>Browse and compare anime from the catalogue</h2>
-          <p class="chapter-lede">
-            Explore the loaded anime catalogue by genre, year, studio, and format. Shortlist 2–3 titles to compare runtime and audience scores, and open any title for details.
-          </p>
-        </header>
-
-        <div id="journey-overview" class="journey-overview" hidden></div>
-
-        <section class="kpi-grid" aria-label="The sample at a glance">
-          <article class="kpi-card">
-            <span>Visible anime</span>
-            <strong id="kpi-count">—</strong>
-            <small>after current filters</small>
-          </article>
-
-          <article class="kpi-card">
-            <span>Average score</span>
-            <strong id="kpi-score">—</strong>
-            <small>out of 100</small>
-          </article>
-
-          <article class="kpi-card">
-            <span>Total popularity</span>
-            <strong id="kpi-popularity">—</strong>
-            <small>combined list users</small>
-          </article>
-
-          <article class="kpi-card">
-            <span>Studios represented</span>
-            <strong id="kpi-studios">—</strong>
-            <small>primary studios</small>
-          </article>
-
-          <article class="kpi-card">
-            <span>Voice actors represented</span>
-            <strong id="kpi-actors">—</strong>
-            <small>Japanese main-role cast</small>
-          </article>
-        </section>
-
-        <section class="insight-strip">
-          <div class="mini-heading">
-            <p class="eyebrow">Automatically generated</p>
-            <h3>Key facts at a glance</h3>
-          </div>
-
-          <div id="insight-cards" class="insight-grid"></div>
-        </section>
-
         <section class="explorer-panel" aria-label="Anime explorer">
           <div class="explorer-head">
-            <h3>Anime explorer</h3>
+            <h1>Full Catalogue</h1>
             <div class="explorer-controls">
               <label class="table-sort">
-                <span>Sort visible titles</span>
+                <span>Sort</span>
                 <select id="table-sort">
                   <option value="popularity">Popularity</option>
                   <option value="score">Average score</option>
@@ -304,15 +177,13 @@
               <thead>
                 <tr>
                   <th scope="col">Shortlist</th>
-                  <th scope="col">Ranking</th>
+                  <th scope="col">Rank</th>
                   <th>Anime</th>
                   <th>Year</th>
                   <th>Format</th>
-                  <th>Studio</th>
-                  <th>Score</th>
+                                    <th>Score</th>
                   <th>Popularity</th>
-                  <th>Genres</th>
-                </tr>
+                                  </tr>
               </thead>
 
               <tbody id="anime-table-body"></tbody>
@@ -322,76 +193,24 @@
           <div id="table-pagination" class="table-pagination"></div>
 
           <p id="table-note" class="table-note"></p>
+          <p id="catalogue-notice" class="table-note" role="status" hidden></p>
           <p id="shortlist-status" class="table-note" role="status">Select 2–3 titles to compare.</p>
         </section>
 
+        <section id="comparison-footer" class="comparison-footer" aria-label="Catalogue shortlist comparison" hidden></section>
+
         <details class="methodology">
-          <summary>Methodology &amp; limitations</summary>
-
-          <div class="method-grid">
-            <article>
-              <h3>Data source</h3>
-              <p>
-                Data is requested from AniList's GraphQL API. The backend
-                retrieves popular non-adult anime and derives coordinated
-                summaries for the frontend.
-              </p>
-            </article>
-
-            <article>
-              <h3>Unit of analysis</h3>
-              <p>
-                One record represents one anime entry. Franchise seasons, movies,
-                specials, and related adaptations may appear as separate entries.
-              </p>
-            </article>
-
-            <article>
-              <h3>Sampling caution</h3>
-              <p>
-                This is a popularity-sorted sample. It is useful for studying
-                highly visible anime, but it is not a random sample or a complete
-                history of the anime industry.
-              </p>
-            </article>
-
-            <article>
-              <h3>Network definition</h3>
-              <p>
-                The network uses Japanese main-role cast records returned by
-                AniList. Links show who voices a character, which works an actor
-                appears in, and which work contains a character. Character nodes
-                represent roles within individual works. Actors and characters
-                are also linked to peers in the same anime. Up to 35 matching works
-                with the highest popularity are shown to keep the graph readable.
-              </p>
-            </article>
-
-            <article>
-              <h3>Missing values</h3>
-              <p>
-                Some entries lack scores, dates, studios, episode counts, or cast
-                information. Visualizations exclude missing values only when the
-                corresponding encoding requires them.
-              </p>
-            </article>
-
-            <article>
-              <h3>Reproducibility</h3>
-              <p>
-                The backend caches processed API responses. The generation time
-                and cache status appear in the left rail.
-              </p>
-            </article>
-          </div>
-        </details>
-
-        <div class="stage-foot">
-          <strong>AnIViz</strong>
-          <p>Educational data-visualization project using AniList and D3.js.</p>
-        </div>
+          <summary>About / Data</summary>
+          <div class="about-content"><p>The Full Catalogue is the loaded popularity-sorted AniList sample, not every anime. Seasons and films are separate entries. Popularity counts AniList list users; scores use a 0–100 scale. Missing values remain unknown.</p><p>Filters and shortlist are independent of Dust &amp; Magnet. Select a row for secondary metadata and credits.</p><p><a href="https://anilist.co/" target="_blank" rel="noopener noreferrer">Source: AniList</a></p></div>
+        <div class="data-freshness"><span id="footer-generated">Data not loaded</span> · <span id="footer-cache"></span></div></details>
       </section>
-      <aside id="comparison-footer" class="comparison-footer" aria-label="Shortlist comparison" hidden></aside>
+    <footer class="data-footer">
+        <div class="data-status" role="status" aria-live="polite">
+          <span id="status-dot" class="status-dot loading"></span>
+          <span id="data-status">Loading anime data…</span>
+        </div>
+        <span class="source-credit">AniList × Python × D3.js</span>
+      </footer>
     </main>
   </div>
 

@@ -110,12 +110,13 @@
 .dust-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; min-width: 0; max-width: 100%; color: var(--text-muted); font-size: .7rem; }
 .dust-legend > span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .dust-legend-dot { flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--magnet-color, var(--cyan)); }
-.dust-legend-dot.is-selected { background: var(--pink); }
+.dust-legend-dot.is-selected { background: transparent; outline: 2px solid white; outline-offset: 2px; }
 .dust-map { border-radius: 14px; background: radial-gradient(ellipse at center, rgba(67,217,230,.025), transparent 70%); }
 .dust-node { cursor: pointer; outline: none; }
 .dust-hit-area { fill: transparent; }
 .dust-grain { stroke: var(--surface-solid); stroke-width: 1.5; pointer-events: none; }
-.dust-node.is-selected .dust-grain { fill: var(--pink); r: 6px; stroke: #ffc2de; stroke-width: 1.5; }
+.dust-node.is-selected .dust-grain { r: 6px; stroke: white; stroke-width: 2; }
+.dust-node.is-selected .dust-hit-area { stroke: white; stroke-width: 1; stroke-dasharray: 2 2; }
 .dust-node.is-preview .dust-grain, .dust-node:focus-visible .dust-grain { r: 7px; stroke: white; stroke-width: 2; }
 .dust-node:focus-visible .dust-hit-area { stroke: white; stroke-width: 1; stroke-dasharray: 2 2; }
 .dust-selected-link { stroke-width: 1; stroke-dasharray: 3 5; opacity: .4; pointer-events: none; }
@@ -419,5 +420,106 @@ tbody tr:hover {
   .method-grid { grid-template-columns: 1fr; }
 }
 
-body[data-chapter="recommendations"] .filterbar,
-body[data-chapter="dust-magnet"] .filterbar { display: none; }
+body[data-chapter="recommendations"] .filterbar { display: none; }
+
+#dust-analysis { display: grid; gap: 18px; margin-block: 24px; min-width: 0; }
+#dust-analysis .chart-card { min-width: 0; }
+.dust-linked-chart { min-width: 0; min-height: 390px; overflow-x: auto; }
+.dust-linked-chart svg { display: block; width: 100%; height: auto; }
+[data-dust-chart="heatmap"] { min-height: 540px; }
+[data-dust-chips] { display: flex; flex-wrap: wrap; gap: 8px; }
+[data-dust-ranking-pages] { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+[data-dust-scope], [data-coverage] { color: var(--muted, #aab3cf); font-size: 0.85rem; }
+[data-dust-notice]:empty { display: none; }
+[data-dust-ranking-body] tr.is-selected { outline: 2px solid white; outline-offset: -2px; }
+[data-dust-ranking-body] td { padding: 10px; }
+[data-dust-ranking-head] th { padding: 10px; text-align: left; }
+
+[data-dust-chart="studios"] { min-height: 480px; }
+[data-dust-chart="reception"] { min-height: 430px; }
+[data-dust-chart="heatmap"] svg { min-width: 760px; }
+[data-dust-chart="connections"] svg { min-width: 550px; }
+
+/* Main field: compact controls above, selected-title details in document flow. */
+body[data-chapter="dust-magnet"] .stage { padding: 8px 16px 48px; }
+body[data-chapter="dust-magnet"] #chapter-dust-magnet { gap: 8px; }
+body[data-chapter="dust-magnet"] .recommendation-picker {
+  position: relative; display: flex; align-items: center; gap: 10px;
+  min-height: 52px; padding: 0; border: 0; border-radius: 0; background: transparent;
+}
+body[data-chapter="dust-magnet"] .recommendation-controls { display: block; flex: 0 1 320px; min-width: 160px; }
+body[data-chapter="dust-magnet"] .recommendation-controls input { min-height: 36px; padding: 6px 10px; font-size: .8rem; }
+body[data-chapter="dust-magnet"] .movie-magnets { flex: 1; flex-wrap: nowrap; gap: 6px; margin: 0; min-width: 0; }
+body[data-chapter="dust-magnet"] .movie-magnet-chip { flex: 0 1 auto; padding: 2px 3px 2px 8px; gap: 6px; font-size: .72rem; }
+body[data-chapter="dust-magnet"] .movie-magnet-chip > span:nth-child(2) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body[data-chapter="dust-magnet"] .movie-magnet-chip small, body[data-chapter="dust-magnet"] .magnet-empty-slot { display: none; }
+body[data-chapter="dust-magnet"] #recommendation-status { position: absolute; top: 100%; left: 0; z-index: 5; padding: 5px 9px; margin: 0; max-width: 100%; background: var(--bg-soft); border-radius: 5px; font-size: .72rem; }
+body[data-chapter="dust-magnet"] #recommendation-status:empty { display: none; }
+body[data-chapter="dust-magnet"] .movie-search-results { position: absolute; z-index: 40; left: 0; top: 100%; width: min(550px, 100%); margin: 0; box-shadow: var(--shadow); }
+.field-options { flex: none; margin-left: auto; font-size: .76rem; }
+.field-options-panel { position: absolute; z-index: 35; top: 100%; right: 0; width: min(700px, 100%); max-height: calc(100svh - 120px); overflow-y: auto; padding: 16px; border: 1px solid var(--border-strong); border-radius: 10px; background: #12182d; box-shadow: var(--shadow); }
+.field-options-panel #dust-limit-control { display: inline-flex; align-items: center; gap: 10px; margin-right: 20px; }
+.field-options-panel select { color: var(--text); background: var(--bg-soft); border: 1px solid var(--border-strong); border-radius: 5px; padding: 5px; }
+.field-options-panel .filterbar { margin: 16px 0 0; }
+.field-options-panel .filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.field-options-panel .filter-grid > label:first-child { grid-column: 1 / -1; }
+body[data-chapter="dust-magnet"] .recommendation-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+body[data-chapter="dust-magnet"] .recommendation-chart-card {
+  display: flex; flex-direction: column; min-width: 0;
+  height: calc(100svh - 128px); min-height: 400px;
+  padding: 8px 10px; border-radius: 10px; background: rgba(10,16,29,.7);
+}
+body[data-chapter="dust-magnet"] .recommendation-chart-card .chart-heading,
+body[data-chapter="dust-magnet"] #recommendation-chart-guide { display: none; }
+body[data-chapter="dust-magnet"] .dust-toolbar { flex: none; gap: 6px 14px; margin: 0 0 4px; min-height: 24px; }
+body[data-chapter="dust-magnet"] [data-dust-scope] { margin: 0; font-size: .72rem; }
+body[data-chapter="dust-magnet"] .dust-legend { margin-left: auto; font-size: .68rem; }
+body[data-chapter="dust-magnet"] #recommendation-chart { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+body[data-chapter="dust-magnet"] .recommendation-score-note { margin: 4px 0 0; border: 0; padding: 0; font-size: .7rem; }
+body[data-chapter="dust-magnet"] #dust-layout-status { margin: 4px 0; }
+body[data-chapter="dust-magnet"] [data-dust-chips]:empty { display: none; }
+body[data-chapter="dust-magnet"] [data-dust-chips] { flex: none; }
+body[data-chapter="dust-magnet"] .recommendation-detail { position: static; padding: 20px; }
+body[data-chapter="dust-magnet"] .dust-empty { min-height: 0; height: 100%; display: grid; align-content: center; justify-items: center; }
+body[data-chapter="dust-magnet"] .dust-selection { margin: 0; padding-top: 4px; font-size: .72rem; }
+@media (max-width: 760px) {
+  body[data-chapter="dust-magnet"] .stage { padding-inline: 8px; }
+  body[data-chapter="dust-magnet"] .recommendation-picker { flex-wrap: wrap; gap: 6px; padding-block: 2px; }
+  body[data-chapter="dust-magnet"] .recommendation-controls { flex: 1 1 200px; }
+  body[data-chapter="dust-magnet"] .movie-magnets { order: 3; flex: 1 1 100%; }
+  body[data-chapter="dust-magnet"] .recommendation-chart-card { height: calc(100svh - 170px); min-height: 380px; }
+  body[data-chapter="dust-magnet"] .dust-legend { margin-left: 0; }
+  .field-options-panel .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.magnet-example { color: var(--text-muted); font-size: .65rem; font-style: normal; }
+
+.dust-details-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dust-details-heading h3 { margin: 0; }
+.dust-comparison-scroll { max-width: 100%; overflow-x: auto; margin-top: 16px; }
+.dust-comparison-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.dust-comparison-table th, .dust-comparison-table td { min-width: 150px; padding: 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.dust-comparison-table thead button { display: block; margin-top: 8px; }
+.dust-comparison-table meter { display: block; width: 100%; height: 10px; margin-top: 6px; accent-color: #9d7bff; }
+.dust-comparison-table .dust-movie-metric th { color: var(--magnet-color); }
+.dust-comparison-table meter::-webkit-meter-bar { background: #28334c; border: none; }
+.dust-comparison-table meter::-webkit-meter-optimum-value { background: var(--magnet-color, #9d7bff); }
+.dust-comparison-table meter::-moz-meter-bar { background: var(--magnet-color, #9d7bff); }
+.dust-metric-value { font-variant-numeric: tabular-nums; }
+.dust-selected-story { margin-top: 12px; }
+.dust-title-evidence { margin-block: 8px; }
+.dust-title-evidence summary { cursor: pointer; }
+.dust-outside-detail { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--border); }
+.dust-outside-detail:only-child { margin-top: 0; border-top: 0; }
+@media (max-width: 680px) {
+  .dust-comparison-table { min-width: 600px; }
+}
+
+body[data-chapter="dust-magnet"] #dust-analysis .chart-card { padding: 14px 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; box-shadow: none; }
+body[data-chapter="dust-magnet"] #dust-analysis h3 { margin: 0 0 6px; font-size: 1.1rem; }
+body[data-chapter="dust-magnet"] #dust-analysis p { margin: 6px 0; font-size: .75rem; }
+body[data-chapter="dust-magnet"] .table-wrapper { box-shadow: none; border-radius: 4px; }
+body[data-chapter="dust-magnet"] .methodology { border: 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; }
+body[data-chapter="dust-magnet"] .methodology > summary { padding: 10px 0; font-size: .85rem; }
+body[data-chapter="dust-magnet"] .method-grid { padding: 8px 0; }
+body[data-chapter="dust-magnet"] .method-grid article { min-height: 0; padding: 0; border: 0; background: transparent; }

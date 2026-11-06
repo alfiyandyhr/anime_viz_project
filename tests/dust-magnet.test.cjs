@@ -10,7 +10,7 @@ const view = new DataView(binary.buffer, binary.byteOffset, binary.byteLength);
 const scores = Float32Array.from({ length: binary.length / 4 }, (_, index) => view.getFloat32(index * 4, true));
 const favorites = ["Inception", "Interstellar", "The Matrix"].map((title) => data.movies.find((movie) => movie.title === title).id);
 
-test("dust selection resets only for non-dot clicks inside the playground", () => {
+test("incidental field, magnet and outside clicks preserve dust selection", () => {
   const element = (parent = null, isDust = false) => ({
     parent, listeners: {},
     addEventListener(type, handler) { (this.listeners[type] ??= []).push(handler); },
@@ -54,14 +54,14 @@ test("dust selection resets only for non-dot clicks inside the playground", () =
   for (const target of [playground, magnet]) {
     recommendationState.animeId = "selected-anime";
     click(target);
-    assert.equal(recommendationState.animeId, null);
+    assert.equal(recommendationState.animeId, "selected-anime");
   }
-  assert.equal(detailRenders, 2);
-  assert.equal(highlights, 2);
-  assert.equal(tooltipHides, 2);
+  assert.equal(detailRenders, 0);
+  assert.equal(highlights, 0);
+  assert.equal(tooltipHides, 0);
 
   click(playground);
-  assert.equal(detailRenders, 2, "empty selection needs no rerender");
+  assert.equal(detailRenders, 0, "background clicks never change selection");
   recommendationState.viz = "connections";
   recommendationState.animeId = "selected-anime";
   click(playground);
