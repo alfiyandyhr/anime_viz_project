@@ -76,16 +76,15 @@ test('inline details omit empty panels and compare metadata and every movie on s
   assert.doesNotMatch(result.html,/Similarity rank|single-seed/);
 });
 
-test('missing metadata stays Unknown and independent ranking inspection preserves comparison', () => {
+test('ranking inspection cannot add inline evidence or change the dust comparison', () => {
   const {context,data} = fixture();
   context.toggleSelection('0'); context.toggleSelection('1');
   context.setFilters({yearFrom:2000}); // Records with unknown years leave the displayed set.
   const before = context.snapshot();
   const result = renderDetails(context,data,'4');
   assert.match(result.html,/Comparing 2 anime/);
-  assert.match(result.html,/outside the displayed dust set/);
-  assert.match(result.html,/Unknown/);
-  assert.match(result.html,/Cast metadata unavailable/);
+  assert.equal(result.html, renderDetails(context,data).html);
+  assert.doesNotMatch(result.html,/outside the displayed dust set|Ranking anime details|Title 4/);
   assert.doesNotMatch(result.html,/Unknown min|Unknown \/ 100/);
   assert.deepEqual(context.snapshot().selectedAnimeIds,before.selectedAnimeIds);
   assert.deepEqual(context.snapshot().displayedDustIds,before.displayedDustIds);

@@ -10,20 +10,25 @@ below this section are historical records of earlier implementation stages.
    Inception example and 60 dots. Use the four-item dropdown with keyboard arrows,
    Tab/Enter and Escape. Add Interstellar and The Matrix in the search input;
    exercise 30, 60 and 90 dots under Field options and remove movies directly.
-2. Scroll through Similarity connections → Full anime ranking → Genres → Release
-   years → Studios → Studio × genre → Score vs. popularity. No task, show-chart or
-   comparison action is needed. The map may show its stated top/bottom subset of
-   displayed IDs; the ranking includes all 1,000 recommendation records.
+2. Scroll through Similarity connections → Genres → Release years → Studios →
+   Studio × genre → Score vs. popularity → Full anime ranking. No task, show-chart or
+   comparison action is needed. Each movie map shows its displayed-dust top 5 and bottom 5
+   with curved, score-weighted links (ranks 1–5 and 56–60 with 60 visible dots).
+   Curves, endpoint dots and scores match the anime's dust color for its closest magnet;
+   the full ranking table includes all 1,000 recommendation records.
 3. Select two dots by tap or Enter/Space. Inspect automatic comparison immediately
    below the field. Confirm shared highlights and aggregate contributions without
    changing the charts' displayed-dust scope. Reset positions preserves selection;
    Remove / Clear selection clears it. A fourth selection retains the first three.
 4. Exercise each active magnet sort and Average similarity. Every sort resets
    pagination, preserves selected IDs, candidates, scores and positions, and
-   reorders only ranking/map presentation. Remove the sorted movie: Average
-   similarity becomes active. Outside-dust ranking rows open separate details.
+   reorders only the ranking table. Remove the sorted movie: Average
+   similarity becomes active. Both displayed and outside-dust ranking titles
+   open the catalogue detail drawer without changing the dust comparison.
 5. Filter using genre, studio, year and occupied heatmap marks, then remove chips.
-   Filter to empty and Reset filters. All charts consume the same displayed IDs;
+   Filter to empty and Reset filters. Supporting charts consume the same displayed IDs;
+   comparison maps rerank within the filtered dust and stay independent of table sorting;
+   an empty dust field also clears the maps and offers filter guidance;
    missing metadata is separate from filtering, and unknown metrics stay unknown.
 6. Switch to Network: Current dust uses the displayed set; Catalogue is local.
    Full Catalogue starts from its own sample and filters; its shortlist does not
@@ -118,7 +123,14 @@ NODE_PATH=/tmp/aniviz-browser/node_modules \
 NODE_PATH=/tmp/aniviz-browser/node_modules \
   CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
   node tests/browser/routes.cjs
+NODE_PATH=/tmp/aniviz-browser/node_modules \
+  CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+  node tests/browser/dust-connections.cjs
 ```
+
+The dust-connections regression checks displayed-only local ranks, 30/60/90 dots,
+filters and empty/small sets, per-anime curve/dot/score colors, stable colors after
+movie removal/re-addition, keyboard detail access, and mobile session restoration.
 
 `ANIVIZ_CAPTURE_DIR` writes screenshots. `ANIVIZ_BASE_URL` changes the base for
 either runner. Prefix verification used a server rooted at the repository's parent

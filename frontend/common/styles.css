@@ -20,6 +20,7 @@
   --radius-large: 26px;
   --radius-medium: 18px;
   --radius-small: 11px;
+  --page-gutter: clamp(20px, 3.3vw, 64px);
 }
 
 * {
@@ -83,11 +84,11 @@ img {
 
 /* ─────────────────────────── Shell ─────────────────────────── */
 
-/* The header occupies one row; every view uses the full content width. */
+/* Shared gutters keep navigation and content aligned across all views. */
 .app-shell { width: 100%; margin-inline: auto; }
 .site-header {
   position: sticky; top: 0; z-index: 60; height: 48px;
-  display: flex; align-items: center; gap: 20px; padding: 0 20px;
+  display: flex; align-items: center; gap: 20px; padding: 0 var(--page-gutter);
   border-bottom: 1px solid var(--border); background: #0d1221;
 }
 .brand { font-family: "Space Grotesk", sans-serif; font-size: 1.08rem; font-weight: 700; }
@@ -147,7 +148,7 @@ img {
 .stage {
   min-width: 0;
   min-height: 100vh;
-  padding: 20px 24px 60px;
+  padding: 20px var(--page-gutter) 60px;
 }
 
 /* Buttons */
@@ -727,7 +728,7 @@ input[type="range"] {
 
 @media (max-width: 680px) {
   .stage {
-    padding: 22px 16px 70px;
+    padding: 22px var(--page-gutter) 70px;
   }
 
   .filter-grid {

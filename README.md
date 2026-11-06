@@ -14,7 +14,7 @@ The compact dropdown contains exactly four destinations:
 
 | View | Data and interactions |
 | --- | --- |
-| Dust & Magnet | Movie magnets and 30/60/90 anime dots. Scroll through Similarity connections → Full anime ranking → Genres / Release years → Studios / Studio × genre → Score vs. popularity. All charts are available without selecting a title. |
+| Dust & Magnet | Movie magnets and 30/60/90 anime dots. Scroll through Similarity connections → Genres / Release years → Studios / Studio × genre → Score vs. popularity → Full anime ranking. All charts are available without selecting a title. |
 | History | Six eras, annual Top 10 posters, sticky timeline and period rankings from an independent historical dataset. Popularity is current AniList list popularity, not historical audience figures. |
 | Network | Actor/character/work collaboration graph, defaulting to Current dust when a saved dust context exists, otherwise Catalogue. A local selector switches scopes without changing other views. The 35-work display cap and sampled Japanese cast credits are disclosed. |
 | Full Catalogue | The loaded 1,000-title metadata sample, with its own search, filters, sorting, pagination, details and automatic shortlist comparison. Saved movies never narrow its scope. |
@@ -24,7 +24,7 @@ The right panel shows the latest selected anime with its banner, cover, synopsis
 tags and sampled Japanese cast. Both panels scroll away above the analysis charts.
 Options contain suggestions, dot count, Reset positions and main-view filters.
 Genre, studio, year and heatmap marks filter the **same displayed dusts** across
-the field, connection map and supporting charts. Filters narrow the original
+the field and supporting charts. Filters narrow the original
 candidates without refilling them; removable chips and Reset filters undo them.
 The full similarity ranking covers every recommendation record, marks displayed
 rows, and sorts by any active movie or their arithmetic mean. Sorting and magnet
@@ -38,9 +38,9 @@ movie's similarity on shared scales, directly below the field. A fourth is decli
 with a brief notice. Each click on empty playground space deselects the most
 recently selected dust. Dragging and Reset positions preserve selection.
 Explicit Remove / Clear controls also clear it. Overview charts keep their
-full displayed scope and highlight selected contributions. A ranking row outside
-the field opens separate evidence without joining the comparison. Catalogue
-shortlists are independent and remain in memory for that page visit.
+full displayed scope and highlight selected contributions. Every ranking title
+opens the Full Catalogue detail drawer without joining or changing the comparison.
+Catalogue shortlists are independent and remain in memory for that page visit.
 
 ## Routes and session state
 
@@ -267,11 +267,17 @@ suggests spreading the magnets or resetting their positions. Anime-to-anime
 distances carry no meaning. Exact scores remain in tooltips and details. Moving
 magnets does not change the candidate set, scores, or rank.
 
-The connection map and linked content, creator, and reception charts summarize
-the displayed dusts. The separately labelled **Full anime ranking** uses the
-complete recommendation corpus and supports sorting by each active movie or
-average similarity. Neither ranking sorts nor magnet movement alter the displayed
-anime membership. The view lazily loads the published similarity JSON and binary
+Each of up to three active movies has a compact curved-link map of its top 5 and
+bottom 5 anime within the displayed dust, with local ranks and cosine scores.
+With 60 visible dots the maps show ranks 1–5 and 56–60. Dot-count changes and
+filters update their membership and ranks; table sorting does not. Curves,
+endpoint dots and scores use each anime's dust color for its highest-scoring
+magnet, including stable movie colors after removal or reordering. The linked
+content, creator, and reception charts summarize the displayed dusts. **Full anime ranking** appears
+after Score vs. popularity, uses the complete recommendation corpus, and supports
+sorting by each active movie or average similarity. Its titles open the same right
+detail drawer as Full Catalogue without changing the selected dust comparison.
+Neither ranking sorts nor magnet movement alter the displayed anime membership. The view lazily loads the published similarity JSON and binary
 matrix, without an embedding model or API token. Similarity measures semantic
 proximity, not a percentage or a prediction of enjoyment.
 

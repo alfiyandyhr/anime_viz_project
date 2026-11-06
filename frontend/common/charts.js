@@ -476,8 +476,8 @@
         });
       });
 
-      const width = Math.max(container.clientWidth, 850);
-      const height = Math.max(container.clientHeight, 540);
+      const width = Math.max(container.clientWidth, 560);
+      const height = Math.max(container.clientHeight, 480);
       const margin = { top: 135, right: 25, bottom: 35, left: 130 };
 
       const svg = d3.select(container)

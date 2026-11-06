@@ -4,7 +4,6 @@
   let context, composition, latest, metadataPayload = null, metadataError = false;
   let sources = [], sourceMovies = "", sourceLimit, rankingPage = 0, rankingSignature = "";
   let restored = false, scrollRestored = false, pendingNotice = "";
-  let externalId = null;
   const $ = selector => document.querySelector(selector);
   const movieColors = new Map();
   function color(movieId) {
@@ -51,19 +50,22 @@
   function movies() {
     return (latest?.movieIds || []).map(id => recommendationState.data?.movies.find(movie => String(movie.id) === id)).filter(Boolean);
   }
+  function inspectAnime(id) {
+    const anime = latest?.lookup.get(String(id))?.anime;
+    if (!anime) return;
+    openAnimeDetail({ ...anime, cover: anime.cover || {},
+      description: anime.description || anime.synopsis,
+      site_url: anime.site_url || anime.url || `https://anilist.co/anime/${anime.id}` });
+  }
   function select(id) {
     const key = String(id);
-    if (latest.displayedDustIds.includes(key)) {
-      externalId = null;
-      context.toggleSelection(key);
-    } else {
-      externalId = key;
-    }
+    if (!latest.displayedDustIds.includes(key)) { inspectAnime(key); return; }
+    context.toggleSelection(key);
     renderDetails(); highlightRecommendation();
   }
   function renderDetails() {
     if (!latest) return;
-    const result = AnivizDustDetails.render({ snapshot: latest, movies: movies(), externalId, color,
+    const result = AnivizDustDetails.render({ snapshot: latest, movies: movies(), color,
       helpers: { escapeHTML, escapeAttribute, humanize, formatNumber } });
     const detail = $('#recommendation-detail'), cue = $('#dust-selection');
     const focus = $('#dust-focus');
@@ -71,20 +73,18 @@
     detail.hidden = !result.html;
     detail.innerHTML = result.html;
     cue.hidden = !result.html;
-    cue.innerHTML = result.html ? `<a href="#recommendation-detail">${result.count > 1 ? `Comparing ${result.count} anime` : result.count ? 'Selected anime' : 'Ranking details'} · below ↓</a>` : '';
+    cue.innerHTML = result.html ? `<a href="#recommendation-detail">${result.count > 1 ? `Comparing ${result.count} anime` : 'Selected anime'} · below ↓</a>` : '';
   }
   function publish(snapshot) {
     latest = snapshot;
-    if (snapshot.displayedDustIds.includes(externalId) || !snapshot.ranking.some(row => String(row.anime.id) === externalId)) externalId = null;
     recommendationState.animeId = snapshot.selectedAnimeIds.at(-1) || null;
     recommendationState.dustMatches = snapshot.displayedDust;
     const anime = snapshot.displayedDustIds.map(id => snapshot.lookup.get(id).anime);
     const genreColor = d3.scaleOrdinal([...new Set([...snapshot.lookup.values()].flatMap(row => row.anime.genres))].sort(), [...d3.schemeTableau10, ...d3.schemeSet3]);
-    composition.update({ anime, selectedIds: snapshot.selectedAnimeIds, genreColor,
+    composition.update({ anime, movies: movies(), selectedIds: snapshot.selectedAnimeIds, genreColor,
       metric: $('[data-dust-genre-metric]').value, onFilter: setFilters, onSelect: select,
       snapshot });
     const count = snapshot.displayedDustIds.length, candidates = snapshot.candidateDustIds.length;
-    $('[data-dust-chart="connections"]').style.minHeight = `${count ? 110 + Math.min(20, count) * 38 : 200}px`;
     $('[data-dust-scope]').textContent = `${count} / ${candidates} anime`;
     elements.filterSummary.textContent = `${count} / ${candidates} anime`;
     $('[data-dust-notice]').textContent = pendingNotice;
@@ -124,53 +124,13 @@
     const basis = latest.rankingSortKey === 'average' ? 'average similarity' : active.find(movie => String(movie.id) === latest.rankingSortKey)?.title;
     $('[data-dust-ranking-note]').textContent = `${all.length} corpus anime · ${all.length ? `${start + 1}–${start + rows.length}` : 'Unavailable'}`;
     $('[data-dust-ranking-head]').innerHTML = `<tr><th scope="col">Rank · ${escapeHTML(basis || '')}</th><th scope="col">Anime</th>${active.map((movie, i) => `<th scope="col">M${i + 1} · ${escapeHTML(movie.title)}</th>`).join('')}<th scope="col">Average similarity</th><th scope="col">Format / year</th><th scope="col">Displayed dust</th></tr>`;
-    $('[data-dust-ranking-body]').innerHTML = rows.map(match => `<tr class="${latest.selectedAnimeIds.includes(String(match.anime.id)) ? 'is-selected' : ''}"><td>${match.rank}</td><td><button type="button" class="recommendation-title-button" data-dust-rank-id="${escapeAttribute(match.anime.id)}"${match.displayed ? ` aria-pressed="${latest.selectedAnimeIds.includes(String(match.anime.id))}"` : ''}>${escapeHTML(match.anime.title)}</button></td>${match.scores.map(score => `<td title="Cosine ${score}">${score.toFixed(3)}</td>`).join('')}<td title="Average cosine ${match.score}">${match.score.toFixed(3)}</td><td>${escapeHTML(humanize(match.anime.format))} / ${match.anime.year || 'Unknown'}</td><td>${match.displayed ? 'Yes' : '—'}</td></tr>`).join('');
+    $('[data-dust-ranking-body]').innerHTML = rows.map(match => `<tr><td>${match.rank}</td><td><button type="button" class="recommendation-title-button" data-dust-rank-id="${escapeAttribute(match.anime.id)}" aria-haspopup="dialog" aria-controls="detail-drawer">${escapeHTML(match.anime.title)}</button></td>${match.scores.map(score => `<td title="Cosine ${score}">${score.toFixed(3)}</td>`).join('')}<td title="Average cosine ${match.score}">${match.score.toFixed(3)}</td><td>${escapeHTML(humanize(match.anime.format))} / ${match.anime.year || 'Unknown'}</td><td>${match.displayed ? 'Yes' : '—'}</td></tr>`).join('');
     const pages = [];
     for (let page = 0; page < total; page++) if (page === 0 || page === total - 1 || Math.abs(page - rankingPage) <= 1) pages.push(page);
     $('[data-dust-ranking-pages]').innerHTML = total < 2 ? '' :
       `<button type="button" class="page-btn" data-dust-page="${rankingPage - 1}" ${rankingPage === 0 ? 'disabled' : ''} aria-label="Previous ranking page">‹</button>` +
       pages.map(page => `<button type="button" class="page-btn" data-dust-page="${page}" ${page === rankingPage ? 'aria-current="page"' : ''}>${page + 1}</button>`).join('') +
       `<button type="button" class="page-btn" data-dust-page="${rankingPage + 1}" ${rankingPage === total - 1 ? 'disabled' : ''} aria-label="Next ranking page">›</button>`;
-  }
-  // Node-and-link map using the displayed set only; the full ranking has a separate corpus scope.
-  function connectionRenderer(container) {
-    return { update({ snapshot }) {
-      const focused = container.contains(document.activeElement) ? document.activeElement.dataset.dustConnectionId : null;
-      container.replaceChildren();
-      const active = movies(), visible = new Set(snapshot.displayedDustIds);
-      const ordered = snapshot.ranking.filter(match => visible.has(String(match.anime.id)));
-      const subset = ordered.length > 20 ? [...ordered.slice(0, 10), ...ordered.slice(-10)] : ordered;
-      $('[data-coverage="connections"]').textContent = `${subset.length} of ${visible.size} displayed dusts${ordered.length > 20 ? ' · top / bottom 10 by ranking sort' : ''} · Focus for cosine scores.`;
-      if (!active.length || !subset.length) { renderEmpty(container, 'Add movies or broaden dust filters to see connections.'); return; }
-      const width = Math.max(container.clientWidth, 550), height = 110 + subset.length * 38, x = width * .43;
-      const svg = d3.select(container).append('svg').attr('viewBox', `0 0 ${width} ${height}`).attr('role', 'group').attr('aria-label', 'Displayed dust similarity connections');
-      const nodes = active.map((movie, i) => ({ movie, x: 25, y: height * (i + 1) / (active.length + 1) }));
-      nodes.forEach((node, movieIndex) => {
-        svg.append('rect').attr('x', node.x).attr('y', node.y - 30).attr('width', x - 70).attr('height', 60).attr('rx', 8).attr('fill', '#111c30').attr('stroke', color(node.movie.id));
-        svg.append('text').attr('x', node.x + 10).attr('y', node.y + 4).attr('fill', color(node.movie.id)).text(`M${movieIndex + 1} · ${truncate(node.movie.title, 21)}`).append('title').text(node.movie.title);
-      });
-      subset.forEach((match, i) => {
-        const y = 50 + i * 38, selected = snapshot.selectedAnimeIds.includes(String(match.anime.id));
-        nodes.forEach((node, j) => {
-          svg.append('line').attr('x1', x - 45).attr('y1', node.y).attr('x2', x).attr('y2', y)
-            .attr('stroke', color(node.movie.id)).attr('stroke-width', selected || snapshot.rankingSortKey === String(node.movie.id) ? 2.5 : 1).attr('opacity', selected || snapshot.rankingSortKey === String(node.movie.id) ? 1 : .35)
-            .append('title').text(`${node.movie.title} → ${match.anime.title}: cosine ${match.scores[j]}`);
-        });
-        const row = svg.append('g').attr('role', 'button').attr('tabindex', 0).attr('aria-pressed', selected)
-          .attr('data-dust-connection-id', match.anime.id)
-          .attr('aria-label', `${match.anime.title}. ${active.map((movie, j) => `${movie.title}: ${match.scores[j]}`).join('. ')}`)
-          .on('mouseenter focus', event => {
-            const rect = event.currentTarget.getBoundingClientRect();
-            showTooltip(event.type === 'focus' ? { clientX: rect.x + rect.width / 2, clientY: rect.y } : event,
-              `<strong>${escapeHTML(match.anime.title)}</strong>` + active.map((movie, j) => `<span>${escapeHTML(movie.title)}: cosine ${match.scores[j]}</span>`).join(''));
-          }).on('mousemove', moveTooltip).on('mouseleave blur', hideTooltip)
-          .on('click', () => select(match.anime.id)).on('keydown', event => { if (['Enter', ' '].includes(event.key)) { event.preventDefault(); select(match.anime.id); } });
-        row.append('rect').attr('x', x).attr('y', y - 14).attr('width', width - x - 10).attr('height', 29).attr('rx', 5).attr('fill', '#17243a').attr('stroke', selected ? 'white' : '#43536d').attr('stroke-width', selected ? 3 : 1);
-        row.append('text').attr('x', x + 8).attr('y', y + 4).attr('fill', '#e4e8f3').attr('font-size', 11).text(truncate(match.anime.title, 37));
-        row.append('title').text(active.map((movie, j) => `${movie.title}: cosine ${match.scores[j]}`).join('\n'));
-      });
-      if (focused) container.querySelector(`[data-dust-connection-id="${CSS.escape(focused)}"]`)?.focus({ preventScroll: true });
-    }, destroy() { container.replaceChildren(); } };
   }
   async function loadMetadata() {
     try {
@@ -210,7 +170,8 @@
     composition = AnivizComposition.create({ onError: error => console.error(error) });
     document.querySelectorAll('[data-dust-chart]').forEach(container => {
       const kind = container.dataset.dustChart;
-      composition.mount(container, kind === 'connections' ? connectionRenderer(container)
+      composition.mount(container, kind === 'connections' ? AnivizDustConnections.create({ container, d3, color, onInspect: inspectAnime,
+          onCoverage: text => { $('[data-coverage="connections"]').textContent = text; }, renderEmpty, helpers: { escapeHTML, escapeAttribute } })
         : AnivizCharts.create(kind, { container, d3, helpers: chartHelpers() }));
     });
     context.subscribe(publish);
@@ -222,13 +183,12 @@
     });
     $('[data-dust-ranking-body]').addEventListener('click', event => {
       const button = event.target.closest('[data-dust-rank-id]');
-      if (button) { select(button.dataset.dustRankId); $('[data-dust-ranking-body]').querySelector(`[data-dust-rank-id="${CSS.escape(button.dataset.dustRankId)}"]`)?.focus({ preventScroll: true }); }
+      if (button) { inspectAnime(button.dataset.dustRankId); $('[data-dust-ranking-body]').querySelector(`[data-dust-rank-id="${CSS.escape(button.dataset.dustRankId)}"]`)?.focus({ preventScroll: true }); }
     });
     $('#recommendation-detail').addEventListener('click', event => {
       const remove = event.target.closest('[data-dust-remove]');
       if (remove) context.toggleSelection(remove.dataset.dustRemove);
       if (event.target.closest('[data-dust-clear]')) context.setSelection([]);
-      if (event.target.closest('[data-dust-close]')) { externalId = null; renderDetails(); }
     });
     bindRecommendationControls();
     populateFallbackControls();
@@ -286,7 +246,7 @@
     deselectLast() {
       if (latest?.selectedAnimeIds.length) context.setSelection(latest.selectedAnimeIds.slice(0, -1));
     },
-    clearSelection() { externalId = null; context.setSelection([]); },
+    clearSelection() { context.setSelection([]); },
     resetPositions() { context.resetPositions(); recommendationState.magnetPositions = {}; dustChart = null; },
     refresh() { composition?.setActive(true); composition?.refresh(); },
     snapshot: () => context?.snapshot() };

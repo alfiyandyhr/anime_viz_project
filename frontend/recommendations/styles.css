@@ -422,26 +422,52 @@ tbody tr:hover {
 
 body[data-chapter="recommendations"] .filterbar { display: none; }
 
-#dust-analysis { display: grid; gap: 18px; margin-block: 24px; min-width: 0; }
-#dust-analysis .chart-card { min-width: 0; }
-.dust-linked-chart { min-width: 0; min-height: 390px; overflow-x: auto; }
+#dust-analysis {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 32px; margin-block: 24px; min-width: 0;
+}
+#dust-analysis .chart-card { display: flex; flex-direction: column; min-width: 0; }
+#dust-analysis .dust-linked-chart { margin-top: auto; }
+#dust-analysis .dust-analysis-wide { grid-column: 1 / -1; }
+#dust-analysis #reception { grid-column: 1 / -1; width: min(100%, 720px); justify-self: center; }
+/* Keep scaled SVG heights from inflating chart geometry when columns resize. */
+.dust-linked-chart { min-width: 0; height: 390px; min-height: 390px; overflow-x: auto; }
 .dust-linked-chart svg { display: block; width: 100%; height: auto; }
-[data-dust-chart="heatmap"] { min-height: 540px; }
+[data-dust-chart="heatmap"] { min-height: 480px; }
 [data-dust-chips] { display: flex; flex-wrap: wrap; gap: 8px; }
 [data-dust-ranking-pages] { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 [data-dust-scope], [data-coverage] { color: var(--muted, #aab3cf); font-size: 0.85rem; }
 [data-dust-notice]:empty { display: none; }
-[data-dust-ranking-body] tr.is-selected { outline: 2px solid white; outline-offset: -2px; }
 [data-dust-ranking-body] td { padding: 10px; }
 [data-dust-ranking-head] th { padding: 10px; text-align: left; }
 
 [data-dust-chart="studios"] { min-height: 480px; }
 [data-dust-chart="reception"] { min-height: 430px; }
-[data-dust-chart="heatmap"] svg { min-width: 760px; }
-[data-dust-chart="connections"] svg { min-width: 550px; }
+[data-dust-chart="heatmap"] svg { min-width: 560px; }
+#dust-analysis .dust-analysis-control { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 8px 0; font-size: .8rem; }
+.dust-analysis-control select { width: auto; max-width: 100%; min-height: 34px; padding: 0 8px; }
+#dust-analysis [data-dust-chart="connections"] {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 500px), 1fr));
+  gap: 24px 32px; height: auto; min-height: 0; margin: 8px 0 0; overflow: visible;
+}
+.dust-connection-map { width: 100%; max-width: 720px; min-width: 0; justify-self: center; }
+.dust-connection-map h4 { margin: 10px 0 4px; font-size: .95rem; overflow-wrap: anywhere; }
+.dust-connection-map h4 span { margin-right: 6px; }
+.dust-connection-map h4 small { color: var(--text-muted); font-weight: 400; }
+.dust-connection-map .connection-movie-title { font-size: 12px; }
+.dust-connection-map .recommendation-chart-score { font-size: 12px; }
+.dust-connection-map .recommendation-chart-row .connection-line { stroke: var(--dust-color); }
+.dust-connection-map .recommendation-chart-row .recommendation-dot,
+.dust-connection-map .recommendation-chart-row .recommendation-chart-score { fill: var(--dust-color); }
+.dust-connection-map .recommendation-group-label { fill: var(--text-soft); }
+
+@media (max-width: 1099px) {
+  #dust-analysis { grid-template-columns: minmax(0, 1fr); }
+  #dust-analysis #reception { width: 100%; }
+}
 
 /* The controls and latest anime frame the field; all three scroll away with it. */
-body[data-chapter="dust-magnet"] .stage { padding: 8px 16px 48px; }
+body[data-chapter="dust-magnet"] .stage { padding: 8px var(--page-gutter) 48px; }
 body[data-chapter="dust-magnet"] #chapter-dust-magnet { gap: 12px; }
 .dust-playground {
   --field-height: max(460px, calc(100svh - 96px));
@@ -506,7 +532,6 @@ body[data-chapter="dust-magnet"] .dust-selection { margin: 0; padding-top: 4px; 
   body[data-chapter="dust-magnet"] .recommendation-picker, body[data-chapter="dust-magnet"] .dust-focus { padding: 10px; }
 }
 @media (max-width: 760px) {
-  body[data-chapter="dust-magnet"] .stage { padding-inline: 8px; }
   .dust-playground { grid-template-columns: minmax(0, 1fr); --field-height: max(400px, calc(100svh - 160px)); }
   body[data-chapter="dust-magnet"] .recommendation-picker, body[data-chapter="dust-magnet"] .dust-focus { max-height: none; overflow: visible; }
   body[data-chapter="dust-magnet"] .movie-magnets { flex-direction: row; flex-wrap: wrap; }

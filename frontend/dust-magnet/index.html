@@ -41,6 +41,7 @@
   <script src="../common/chart-composition.js" defer></script>
   <script src="../common/dust-context.js" defer></script>
   <script src="../common/dust-details.js" defer></script>
+  <script src="../common/dust-connections.js" defer></script>
   <script src="../common/app.js" defer></script>
   <script src="../recommendations/app.js" defer></script>
   <script src="../recommendations/dust-magnet.js" defer></script>
@@ -204,21 +205,16 @@
         </aside>
         </div>
         <div id="dust-selection" class="dust-selection" role="status" aria-live="polite" hidden></div>
-        <aside id="recommendation-detail" class="recommendation-detail" aria-label="Selected anime comparison and ranking details" hidden></aside>
+        <aside id="recommendation-detail" class="recommendation-detail" aria-label="Selected anime comparison" hidden></aside>
 
         <section id="dust-analysis" aria-label="Displayed dust analysis">
 
-          <article class="chart-card"><h3>Similarity connections</h3>
-            <p data-coverage="connections"></p><div class="dust-linked-chart" role="region" tabindex="0" aria-label="Similarity connections, scroll horizontally" data-dust-chart="connections"></div></article>
-          <article class="chart-card"><h3>Full anime ranking</h3>
-            <p data-dust-ranking-note></p>
-            <label>Rank by <select data-dust-ranking-sort><option value="average">Average similarity</option></select></label>
-            <div class="table-wrapper" role="region" tabindex="0" aria-label="Full similarity ranking, scroll horizontally">
-              <table><thead data-dust-ranking-head></thead><tbody data-dust-ranking-body></tbody></table>
-            </div><nav data-dust-ranking-pages aria-label="Full similarity ranking pages"></nav>
-          </article>
+          <article class="chart-card dust-analysis-wide"><p class="chart-kicker">Compare similarities &amp; differences</p>
+            <h3>Which stories are similar—and which differ?</h3>
+            <p>Each movie connects to its top 5 and bottom 5 anime within the displayed dust. Ranks update with the dot count and filters. Curves and scores use each anime’s dust color, identifying its closest magnet. Thicker curves mean higher similarity. Select a title to open its anime card.</p>
+            <p data-coverage="connections"></p><div class="dust-linked-chart" role="region" aria-label="Movie and anime similarity connections" data-dust-chart="connections"></div></article>
           <article class="chart-card" id="content"><h3>Genres</h3>
-            <label>Metric <select data-dust-genre-metric><option value="count">Titles</option><option value="score">Average score</option><option value="popularity">Popularity</option></select></label>
+            <label class="dust-analysis-control">Metric <select data-dust-genre-metric><option value="count">Titles</option><option value="score">Average score</option><option value="popularity">Popularity</option></select></label>
             <p data-coverage="genres"></p><div class="dust-linked-chart" data-dust-chart="genres"></div></article>
           <article class="chart-card"><h3>Release years</h3>
             <p data-coverage="years"></p><div class="dust-linked-chart" data-dust-chart="years"></div></article>
@@ -228,6 +224,13 @@
             <p data-coverage="heatmap"></p><div class="dust-linked-chart" role="region" tabindex="0" aria-label="Studio genre chart, scroll horizontally" data-dust-chart="heatmap"></div></article>
           <article class="chart-card" id="reception"><h3>Score vs. popularity</h3>
             <p data-coverage="reception"></p><div class="dust-linked-chart" data-dust-chart="reception"></div></article>
+          <article class="chart-card dust-analysis-wide"><h3>Full anime ranking</h3>
+            <p data-dust-ranking-note></p>
+            <label class="dust-analysis-control">Rank by <select data-dust-ranking-sort><option value="average">Average similarity</option></select></label>
+            <div class="table-wrapper" role="region" tabindex="0" aria-label="Full similarity ranking, scroll horizontally">
+              <table><thead data-dust-ranking-head></thead><tbody data-dust-ranking-body></tbody></table>
+            </div><nav data-dust-ranking-pages aria-label="Full similarity ranking pages"></nav>
+          </article>
         </section>
 
         <details class="methodology">
