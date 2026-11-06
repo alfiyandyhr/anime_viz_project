@@ -30,12 +30,33 @@
         <table class="dust-comparison-table"><caption class="sr-only">${comparison ? 'Selected anime comparison' : 'Anime details and similarities'}</caption>
         <thead><tr><th scope="col">${comparison ? 'Compare anime' : 'Anime details'}</th>${anime.map(item => `<th scope="col">${escape(item.title)}${comparison ? `<button type="button" class="small-button ghost" data-dust-remove="${attr(item.id)}" aria-label="Remove ${attr(item.title)} from comparison">Remove</button>` : ''}</th>`).join('')}</tr></thead>
         <tbody>${rows.map(([label, cell], index) => `<tr${index >= 5 && index < 5 + movies.length ? ` style="--magnet-color:${color(movies[index - 5].id)}" class="dust-movie-metric"` : ''}><th scope="row">${escape(label)}</th>${values.map((value, i) => `<td>${cell(value, i)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
-        <p class="table-note">Runtime = episodes × minutes per episode. Unknown values are omitted from bars. Cosine scale: −1 to 1; scores are not percentages.</p>
-        ${anime.map(item => `<div class="dust-selected-story">${comparison ? `<h4>${escape(item.title)}</h4>` : ''}<p>${escape((item.genres || []).join(' · '))}</p>${evidence(item)}</div>`).join('')}`;
+        <p class="table-note">Runtime = episodes × minutes per episode. Unknown values are omitted from bars. Cosine scale: 0 to 1; scores are not percentages.</p>
+        ${comparison ? '' : anime.map(item => `<div class="dust-selected-story"><p>${escape((item.genres || []).join(' · '))}</p>${evidence(item)}</div>`).join('')}`;
     }
+    // Keep the focus on the latest selected dust, independently of ranking inspection.
+    const focused = selected.at(-1), anime = focused && animeFor(focused);
+    const cover = anime?.cover?.extra_large || anime?.cover?.large || '';
+    const banner = anime?.banner_image || cover;
+    const tags = anime?.tags || [];
+    const focusHtml = anime ? `<p class="chart-kicker">Anime in focus</p>
+      <div class="dust-focus-hero">
+        ${banner ? `<img class="detail-banner" src="${attr(banner)}" alt="">` : ''}
+        ${cover ? `<img class="detail-cover" src="${attr(cover)}" alt="Cover for ${attr(anime.title)}">` : ''}
+      </div>
+      <h3 aria-live="polite">${escape(anime.title)}</h3>
+      <p class="recommendation-detail-meta">${escape(humanize(anime.format || 'Unknown'))} · ${anime.year || 'Year unknown'}</p>
+      <div class="dust-detail-scores">${movies.map((movie, index) => `<div style="--magnet-color:${color(movie.id)}"><span><i></i>${escape(movie.title)}</span><strong>${focused.scores[index].toFixed(3)}</strong></div>`).join('')}<small>Cosine similarity · higher means closer</small></div>
+      <div class="genre-list">${(anime.genres || []).map(genre => `<span class="tag">${escape(genre)}</span>`).join('')}</div>
+      <div class="dust-story"><h4>Storyline</h4><p>${escape(anime.synopsis || anime.description || 'No synopsis available for this anime.')}</p></div>
+      <div class="recommendation-context"><h4>Story tags</h4><div class="genre-list">${tags.slice(0, 8).map(tag => `<span class="tag">${escape(tag)}</span>`).join('') || '<small>No tags available.</small>'}</div>
+        ${tags.length > 8 ? `<details class="dust-more-tags"><summary>All ${tags.length} tags</summary><div class="genre-list">${tags.slice(8).map(tag => `<span class="tag">${escape(tag)}</span>`).join('')}</div></details>` : ''}</div>
+      <div class="recommendation-context"><h4>Japanese sampled voice credits</h4><ul>${(anime.voice_actors || []).map(actor => `<li>${escape(actor.name)}${actor.characters?.length ? ` — ${escape(actor.characters.join(', '))}` : ''}</li>`).join('') || '<li>Cast metadata unavailable.</li>'}</ul></div>
+      <a class="button button-secondary" href="${attr(anime.url || anime.site_url || `https://anilist.co/anime/${anime.id}`)}" target="_blank" rel="noopener noreferrer">Explore on AniList ↗</a>`
+      : '<div class="dust-detail-placeholder"><p class="chart-kicker">Anime in focus</p><h3>Every dot has a story.</h3><p>Click any anime dot to discover its storyline, genres, tags, and similarity to your movies.</p></div>';
     return {
       count: selected.length,
-      html: (selected.length ? `<section aria-label="Selected dust anime"><div class="dust-details-heading"><h3>${selected.length > 1 ? `Comparing ${selected.length} anime` : escape(animeFor(selected[0]).title)}</h3><button type="button" class="small-button ghost" data-dust-clear>Clear selection</button></div>${table(selected, selected.length > 1)}</section>` : '')
+      focusHtml,
+      html: (selected.length ? `<section aria-label="Selected dust anime"><div class="dust-details-heading"><h3>${selected.length > 1 ? `Comparing ${selected.length} anime` : escape(animeFor(selected[0]).title)}</h3><button type="button" class="small-button ghost" data-dust-clear>Clear selection</button></div>${table(selected, true)}</section>` : '')
         + (outside ? `<section class="dust-outside-detail" aria-label="Ranking anime details"><div class="dust-details-heading"><h3>${escape(animeFor(outside).title)}</h3><button type="button" class="small-button ghost" data-dust-close>Close details</button></div><p>Ranking inspection · outside the displayed dust set. This title is not in your dust comparison.</p>${table([outside], false)}</section>` : '')
     };
   }

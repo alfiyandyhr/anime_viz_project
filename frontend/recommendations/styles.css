@@ -440,33 +440,43 @@ body[data-chapter="recommendations"] .filterbar { display: none; }
 [data-dust-chart="heatmap"] svg { min-width: 760px; }
 [data-dust-chart="connections"] svg { min-width: 550px; }
 
-/* Main field: compact controls above, selected-title details in document flow. */
+/* The controls and latest anime frame the field; all three scroll away with it. */
 body[data-chapter="dust-magnet"] .stage { padding: 8px 16px 48px; }
-body[data-chapter="dust-magnet"] #chapter-dust-magnet { gap: 8px; }
-body[data-chapter="dust-magnet"] .recommendation-picker {
-  position: relative; display: flex; align-items: center; gap: 10px;
-  min-height: 52px; padding: 0; border: 0; border-radius: 0; background: transparent;
+body[data-chapter="dust-magnet"] #chapter-dust-magnet { gap: 12px; }
+.dust-playground {
+  --field-height: max(460px, calc(100svh - 96px));
+  display: grid; grid-template-columns: clamp(200px, 17vw, 250px) minmax(0, 1fr) clamp(260px, 23vw, 340px);
+  align-items: start; gap: 12px; min-width: 0;
 }
-body[data-chapter="dust-magnet"] .recommendation-controls { display: block; flex: 0 1 320px; min-width: 160px; }
-body[data-chapter="dust-magnet"] .recommendation-controls input { min-height: 36px; padding: 6px 10px; font-size: .8rem; }
-body[data-chapter="dust-magnet"] .movie-magnets { flex: 1; flex-wrap: nowrap; gap: 6px; margin: 0; min-width: 0; }
-body[data-chapter="dust-magnet"] .movie-magnet-chip { flex: 0 1 auto; padding: 2px 3px 2px 8px; gap: 6px; font-size: .72rem; }
-body[data-chapter="dust-magnet"] .movie-magnet-chip > span:nth-child(2) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-body[data-chapter="dust-magnet"] .movie-magnet-chip small, body[data-chapter="dust-magnet"] .magnet-empty-slot { display: none; }
-body[data-chapter="dust-magnet"] #recommendation-status { position: absolute; top: 100%; left: 0; z-index: 5; padding: 5px 9px; margin: 0; max-width: 100%; background: var(--bg-soft); border-radius: 5px; font-size: .72rem; }
+body[data-chapter="dust-magnet"] .recommendation-picker {
+  position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 12px;
+  min-width: 0; max-height: var(--field-height); overflow-y: auto; overscroll-behavior: contain;
+  margin: 0; padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+}
+.recommendation-picker > .chart-kicker { margin: 0; }
+body[data-chapter="dust-magnet"] .recommendation-controls { display: block; min-width: 0; }
+body[data-chapter="dust-magnet"] .recommendation-controls input { min-height: 36px; padding: 8px; font-size: .8rem; }
+body[data-chapter="dust-magnet"] .movie-magnets { flex-direction: column; align-items: stretch; gap: 6px; margin: 0; min-width: 0; }
+body[data-chapter="dust-magnet"] .movie-magnet-chip { padding: 4px 5px 4px 8px; gap: 6px; font-size: .75rem; }
+body[data-chapter="dust-magnet"] .movie-magnet-chip > span:nth-child(2) { flex: 1; }
+body[data-chapter="dust-magnet"] .magnet-empty-slot { font-size: .7rem; }
+body[data-chapter="dust-magnet"] #recommendation-status { margin: 0; font-size: .72rem; }
 body[data-chapter="dust-magnet"] #recommendation-status:empty { display: none; }
-body[data-chapter="dust-magnet"] .movie-search-results { position: absolute; z-index: 40; left: 0; top: 100%; width: min(550px, 100%); margin: 0; box-shadow: var(--shadow); }
-.field-options { flex: none; margin-left: auto; font-size: .76rem; }
-.field-options-panel { position: absolute; z-index: 35; top: 100%; right: 0; width: min(700px, 100%); max-height: calc(100svh - 120px); overflow-y: auto; padding: 16px; border: 1px solid var(--border-strong); border-radius: 10px; background: #12182d; box-shadow: var(--shadow); }
-.field-options-panel #dust-limit-control { display: inline-flex; align-items: center; gap: 10px; margin-right: 20px; }
-.field-options-panel select { color: var(--text); background: var(--bg-soft); border: 1px solid var(--border-strong); border-radius: 5px; padding: 5px; }
-.field-options-panel .filterbar { margin: 16px 0 0; }
-.field-options-panel .filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.field-options-panel .filter-grid > label:first-child { grid-column: 1 / -1; }
-body[data-chapter="dust-magnet"] .recommendation-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+body[data-chapter="dust-magnet"] .movie-search-results { position: static; width: 100%; max-height: 320px; overflow-y: auto; margin: 0; }
+body[data-chapter="dust-magnet"] .movie-search-results button { padding: 8px; }
+.field-options { font-size: .76rem; }
+.field-options-panel { padding-top: 12px; }
+.field-options-panel #dust-limit-control { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.field-options-panel select { max-width: 100%; color: var(--text); background: var(--bg-soft); border: 1px solid var(--border-strong); border-radius: 5px; padding: 5px; }
+.field-options-panel .filterbar { margin: 16px 0 0; padding: 8px; }
+.field-options-panel .filter-grid { grid-template-columns: minmax(0, 1fr); padding: 8px 0; }
+.field-options-panel .filter-grid > label:first-child { grid-column: auto; }
+.field-options-panel .filter-grid > * { min-width: 0; }
+.field-options-panel .movie-suggestions { flex-direction: column; align-items: stretch; }
+.dust-playground > #recommendation-content { min-width: 0; }
+body[data-chapter="dust-magnet"] .recommendation-workspace { display: block; }
 body[data-chapter="dust-magnet"] .recommendation-chart-card {
-  display: flex; flex-direction: column; min-width: 0;
-  height: calc(100svh - 128px); min-height: 400px;
+  display: flex; flex-direction: column; min-width: 0; height: var(--field-height);
   padding: 8px 10px; border-radius: 10px; background: rgba(10,16,29,.7);
 }
 body[data-chapter="dust-magnet"] .recommendation-chart-card .chart-heading,
@@ -480,16 +490,30 @@ body[data-chapter="dust-magnet"] #dust-layout-status { margin: 4px 0; }
 body[data-chapter="dust-magnet"] [data-dust-chips]:empty { display: none; }
 body[data-chapter="dust-magnet"] [data-dust-chips] { flex: none; }
 body[data-chapter="dust-magnet"] .recommendation-detail { position: static; padding: 20px; }
+body[data-chapter="dust-magnet"] .dust-focus { max-height: var(--field-height); overflow-y: auto; overscroll-behavior: contain; min-width: 0; padding: 16px; border-radius: 10px; }
+.dust-focus-hero .detail-banner { height: 120px; border-radius: 8px; }
+.dust-focus-hero .detail-cover { display: block; position: relative; width: 80px; height: 112px; margin: -42px 0 12px 10px; border-width: 3px; border-radius: 8px; }
+.dust-focus-hero:empty { display: none; }
+.dust-focus .dust-detail-scores > div > span { min-width: 0; overflow-wrap: anywhere; }
+.dust-focus .dust-story p, .dust-focus .recommendation-context { font-size: .8rem; color: var(--text-soft); }
+.dust-focus .dust-story h4 { margin-bottom: 8px; }
+.dust-focus .recommendation-context ul { padding-left: 18px; }
+.dust-focus h3, .dust-focus .tag { overflow-wrap: anywhere; }
 body[data-chapter="dust-magnet"] .dust-empty { min-height: 0; height: 100%; display: grid; align-content: center; justify-items: center; }
 body[data-chapter="dust-magnet"] .dust-selection { margin: 0; padding-top: 4px; font-size: .72rem; }
+@media (max-width: 1100px) and (min-width: 761px) {
+  .dust-playground { grid-template-columns: 180px minmax(0, 1fr) 240px; gap: 8px; }
+  body[data-chapter="dust-magnet"] .recommendation-picker, body[data-chapter="dust-magnet"] .dust-focus { padding: 10px; }
+}
 @media (max-width: 760px) {
   body[data-chapter="dust-magnet"] .stage { padding-inline: 8px; }
-  body[data-chapter="dust-magnet"] .recommendation-picker { flex-wrap: wrap; gap: 6px; padding-block: 2px; }
-  body[data-chapter="dust-magnet"] .recommendation-controls { flex: 1 1 200px; }
-  body[data-chapter="dust-magnet"] .movie-magnets { order: 3; flex: 1 1 100%; }
-  body[data-chapter="dust-magnet"] .recommendation-chart-card { height: calc(100svh - 170px); min-height: 380px; }
-  body[data-chapter="dust-magnet"] .dust-legend { margin-left: 0; }
+  .dust-playground { grid-template-columns: minmax(0, 1fr); --field-height: max(400px, calc(100svh - 160px)); }
+  body[data-chapter="dust-magnet"] .recommendation-picker, body[data-chapter="dust-magnet"] .dust-focus { max-height: none; overflow: visible; }
+  body[data-chapter="dust-magnet"] .movie-magnets { flex-direction: row; flex-wrap: wrap; }
   .field-options-panel .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .field-options-panel .filter-grid > label:first-child { grid-column: 1 / -1; }
+  .dust-focus-hero .detail-banner { height: 160px; }
+  body[data-chapter="dust-magnet"] .dust-legend { margin-left: 0; }
 }
 
 .magnet-example { color: var(--text-muted); font-size: .65rem; font-style: normal; }

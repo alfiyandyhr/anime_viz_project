@@ -10,62 +10,44 @@ const view = new DataView(binary.buffer, binary.byteOffset, binary.byteLength);
 const scores = Float32Array.from({ length: binary.length / 4 }, (_, index) => view.getFloat32(index * 4, true));
 const favorites = ["Inception", "Interstellar", "The Matrix"].map((title) => data.movies.find((movie) => movie.title === title).id);
 
-test("incidental field, magnet and outside clicks preserve dust selection", () => {
-  const element = (parent = null, isDust = false) => ({
+test("empty field clicks deselect once while dust, magnet, controls, drag and outside clicks preserve selection", () => {
+  const element = (parent = null, kind = '') => ({
     parent, listeners: {},
     addEventListener(type, handler) { (this.listeners[type] ??= []).push(handler); },
     closest(selector) {
-      return selector === ".dust-node" && isDust ? this : parent?.closest(selector);
+      return selector.split(',').map(s => s.trim()).includes(kind) ? this : parent?.closest(selector);
     }
   });
-  const document = element();
-  const playground = element(document);
-  const detail = element(document);
-  const allTags = element(detail);
-  const dot = element(playground, true);
-  const grain = element(dot);
-  const magnet = element(playground);
+  const document = element(), playground = element(document), detail = element(document);
+  const dot = element(playground, '.dust-node'), grain = element(dot);
+  const magnet = element(playground, '.dust-magnet'), core = element(magnet);
+  const retry = element(playground, 'button');
   const controls = new Map([["#recommendation-chart", playground]]);
-  document.querySelector = (selector) => {
+  document.querySelector = selector => {
     if (!controls.has(selector)) controls.set(selector, element(document));
     return controls.get(selector);
   };
-  let detailRenders = 0, highlights = 0, tooltipHides = 0;
+  let deselections = 0;
   const recommendationState = { viz: "magnets", animeId: "selected-anime" };
-  const context = vm.createContext({
-    document, recommendationState,
-    hideTooltip: () => tooltipHides++,
-    highlightRecommendation: () => highlights++,
-    recordDetailRender: () => detailRenders++
-  });
+  const context = vm.createContext({ document, recommendationState, hideTooltip() {},
+    AnivizMain: { deselectLast() { deselections++; } } });
   vm.runInContext(readFileSync(require.resolve("../frontend/recommendations/dust-magnet.js"), "utf8"), context);
-  vm.runInContext("renderDustDetail = recordDetailRender; bindDustControls();", context);
-  const click = (target) => {
+  vm.runInContext("bindDustControls();", context);
+  const click = (target, defaultPrevented = false) => {
     for (let current = target; current; current = current.parent) {
-      for (const handler of current.listeners.click || []) handler({ target });
+      for (const handler of current.listeners.click || []) handler({ target, defaultPrevented });
     }
   };
-
-  for (const target of [allTags, detail, document, document.querySelector("#dust-limit"), dot, grain]) {
-    click(target);
-    assert.equal(recommendationState.animeId, "selected-anime");
+  for (const target of [detail, document, document.querySelector("#dust-limit"), dot, grain, magnet, core, retry]) click(target);
+  click(playground, true); // D3 suppresses the click following a magnet drag.
+  assert.equal(deselections, 0);
+  for (let i = 1; i <= 3; i++) {
+    click(playground);
+    assert.equal(deselections, i);
   }
-  assert.equal(detailRenders, 0, "outside clicks preserve the focused anime details");
-  for (const target of [playground, magnet]) {
-    recommendationState.animeId = "selected-anime";
-    click(target);
-    assert.equal(recommendationState.animeId, "selected-anime");
-  }
-  assert.equal(detailRenders, 0);
-  assert.equal(highlights, 0);
-  assert.equal(tooltipHides, 0);
-
-  click(playground);
-  assert.equal(detailRenders, 0, "background clicks never change selection");
   recommendationState.viz = "connections";
-  recommendationState.animeId = "selected-anime";
   click(playground);
-  assert.equal(recommendationState.animeId, "selected-anime");
+  assert.equal(deselections, 3);
 });
 
 test("complete web matrix matches its hash, dimensions, and every exported top/bottom score", () => {

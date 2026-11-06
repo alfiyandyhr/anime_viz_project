@@ -66,6 +66,48 @@ const url = route => new URL(route, base).href;
       assert.equal((await snapshot()).ids.length,Number(count));
     }
     console.log('Verified example, keyboard menu and 30/60/90 with three magnets');
+    const layout = await page.evaluate(() => {
+      const left=document.querySelector('.recommendation-picker').getBoundingClientRect();
+      const field=document.querySelector('#recommendation-chart').getBoundingClientRect();
+      const right=document.querySelector('#dust-focus').getBoundingClientRect();
+      return left.right <= field.left && field.right <= right.left;
+    });
+    assert.equal(layout,true,'movie controls, field and focus form three columns');
+    const focusTitle=()=>page.locator('#dust-focus h3').innerText();
+    for(let i=0;i<3;i++) {
+      const dust=page.locator('.dust-node').nth(i);
+      await dust.focus();
+      assert.ok((await page.locator('#tooltip .dust-tooltip-score b').allTextContents()).every(value=>/^-?\d+\.\d{3}$/.test(value)));
+      await page.keyboard.press('Enter');
+      const expected=await page.evaluate(()=>{const s=AnivizMain.snapshot();return s.lookup.get(s.selectedAnimeIds.at(-1)).anime.title});
+      assert.equal(await focusTitle(),expected);
+    }
+    assert.equal(await page.locator('#dust-focus .detail-cover').count(),1);
+    assert.equal(await page.locator('#dust-focus .detail-banner').count(),1);
+    assert.doesNotMatch(await page.locator('#recommendation-detail').innerText(),/Storyline|Story tags|Synopsis|sampled cast|voice credits/);
+    const triple=await snapshot();
+    await page.locator('.magnet-core').first().click();
+    sameEvidence(triple,await snapshot());
+    await page.locator('.recommendation-score-note').click();
+    sameEvidence(triple,await snapshot());
+    for(let left=2;left>=0;left--) {
+      const empty=await page.evaluate(()=>{
+        const field=document.querySelector('#recommendation-chart'), r=field.getBoundingClientRect();
+        for(let y=r.top+15;y<r.bottom-15;y+=20) for(let x=r.left+15;x<r.right-15;x+=20) {
+          const el=document.elementFromPoint(x,y);
+          if(field.contains(el)&&!el.closest('.dust-node, .dust-magnet')) return {x,y};
+        }
+      });
+      assert.ok(empty,'an empty place in the field is available');
+      await page.mouse.click(empty.x,empty.y);
+      assert.deepEqual((await snapshot()).selection,triple.selection.slice(0,left));
+      if(left) {
+        const expected=await page.evaluate(()=>{const s=AnivizMain.snapshot();return s.lookup.get(s.selectedAnimeIds.at(-1)).anime.title});
+        assert.equal(await focusTitle(),expected);
+      } else assert.equal(await focusTitle(),'Every dot has a story.');
+    }
+    console.log('Verified three-decimal tooltips, side panels, focus imagery and last-in-first-out deselection');
+
     const initial=await snapshot();
     for(let i=0;i<2;i++) {await page.locator('.dust-node').nth(i).focus();await page.keyboard.press(i?'Space':'Enter');}
     assert.equal((await snapshot()).selection.length,2);assert.equal(await page.evaluate(()=>scrollY),0);
@@ -96,6 +138,7 @@ const url = route => new URL(route, base).href;
     assert.ok(scoped.selectedMap.every(id=>chosen.selection.includes(id)));
 
     await assertChartScope();
+    assert.equal(await page.evaluate(()=>['.recommendation-picker','#dust-focus'].every(selector=>document.querySelector(selector).getBoundingClientRect().bottom<0)),true,'side panels scroll away above analysis');
     for(const sort of [...chosen.movies,'average']) {
       await page.locator('[data-dust-ranking-pages] button').last().click();
       const positions=await page.evaluate(()=>recommendationState.magnetPositions);

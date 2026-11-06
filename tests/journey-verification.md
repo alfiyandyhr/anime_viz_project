@@ -391,3 +391,19 @@ the current Explorer document: filtering, sorting, pagination, and resizing keep
 them; reloading or navigating away clears them, including scope navigation.
 Missing metadata is never replaced. This walkthrough does not establish outcomes
 for real first-time participants or exhaustive screen-reader/device coverage.
+
+
+## Playground side panels and selection update — 2026-11-06
+
+The current layout supersedes the earlier above-field controls and background-click
+behavior recorded above. Movie search, removable magnets and Field options occupy
+the left panel. The right panel follows the latest selected dust, with its catalogue
+banner/cover, movie cosine scores, genres, synopsis, tags and sampled Japanese cast.
+Both panels scroll away above the analysis; the comparison below omits long text.
+On mobile the controls, field and focus panel stack without document overflow.
+
+Verified all 86 Node tests and the Chrome/Playwright browser suite. Browser checks
+cover three-decimal dust tooltips, left/field/right placement, focus images, three
+successive empty-field clicks removing selections in reverse order, fallback focus,
+magnet/outside-click preservation, panel scroll behavior, and the existing desktop,
+mobile, touch, navigation, persistence, chart scope and failure-state scenarios.

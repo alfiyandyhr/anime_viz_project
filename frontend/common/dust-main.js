@@ -66,6 +66,8 @@
     const result = AnivizDustDetails.render({ snapshot: latest, movies: movies(), externalId, color,
       helpers: { escapeHTML, escapeAttribute, humanize, formatNumber } });
     const detail = $('#recommendation-detail'), cue = $('#dust-selection');
+    const focus = $('#dust-focus');
+    if (focus.innerHTML !== result.focusHtml) { focus.innerHTML = result.focusHtml; focus.scrollTop = 0; }
     detail.hidden = !result.html;
     detail.innerHTML = result.html;
     cue.hidden = !result.html;
@@ -281,6 +283,9 @@
       scrollY: window.scrollY });
   }
   root.AnivizMain = { bind, initialize, sync, select, color, saveLayout, renderDetails,
+    deselectLast() {
+      if (latest?.selectedAnimeIds.length) context.setSelection(latest.selectedAnimeIds.slice(0, -1));
+    },
     clearSelection() { externalId = null; context.setSelection([]); },
     resetPositions() { context.resetPositions(); recommendationState.magnetPositions = {}; dustChart = null; },
     refresh() { composition?.setActive(true); composition?.refresh(); },

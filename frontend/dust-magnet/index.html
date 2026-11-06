@@ -71,14 +71,17 @@
       <section class="chapter is-active" id="chapter-dust-magnet" data-chapter="dust-magnet" aria-label="Dust &amp; Magnet">
         <h1 class="sr-only">Dust &amp; Magnet</h1>
 
-        <article class="recommendation-picker">
+        <div class="dust-playground">
+        <aside class="recommendation-picker" aria-label="Movie magnets and field controls">
+          <h2 class="chart-kicker">Movie magnets</h2>
           <div class="recommendation-controls">
             <label class="movie-search-label" for="movie-search">
-              <span id="movie-search-label" class="sr-only">Add a movie magnet · up to 3</span>
+              <span id="movie-search-label">Add a movie magnet · up to 3</span>
               <input id="movie-search" type="search" placeholder="Add movie magnet… (up to 3)" autocomplete="off" aria-controls="movie-search-results" disabled>
             </label>
 
           </div>
+          <div id="movie-search-results" class="movie-search-results" aria-label="Movie search results" hidden></div>
           <div id="movie-magnets" class="movie-magnets" aria-label="Your movie magnets" hidden></div>
           <details class="field-options" data-field-options>
             <summary>Field options</summary>
@@ -168,11 +171,10 @@
               </details>
             </div>
           </details>
-          <div id="movie-search-results" class="movie-search-results" aria-label="Movie search results" hidden></div>
 
           <p id="recommendation-status" class="recommendation-status" role="status" aria-live="polite">Loading movie–anime similarities…</p>
           <button id="recommendation-retry" class="small-button ghost" type="button" hidden>Retry loading</button>
-        </article>
+        </aside>
 
         <div id="recommendation-content" hidden>
           <div class="recommendation-workspace">
@@ -192,11 +194,17 @@
               <p id="dust-layout-status" class="recommendation-chart-guide" role="status" hidden></p>
               <p id="recommendation-score-note" class="recommendation-score-note">Select up to 3 dots · distance: preference order · cosine ≠ percentage.</p>
             </article>
-            <div id="dust-selection" class="dust-selection" role="status" aria-live="polite" hidden></div>
-            <aside id="recommendation-detail" class="recommendation-detail" aria-label="Selected anime details" hidden></aside>
+
           </div>
 
         </div>
+
+        <aside id="dust-focus" class="recommendation-detail dust-focus" aria-label="Anime in focus">
+          <div class="dust-detail-placeholder"><p class="chart-kicker">Anime in focus</p><h3>Every dot has a story.</h3><p>Select an anime dot to explore its storyline, genres, tags, and similarity to your movies.</p></div>
+        </aside>
+        </div>
+        <div id="dust-selection" class="dust-selection" role="status" aria-live="polite" hidden></div>
+        <aside id="recommendation-detail" class="recommendation-detail" aria-label="Selected anime comparison and ranking details" hidden></aside>
 
         <section id="dust-analysis" aria-label="Displayed dust analysis">
 
@@ -228,7 +236,7 @@
             <article><h3>One million comparisons</h3><p id="recommendation-method-data">1,000 popular AniList anime × 1,000 popular TMDB movies. The dust field combines the strongest matches to each movie and shared favorites using the complete score matrix.</p></article>
             <article><h3>Story similarity</h3><p id="recommendation-method-model">Qwen3-Embedding-4B embeds titles, genres, tags, and synopses. Cosine similarity compares the normalized vectors; ratings and popularity do not affect the score.</p></article>
 
-            <article><h3>Reading the magnets</h3><p>Dots combine strong matches to each movie and the highest average scores across your movies. With multiple magnets, each dot stays closer to its higher-scoring movies, including when scores are zero or negative. Spacing respects this preference order. A single movie gathers a compact cloud through positive-score attraction. Moving magnets changes the layout, never the scores. Distances show each dot’s preference order across movies, not an exact cosine scale or a ranking of different anime. Some nearly collinear arrangements cannot show every preference; a message suggests spreading or resetting the magnets, while the highest-scoring movie stays nearest. Color identifies the highest-scoring movie; white outlines mark selected anime. Click or press Enter/Space on up to three dots to compare them below; select again to remove. Use Clear selection to remove all titles. Reset positions keeps selection. Hover or focus for exact scores. Distances between anime carry no meaning.</p></article>
+            <article><h3>Reading the magnets</h3><p>Dots combine strong matches to each movie and the highest average scores across your movies. With multiple magnets, each dot stays closer to its higher-scoring movies, including when scores are zero or negative. Spacing respects this preference order. A single movie gathers a compact cloud through positive-score attraction. Moving magnets changes the layout, never the scores. Distances show each dot’s preference order across movies, not an exact cosine scale or a ranking of different anime. Some nearly collinear arrangements cannot show every preference; a message suggests spreading or resetting the magnets, while the highest-scoring movie stays nearest. Color identifies the highest-scoring movie; white outlines mark selected anime. Click or press Enter/Space on up to three dots to compare them below; select again to remove. Click empty playground space to deselect the most recently selected dot, one at a time. The right panel follows the last selected anime. Use Clear selection to remove all titles. Reset positions keeps selection. Hover or focus for cosine scores rounded to three decimals. Distances between anime carry no meaning.</p></article>
             <article><h3>Reading the charts</h3><p>Popularity counts AniList list users. The catalogue is a popularity-sorted sample. A title can have multiple genres and studios, so counts overlap. Reception marker size shows favourites; unknown favourites use a minimum marker. Missing metric values are excluded only from the relevant chart.</p></article>
             <article><h3>A starting point</h3><p>These are text-based recommendations, not predictions of your enjoyment. Seasons, sequels, and the same animated film in both databases can appear separately. Genre labels are context, not an explanation of the model’s score.</p></article>
           </div>

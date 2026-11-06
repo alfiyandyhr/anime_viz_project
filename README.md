@@ -19,7 +19,9 @@ The compact dropdown contains exactly four destinations:
 | Network | Actor/character/work collaboration graph, defaulting to Current dust when a saved dust context exists, otherwise Catalogue. A local selector switches scopes without changing other views. The 35-work display cap and sampled Japanese cast credits are disclosed. |
 | Full Catalogue | The loaded 1,000-title metadata sample, with its own search, filters, sorting, pagination, details and automatic shortlist comparison. Saved movies never narrow its scope. |
 
-Movie search, removable magnet chips and **Field options** sit above the field.
+Movie search, removable magnet chips and **Field options** sit in the left panel.
+The right panel shows the latest selected anime with its banner, cover, synopsis,
+tags and sampled Japanese cast. Both panels scroll away above the analysis charts.
 Options contain suggestions, dot count, Reset positions and main-view filters.
 Genre, studio, year and heatmap marks filter the **same displayed dusts** across
 the field, connection map and supporting charts. Filters narrow the original
@@ -30,11 +32,12 @@ dragging preserve membership, scores and selection. Removing the sorted movie
 returns the ranking to average similarity. Cosine scores are not percentages;
 field distances encode each anime's preference order across movies.
 
-Click/tap or Enter/Space toggles a dust title. One selection shows details;
+Click/tap or Enter/Space toggles a dust title. The latest selection appears in the right focus panel;
 two or three automatically compare metadata, runtime, ratings and every active
 movie's similarity on shared scales, directly below the field. A fourth is declined
-with a brief notice. Background clicks, dragging and Reset positions preserve
-selection. Explicit Remove / Clear controls clear it. Overview charts keep their
+with a brief notice. Each click on empty playground space deselects the most
+recently selected dust. Dragging and Reset positions preserve selection.
+Explicit Remove / Clear controls also clear it. Overview charts keep their
 full displayed scope and highlight selected contributions. A ranking row outside
 the field opens separate evidence without joining the comparison. Catalogue
 shortlists are independent and remain in memory for that page visit.
@@ -227,11 +230,13 @@ Open the root URL, choose **Dust & Magnet** in the dropdown, or visit
 remove a magnet with its × button. **Field options** contains suggestions, the
 30/60/90 dot choices, filters, and **Reset positions**. Drag magnets, or focus
 one and use arrow keys, to rearrange the field. Hover or keyboard-focus an anime
-for its title and exact cosine scores. Click or press Enter to show its details
-below the field. Enter/Space or another click toggles selection; two or three
+for its title and cosine scores rounded to three decimals. Click or press Enter
+to show its details in the right panel. Enter/Space or another click toggles selection; two or three
 selected titles compare automatically. Clear selection and individual removal
-controls appear in the inline details. Background clicks, dragging and resetting
-positions preserve selection. All linked charts remain available by scrolling.
+controls appear in the comparison below the field, which omits synopsis, tags
+and cast. Empty-field clicks deselect the last selected anime, one at a time.
+Dragging and resetting positions preserve selection. All linked charts remain
+available by scrolling.
 
 The dust field defaults to **60 dots**, with 30 and 90 options. It reserves half
 the candidate budget equally for each movie's strongest matches, then fills

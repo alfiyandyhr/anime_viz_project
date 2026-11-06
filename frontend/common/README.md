@@ -81,10 +81,15 @@ pagination/sort controls. `dust-details.js` renders one-title metadata or automa
 comparison for two/three selections, reusing the Explorer comparison transform.
 Runtime uses a common selected-title maximum, AniList scores use 0–100, and
 cosine scores use −1–1 across all columns; exact scores remain available on
-focus/hover. Synopsis/tags and sampled Japanese cast are disclosed on demand.
+focus/hover in the comparison. Dust hover scores show three decimals.
+The latest selected anime appears in a separate right panel with catalogue
+banner/cover images, synopsis, tags and sampled Japanese cast. These long text
+sections are omitted from the comparison. Movie controls occupy the left panel;
+both panels scroll away with the playground.
 Ranking inspection outside the displayed set has separate inline evidence and
-never adds to the comparison. Background clicks, dragging and position reset
-preserve selection; toggles, individual removal and Clear selection are explicit.
+never adds to the comparison or changes the focused dust. Empty-field clicks
+remove the latest selected dust, one at a time. Dragging and position reset
+preserve selection; toggles, individual removal and Clear selection also work.
 Explorer uses the same extracted chart transforms and table instance. `collaboration-network.js` owns the extracted actor/character/work graph and
 inspection functions for Network. `network/app.js`
 is the dedicated Network adapter: `network/scope.js` reads the versioned dust

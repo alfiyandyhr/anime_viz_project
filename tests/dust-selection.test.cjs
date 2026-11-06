@@ -56,11 +56,16 @@ test('inline details omit empty panels and compare metadata and every movie on s
   let result = renderDetails(context,data);
   assert.equal(result.count,1);
   assert.match(result.html,/Title 0/);
-  assert.match(result.html,/<details[^>]*><summary>Synopsis, tags &amp; sampled cast/);
+  assert.match(result.focusHtml,/Storyline/);
+  assert.match(result.focusHtml,/Story tags/);
+  assert.match(result.focusHtml,/Japanese sampled voice credits/);
+  assert.doesNotMatch(result.html,/Synopsis|Storyline|Story tags|sampled cast|voice credits/);
   context.toggleSelection('1');
   result = renderDetails(context,data);
   assert.equal(result.count,2);
   assert.match(result.html,/Comparing 2 anime/);
+  assert.match(result.focusHtml, /<h3[^>]*>Title 1<\/h3>/);
+  assert.doesNotMatch(result.html,/Synopsis|Storyline|Story tags|sampled cast|voice credits/);
   assert.match(result.html,/max="288" value="288"/);
   assert.match(result.html,/max="288" value="90"/);
   assert.match(result.html,/max="100" value="80"/);
@@ -85,4 +90,27 @@ test('missing metadata stays Unknown and independent ranking inspection preserve
   assert.deepEqual(context.snapshot().selectedAnimeIds,before.selectedAnimeIds);
   assert.deepEqual(context.snapshot().displayedDustIds,before.displayedDustIds);
   assert.equal(context.snapshot().revision,before.revision);
+});
+
+
+test('focus uses the latest selected anime with catalogue images, and falls back after removing it', () => {
+  const {context, data} = fixture();
+  context.setMetadata([{id:0, title:'First anime', description:'First storyline', cover:{large:'https://example.com/cover.jpg'}, banner_image:'https://example.com/banner.jpg',
+    voice_actors:[{name:'Actor',characters:['Character']}]}]);
+  context.toggleSelection('0');
+  let result = renderDetails(context,data);
+  assert.match(result.focusHtml,/src="https:\/\/example.com\/cover.jpg"/);
+  assert.match(result.focusHtml,/src="https:\/\/example.com\/banner.jpg"/);
+  assert.match(result.focusHtml,/First storyline/);
+  assert.match(result.focusHtml,/Actor — Character/);
+  context.toggleSelection('1');
+  result = renderDetails(context,data);
+  assert.match(result.focusHtml,/<h3[^>]*>Title 1<\/h3>/);
+  assert.doesNotMatch(result.focusHtml,/First storyline|src=""/);
+  context.toggleSelection('1');
+  assert.match(renderDetails(context,data).focusHtml,/First storyline/);
+  context.setSelection([]);
+  result = renderDetails(context,data);
+  assert.match(result.focusHtml,/Every dot has a story/);
+  assert.equal(result.html,'');
 });

@@ -265,6 +265,13 @@ function selectedMagnetMovies() {
 }
 
 function bindDustControls() {
+  document.querySelector("#recommendation-chart").addEventListener("click", event => {
+    if (recommendationState.viz !== "magnets" || event.defaultPrevented
+      || event.target.closest(".dust-node, .dust-magnet, button")) return;
+    hideTooltip();
+    if (globalThis.AnivizMain) AnivizMain.deselectLast();
+    else clearDustSelection();
+  });
   document.querySelector("#dust-limit").addEventListener("change", (event) => {
     recommendationState.dustLimit = Number(event.target.value);
     renderRecommendations();
@@ -318,7 +325,7 @@ function renderDustRecommendations() {
     <div class="movie-magnet-chip" style="--magnet-color:${(globalThis.AnivizMain?.color(movies[index].id) || MAGNET_COLORS[index])}">
       <span class="magnet-chip-number">${index + 1}</span><span>${escapeHTML(movie.title)} <small>${movie.year || ""}</small>${!recommendationState.cohortSelected && movies.length === 1 ? ' <em class="magnet-example">Example</em>' : ""}</span>
       <button type="button" data-remove-magnet="${escapeAttribute(movie.id)}" aria-label="Remove ${escapeAttribute(movie.title)} magnet">×</button>
-    </div>`).join("") + (movies.length < 3 ? `<span class="magnet-empty-slot">${movies.length ? `${movies.length}/3 movies` : "Add a movie above"}</span>` : `<span class="magnet-empty-slot">3/3 movies · remove one to swap</span>`);
+    </div>`).join("") + (movies.length < 3 ? `<span class="magnet-empty-slot">${movies.length ? `${movies.length}/3 movies` : "Add a movie in the search panel"}</span>` : `<span class="magnet-empty-slot">3/3 movies · remove one to swap</span>`);
   document.querySelectorAll("#movie-suggestions button").forEach((button) => {
     const selected = recommendationState.movieIds.includes(button.dataset.movieId);
     button.setAttribute("aria-pressed", selected);
@@ -326,7 +333,7 @@ function renderDustRecommendations() {
   });
   document.querySelector("#reset-magnets").disabled = !movies.length;
   if (!movies.length) {
-    container.innerHTML = `<div class="dust-empty"><p>Add a movie above to find anime with similar stories.</p></div>`;
+    container.innerHTML = `<div class="dust-empty"><p>Add a movie in the search panel to find anime with similar stories.</p></div>`;
     recommendationState.dustMatches = [];
     renderDustDetail();
     document.querySelector("#recommendation-status").textContent = "No magnets selected. Search for a movie or choose a suggestion.";
@@ -374,14 +381,14 @@ function renderDustChart(container, movies, matches) {
     .attr("class", "dust-selected-link").attr("visibility", "hidden").attr("stroke", (anchor) => anchor.color);
   const dots = svg.append("g").selectAll("g").data(matches, (match) => match.anime.id).join("g")
     .attr("class", "dust-node").attr("data-match-id", (match) => match.anime.id)
-    .attr("role", "button").attr("tabindex", 0).attr("aria-controls", "recommendation-detail")
-    .attr("aria-label", (match) => `${match.anime.title}. ${movies.map((movie, index) => `${movie.title}: cosine ${match.scores[index]}`).join(". ")}. Toggle selection for details or comparison.`)
+    .attr("role", "button").attr("tabindex", 0).attr("aria-controls", "dust-focus recommendation-detail")
+    .attr("aria-label", (match) => `${match.anime.title}. ${movies.map((movie, index) => `${movie.title}: cosine ${match.scores[index].toFixed(3)}`).join(". ")}. Toggle selection for details or comparison.`)
     .on("mouseenter focus", (event, match) => {
       const rect = event.currentTarget.getBoundingClientRect();
       const pointer = event.type === "focus" ? { clientX: rect.x + rect.width / 2, clientY: rect.y + rect.height / 2 } : event;
       showTooltip(pointer, `<strong>${escapeHTML(match.anime.title)}</strong><span>${escapeHTML(humanize(match.anime.format))} · ${match.anime.year || "Year unknown"}</span>`
-        + movies.map((movie, index) => `<span class="dust-tooltip-score"><i style="background:${(globalThis.AnivizMain?.color(movies[index].id) || MAGNET_COLORS[index])}"></i>${escapeHTML(movie.title)} <b>${match.scores[index]}</b></span>`).join("")
-        + `<span>Click or press Enter / Space to toggle selection</span>`);
+        + movies.map((movie, index) => `<span class="dust-tooltip-score"><i style="background:${(globalThis.AnivizMain?.color(movies[index].id) || MAGNET_COLORS[index])}"></i>${escapeHTML(movie.title)} <b>${match.scores[index].toFixed(3)}</b></span>`).join("")
+        + `<span>Click to toggle selection</span>`);
     })
     .on("mousemove", moveTooltip)
     .on("mouseleave blur", hideTooltip)
