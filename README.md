@@ -326,13 +326,3 @@ Movie metadata comes from TMDB. This product uses the TMDB API but is not
 endorsed or certified by TMDB. The bundled approved TMDB logo by Travis Bell
 is preserved from [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Tmdb.new.logo.svg)
 under its [CC BY-SA 4.0 license](https://creativecommons.org/licenses/by-sa/4.0/).
-
-## Supervisor design proposal
-
-`assets/aniviz_supervisor_proposal.pdf` contains a meeting
-proposal for a connected journey from a familiar movie to a first anime. The
-10-page proposal includes an audited dataset inventory, user tasks, three design
-directions with mock-ups, a storyboard, real ranking examples, evaluation plans,
-and a feedback worksheet. The four-view navigation, shared displayed-dust analysis, studio/cast
-exploration, and automatic inline comparisons are implemented. Multi-movie weighted
-ranking, saved shortlists, and franchise detection remain outside this pass.
