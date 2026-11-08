@@ -63,25 +63,21 @@
     <main class="stage">
       <!-- View controls -->
       <div class="catalogue-tools">
-          <label class="catalogue-search">
-            <span>Search titles, studios, or actors</span>
-            <input
-              id="search-input"
-              type="search"
-              placeholder="e.g. Attack on Titan"
-            >
-          </label>
-      <details class="filterbar" id="filterbar">
-        <summary>
-          <span class="filterbar-title">
-            <strong>Filters</strong>
-            <span id="filter-summary">Waiting for data…</span>
-          </span>
-        </summary>
+      <label class="catalogue-search">
+        <span>Search titles, studios, or actors</span>
+        <input
+          id="search-input"
+          type="search"
+          placeholder="e.g. Attack on Titan"
+        >
+      </label>
+      <section class="filterbar" id="filterbar" aria-labelledby="filter-title">
+        <div class="filterbar-title">
+          <strong id="filter-title">Filters</strong>
+          <span id="filter-summary">Waiting for data…</span>
+        </div>
 
         <div class="filter-grid">
-
-
           <label>
             <span>Genre</span>
             <select id="genre-filter">
@@ -135,7 +131,7 @@
             </button>
           </div>
         </div>
-      </details>
+      </section>
       </div>
 
       <!-- ═══════════════════ Chapter: Explorer ═══════════════════════ -->

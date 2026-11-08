@@ -3,6 +3,7 @@
 // Add roving focus shortcuts without replacing standard Tab or link semantics.
 for (const menu of document.querySelectorAll('[data-view-menu], [data-field-options]')) {
   const summary = menu.querySelector('summary');
+  const isViewMenu = menu.hasAttribute('data-view-menu');
   const close = (restoreFocus = false) => {
     menu.open = false;
     if (restoreFocus) summary.focus({ preventScroll: true });
@@ -11,7 +12,7 @@ for (const menu of document.querySelectorAll('[data-view-menu], [data-field-opti
     if (event.key === 'Escape' && menu.open) {
       event.preventDefault(); event.stopPropagation(); close(true);
     }
-    if (!menu.hasAttribute('data-view-menu')) return;
+    if (!isViewMenu) return;
     const links = [...menu.querySelectorAll('nav a')];
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
@@ -23,9 +24,11 @@ for (const menu of document.querySelectorAll('[data-view-menu], [data-field-opti
       : (index + (event.key === 'ArrowDown' ? 1 : -1) + links.length) % links.length;
     links[next]?.focus();
   });
+  window.addEventListener('pageshow', () => close());
+  // Field options is an inline disclosure and stays open during field interactions.
+  if (!isViewMenu) continue;
   menu.addEventListener('focusout', event => {
     if (event.relatedTarget && !menu.contains(event.relatedTarget)) close();
   });
   document.addEventListener('click', event => { if (!menu.contains(event.target)) close(); });
-  window.addEventListener('pageshow', () => close());
 }

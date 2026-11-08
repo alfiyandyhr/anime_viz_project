@@ -30,13 +30,25 @@ const url = route => new URL(route, base).href;
       await page.locator('#view-destinations a').filter({hasText:label}).click();
     };
     const overflow = async () => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),false);
+    const assertVisibleFilters = async () => {
+      assert.equal(await page.locator('#filterbar > summary').count(), 0);
+      for (const id of ['search-input', 'genre-filter', 'studio-filter', 'format-filter', 'year-from', 'year-to']) {
+        const control = page.locator(`#${id}`);
+        assert.ok(await control.isVisible(), `${id} is visible`);
+        assert.deepEqual(await control.evaluate(el => {
+          const style = getComputedStyle(el);
+          return [style.backgroundColor, style.borderTopWidth, style.borderLeftWidth, style.borderRightWidth];
+        }), ['rgba(0, 0, 0, 0)', '0px', '0px', '0px'], `${id} has no surrounding box`);
+      }
+    };
     const assertChartScope = async () => {
       for(const kind of ['genres','years','studios','heatmap','reception']) {
         await page.locator(`[data-dust-chart="${kind}"]`).scrollIntoViewIfNeeded();
         await page.waitForFunction(kind=>document.querySelector(`[data-dust-chart="${kind}"] svg`),kind);
         const failures=await page.evaluate(kind=>{
           const s=AnivizMain.snapshot(),rows=s.displayedDustIds.map(id=>s.lookup.get(id).anime);
-          return [...document.querySelectorAll(`[data-dust-chart="${kind}"] [role="button"]`)].flatMap(el=>{
+          const role = kind === 'reception' ? 'button' : 'img';
+          return [...document.querySelectorAll(`[data-dust-chart="${kind}"] [role="${role}"]`)].flatMap(el=>{
             const d=el.__data__;
             const matching=rows.filter(a=>kind==='genres'?a.genres.includes(d.genre):kind==='years'?a.year===d.year:
               kind==='studios'?a.studio_names.includes(d.studio):kind==='heatmap'?a.studio_names.includes(d.studio)&&a.genres.includes(d.genre):a.id===String(d.id));
@@ -73,6 +85,9 @@ const url = route => new URL(route, base).href;
       return left.right <= field.left && field.right <= right.left;
     });
     assert.equal(layout,true,'movie controls, field and focus form three columns');
+    const fieldOptions = page.locator('[data-field-options]');
+    await fieldOptions.locator('summary').click();
+    await assertVisibleFilters();
     const focusTitle=()=>page.locator('#dust-focus h3').innerText();
     for(let i=0;i<3;i++) {
       const dust=page.locator('.dust-node').nth(i);
@@ -101,11 +116,13 @@ const url = route => new URL(route, base).href;
       assert.ok(empty,'an empty place in the field is available');
       await page.mouse.click(empty.x,empty.y);
       assert.deepEqual((await snapshot()).selection,triple.selection.slice(0,left));
+      assert.ok(await fieldOptions.evaluate(el => el.open), 'deselecting dust keeps Field options open');
       if(left) {
         const expected=await page.evaluate(()=>{const s=AnivizMain.snapshot();return s.lookup.get(s.selectedAnimeIds.at(-1)).anime.title});
         assert.equal(await focusTitle(),expected);
       } else assert.equal(await focusTitle(),'Every dot has a story.');
     }
+    await fieldOptions.locator('summary').click();
     console.log('Verified three-decimal tooltips, side panels, focus imagery and last-in-first-out deselection');
 
     const initial=await snapshot();
@@ -116,26 +133,25 @@ const url = route => new URL(route, base).href;
     const chosen=await snapshot();
 
     // A complete scroll walkthrough requires no task, show, or comparison action.
-    for(const kind of ['connections','genres','years','studios','heatmap','reception']) {
+    for(const kind of ['connections','reception','genres','years','studios','heatmap']) {
       const chart=page.locator(`[data-dust-chart="${kind}"]`);
       await chart.scrollIntoViewIfNeeded();await page.waitForFunction(kind=>document.querySelector(`[data-dust-chart="${kind}"] svg`),kind);
     }
     const scoped=await page.evaluate(()=>{
-      const s=AnivizMain.snapshot(), allowed=new Set(s.displayedDustIds);
-      return {dots:[...document.querySelectorAll('.dust-node')].map(el=>String(el.__data__.anime.id)),
-        map:[...document.querySelectorAll('[data-dust-connection-id]')].map(el=>el.dataset.dustConnectionId),
+      const s=AnivizMain.snapshot();
+      return {dots:[...document.querySelectorAll('#recommendation-chart .dust-node')].map(el=>String(el.__data__.anime.id)),
+        map:[...document.querySelectorAll('[data-dust-connection-id]')].map(el=>String(el.__data__.anime.id)),
         scatter:[...document.querySelectorAll('[data-dust-chart="reception"] circle[role="button"]')].map(el=>String(el.__data__.id)),
         expectedScatter:s.displayedDustIds.filter(id=>{const a=s.lookup.get(id).anime;return a.popularity>0&&Number.isFinite(a.average_score)}),
-        ranking:s.ranking.length, selectedMap:[...document.querySelectorAll('[data-dust-connection-id][aria-pressed="true"]')].map(el=>el.dataset.dustConnectionId),
+        ranking:s.ranking.length,
         displayed:s.ranking.filter(row=>row.displayed).map(row=>String(row.anime.id)),
-        counts:[...document.querySelectorAll('[data-dust-chart="genres"] [role="button"]')].map(el=>({genre:el.__data__.genre,count:el.__data__.count,expected:s.displayedDustIds.filter(id=>s.lookup.get(id).anime.genres.includes(el.__data__.genre)).length}))};
+        counts:[...document.querySelectorAll('[data-dust-chart="genres"] [role="img"]')].map(el=>({genre:el.__data__.genre,count:el.__data__.count,expected:s.displayedDustIds.filter(id=>s.lookup.get(id).anime.genres.includes(el.__data__.genre)).length}))};
     });
     assert.deepEqual(scoped.dots.sort(),[...chosen.ids].sort());
-    assert.ok(scoped.map.every(id=>chosen.ids.includes(id)));assert.equal(scoped.map.length,20);
+    assert.ok(scoped.map.every(id=>chosen.ids.includes(id)));assert.equal(scoped.map.length,chosen.movies.length * 10);
     assert.deepEqual(scoped.scatter.sort(),scoped.expectedScatter.sort());assert.ok(scoped.scatter.length>0);
     assert.equal(scoped.ranking,1000);assert.deepEqual(scoped.displayed.sort(),[...chosen.ids].sort());
     assert.ok(scoped.counts.length>0);for(const row of scoped.counts) assert.equal(row.count,row.expected);
-    assert.ok(scoped.selectedMap.every(id=>chosen.selection.includes(id)));
 
     await assertChartScope();
     assert.equal(await page.evaluate(()=>['.recommendation-picker','#dust-focus'].every(selector=>document.querySelector(selector).getBoundingClientRect().bottom<0)),true,'side panels scroll away above analysis');
@@ -149,21 +165,21 @@ const url = route => new URL(route, base).href;
     }
     await page.locator('[data-dust-page="99"]').click();
     const outside=page.locator('[data-dust-rank-id]').first();assert.equal(chosen.ids.includes(await outside.getAttribute('data-dust-rank-id')),false);
+    const outsideTitle=await outside.innerText();
     await outside.click();sameEvidence(chosen,await snapshot());
-    assert.match(await page.locator('.dust-outside-detail').innerText(),/outside the displayed dust set/);
-    await page.locator('[data-dust-close]').click();
+    assert.equal(await page.locator('#detail-drawer.open h2').innerText(),outsideTitle);
+    await page.locator('#close-drawer').click();
 
     await page.locator('[data-dust-chart="genres"]').scrollIntoViewIfNeeded();
-    const genreMark=page.locator('[data-dust-chart="genres"] [role="button"]').first();
-    await genreMark.focus();await page.keyboard.press('Enter');
+    const genre=await page.locator('[data-dust-chart="genres"] [role="img"]').first().evaluate(el=>el.__data__.genre);
+    await fieldOptions.locator('summary').click();
+    await page.selectOption('#genre-filter',genre);
     const filtered=await snapshot();assert.ok(filtered.ids.length>0&&filtered.ids.length<60);
     assert.deepEqual(filtered.candidates,initial.candidates);
     assert.deepEqual(filtered.selection,chosen.selection.filter(id=>filtered.ids.includes(id)));
     await assertChartScope();
     await page.locator('[data-dust-chips] button').first().click();assert.deepEqual((await snapshot()).ids,initial.ids);
     await page.evaluate(()=>scrollTo(0,0));
-    await page.locator('[data-field-options] > summary').click();
-    await page.locator('#filterbar > summary').click();
     await page.locator('#search-input').fill('no matching anime 910');
     assert.equal((await snapshot()).ids.length,0);assert.equal((await snapshot()).selection.length,0);
     await page.locator('#reset-filters').click();assert.deepEqual((await snapshot()).ids,initial.ids);
@@ -178,6 +194,8 @@ const url = route => new URL(route, base).href;
     await goView('Full Catalogue');await page.waitForSelector('#anime-table-body tr');
     assert.equal(await page.evaluate(()=>state.cohort_ids),null);
     assert.equal(await page.evaluate(()=>state.filteredAnime.length),1000);
+    await page.locator('#filter-title').click();
+    await assertVisibleFilters();
     await page.locator('#search-input').fill('Paprika');
     await goView('Dust & Magnet');await dustReady();sameEvidence(persisted,await snapshot());
     assert.ok(Math.abs(await page.evaluate(()=>scrollY)-scroll)<5);
@@ -223,7 +241,7 @@ const url = route => new URL(route, base).href;
     };
     await checkIsolated(async(c,p)=>{await c.addInitScript(()=>sessionStorage.setItem('aniviz_seed_movie',JSON.stringify({tmdbId:'157336',title:'Interstellar'})));await p.goto(url(''));},async p=>{
       await p.waitForSelector('.dust-node');assert.deepEqual(await p.evaluate(()=>AnivizMain.snapshot().movieIds),['157336']);
-      assert.equal(await p.locator('.dust-node').count(),60);assert.doesNotMatch(await p.locator('#movie-magnets').innerText(),/Example/);
+      assert.equal(await p.locator('#recommendation-chart .dust-node').count(),60);assert.doesNotMatch(await p.locator('#movie-magnets').innerText(),/Example/);
     });
     await checkIsolated(async(c,p)=>{await p.goto(url('frontend/network/index.html'));},async p=>{
       await p.waitForSelector('.network-nodes g');assert.equal(await p.inputValue('#network-scope'),'catalogue');
@@ -254,8 +272,10 @@ const url = route => new URL(route, base).href;
     for(const [width,height] of [[1440,900],[1280,720],[390,844]]) {
       await page.setViewportSize({width,height});await page.goto(url('frontend/dust-magnet/index.html'));await dustReady();
       await page.evaluate(()=>scrollTo(0,0));await overflow();
+      await fieldOptions.locator('summary').click();await assertVisibleFilters();await overflow();
+      await fieldOptions.locator('summary').click();
       if(output) {fs.mkdirSync(output,{recursive:true});await page.screenshot({path:path.join(output,`verified-dust-${width}.png`)});}
-      for(const kind of ['connections','genres','years','studios','heatmap','reception']) {
+      for(const kind of ['connections','reception','genres','years','studios','heatmap']) {
         await page.locator(`[data-dust-chart="${kind}"]`).scrollIntoViewIfNeeded();await overflow();
       }
       for(const view of ['network','story','explorer']) {

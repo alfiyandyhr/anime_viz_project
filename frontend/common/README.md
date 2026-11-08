@@ -56,10 +56,9 @@ Missing values are excluded only from the relevant metric.
 
 `AnivizCharts.create(kind, {container, d3, helpers})` creates an instance for
 `genres`, `years`, `studios`, `heatmap` or `reception`. Call
-`update({anime, selectedIds, genreColor, metric, onFilter, onSelect,
-onCorrelation})`; `destroy()` removes its content. `onFilter` returns a semantic
-filter patch, such as `{genre, studio}` or `{yearFrom, yearTo}`. `onSelect` returns
-a string anime ID. The renderer never reads a page's body, global state, or filter
+`update({anime, selectedIds, dustColor, metric, onSelect,
+onCorrelation})`; `destroy()` removes its content. In the reception chart,
+`onSelect` returns a string anime ID. The renderer never reads a page's body, global state, or filter
 controls. `chartHelpers()` supplies shared formatting, empty states and tooltips.
 
 `AnivizExplorer.create({body, pagination, note, d3, helpers})` owns an independent

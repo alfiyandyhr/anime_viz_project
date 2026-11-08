@@ -116,7 +116,7 @@
 .dust-hit-area { fill: transparent; }
 .dust-grain { stroke: var(--surface-solid); stroke-width: 1.5; pointer-events: none; }
 .dust-node.is-selected .dust-grain { r: 6px; stroke: white; stroke-width: 2; }
-.dust-node.is-selected .dust-hit-area { stroke: white; stroke-width: 1; stroke-dasharray: 2 2; }
+.dust-node.is-selected .dust-hit-area, .reception-selection-ring { stroke: white; stroke-width: 1; stroke-dasharray: 2 2; }
 .dust-node.is-preview .dust-grain, .dust-node:focus-visible .dust-grain { r: 7px; stroke: white; stroke-width: 2; }
 .dust-node:focus-visible .dust-hit-area { stroke: white; stroke-width: 1; stroke-dasharray: 2 2; }
 .dust-selected-link { stroke-width: 1; stroke-dasharray: 3 5; opacity: .4; pointer-events: none; }
@@ -429,20 +429,32 @@ body[data-chapter="recommendations"] .filterbar { display: none; }
 #dust-analysis .chart-card { display: flex; flex-direction: column; min-width: 0; }
 #dust-analysis .dust-linked-chart { margin-top: auto; }
 #dust-analysis .dust-analysis-wide { grid-column: 1 / -1; }
-#dust-analysis #reception { grid-column: 1 / -1; width: min(100%, 720px); justify-self: center; }
+.dust-reception {
+  display: grid; grid-template-columns: minmax(0, 11fr) minmax(0, 8fr);
+  gap: 18px 32px; width: 100%; max-width: 1400px;
+}
 /* Keep scaled SVG heights from inflating chart geometry when columns resize. */
 .dust-linked-chart { min-width: 0; height: 390px; min-height: 390px; overflow-x: auto; }
 .dust-linked-chart svg { display: block; width: 100%; height: auto; }
-[data-dust-chart="heatmap"] { min-height: 480px; }
+.dust-reception .dust-linked-chart { height: 473px; min-height: 473px; }
+#dust-mirror .dust-map { height: 100%; }
+.reception-dot, .studio-dot { outline: none; paint-order: stroke fill; }
+.reception-dot { cursor: pointer; }
+.reception-dot:not([fill="transparent"]):is(:hover, :focus-visible, [aria-pressed="true"]) { stroke: white; stroke-width: 2; }
+.studio-dot:is(:hover, :focus-visible) { fill-opacity: 1; }
+.reception-dot:focus-visible, .studio-dot:focus-visible { filter: drop-shadow(0 0 2px white); }
+.reception-selection-ring { fill: none; pointer-events: none; }
+#dust-analysis [data-dust-chart="heatmap"] { margin-top: 0; min-height: 480px; }
 [data-dust-chips] { display: flex; flex-wrap: wrap; gap: 8px; }
 [data-dust-ranking-pages] { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 [data-dust-scope], [data-coverage] { color: var(--muted, #aab3cf); font-size: 0.85rem; }
 [data-dust-notice]:empty { display: none; }
 [data-dust-ranking-body] td { padding: 10px; }
 [data-dust-ranking-head] th { padding: 10px; text-align: left; }
+[data-dust-ranking-head] th:first-child,
+[data-dust-ranking-body] td:first-child { text-align: right; }
 
 [data-dust-chart="studios"] { min-height: 480px; }
-[data-dust-chart="reception"] { min-height: 430px; }
 [data-dust-chart="heatmap"] svg { min-width: 560px; }
 #dust-analysis .dust-analysis-control { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 8px 0; font-size: .8rem; }
 .dust-analysis-control select { width: auto; max-width: 100%; min-height: 34px; padding: 0 8px; }
@@ -463,7 +475,9 @@ body[data-chapter="recommendations"] .filterbar { display: none; }
 
 @media (max-width: 1099px) {
   #dust-analysis { grid-template-columns: minmax(0, 1fr); }
-  #dust-analysis #reception { width: 100%; }
+}
+@media (max-width: 800px) {
+  .dust-reception { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* The controls and latest anime frame the field; all three scroll away with it. */
@@ -493,12 +507,13 @@ body[data-chapter="dust-magnet"] .movie-search-results button { padding: 8px; }
 .field-options { font-size: .76rem; }
 .field-options-panel { padding-top: 12px; }
 .field-options-panel #dust-limit-control { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
-.field-options-panel select { max-width: 100%; color: var(--text); background: var(--bg-soft); border: 1px solid var(--border-strong); border-radius: 5px; padding: 5px; }
+.field-options-panel #dust-limit { max-width: 100%; color: var(--text); background: var(--bg-soft); border: 1px solid var(--border-strong); border-radius: 5px; padding: 5px; }
 .field-options-panel .filterbar { margin: 16px 0 0; padding: 8px; }
 .field-options-panel .filter-grid { grid-template-columns: minmax(0, 1fr); padding: 8px 0; }
 .field-options-panel .filter-grid > label:first-child { grid-column: auto; }
 .field-options-panel .filter-grid > * { min-width: 0; }
-.field-options-panel .movie-suggestions { flex-direction: column; align-items: stretch; }
+body[data-chapter="dust-magnet"] .movie-suggestions { margin: 0; gap: 6px; }
+body[data-chapter="dust-magnet"] .movie-suggestions > span { flex-basis: 100%; }
 .dust-playground > #recommendation-content { min-width: 0; }
 body[data-chapter="dust-magnet"] .recommendation-workspace { display: block; }
 body[data-chapter="dust-magnet"] .recommendation-chart-card {

@@ -13,22 +13,34 @@
       if (entry.visible) flush(entry);
       else entry.renderer.pause?.();
     }));
+    function retainHeight(entry) {
+      // Auto-height charts may measure their new marks while the container is partially built.
+      if (entry.preserveHeight && entry.container.hasChildNodes()) {
+        entry.container.style.minHeight = `${entry.container.offsetHeight}px`;
+      }
+    }
     function flush(entry) {
       if (!active || destroyed || !entry.visible || !entry.latest) return;
+      retainHeight(entry);
       try { entry.renderer.update(entry.latest); entry.dirty = false; }
       catch (error) { entry.container.textContent = "Chart unavailable."; onError(error); }
+      finally { if (entry.preserveHeight) entry.container.style.removeProperty("min-height"); }
     }
     return {
-      mount(container, renderer) {
+      mount(container, renderer, { preserveHeight = false } = {}) {
         if (entries.has(container)) throw new Error("Container already mounted");
-        entries.set(container, { container, renderer, visible: !observer, latest: null, dirty: false });
+        entries.set(container, { container, renderer, preserveHeight, visible: !observer, latest: null, dirty: false });
         observer?.observe(container);
       },
       update(value) {
         entries.forEach(entry => {
           entry.latest = value; entry.dirty = true;
           if (active && entry.visible) flush(entry);
-          else { entry.renderer.pause?.(); entry.container.replaceChildren(); }
+          else {
+            entry.renderer.pause?.();
+            retainHeight(entry);
+            entry.container.replaceChildren();
+          }
         });
       },
       refresh() { entries.forEach(entry => flush(entry)); },
@@ -43,7 +55,11 @@
       destroy() {
         if (destroyed) return;
         destroyed = true; observer?.disconnect();
-        entries.forEach(entry => entry.renderer.destroy?.()); entries.clear();
+        entries.forEach(entry => {
+          if (entry.preserveHeight) entry.container.style.removeProperty("min-height");
+          entry.renderer.destroy?.();
+        });
+        entries.clear();
       }
     };
   }

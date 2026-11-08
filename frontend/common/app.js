@@ -96,12 +96,6 @@ function chartHelpers() {
 function createPageChart(kind, selector) {
   return AnivizCharts.create(kind, { container: document.querySelector(selector), d3, helpers: chartHelpers() });
 }
-function applyChartFilter(patch) {
-  const names = { genre: "genreFilter", studio: "studioFilter", yearFrom: "yearFrom", yearTo: "yearTo" };
-  Object.entries(patch).forEach(([key, value]) => { if (names[key]) elements[names[key]].value = value; });
-  applyFilters();
-}
-
 const numberFormatter = new Intl.NumberFormat("en-US");
 const compactFormatter = new Intl.NumberFormat("en-US", {
   notation: "compact",

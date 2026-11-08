@@ -15,8 +15,7 @@
     const ChartData = {
       genres: (anime, selected) => metricData("genres", () => transforms.genres(anime, selected)).slice(),
       studios: (anime, selected) => metricData("studios", () => transforms.studios(anime, selected)).slice(),
-      timeline: (anime, selected) => metricData("years", () => transforms.timeline(anime, selected)),
-      correlation: points => metricData("correlation", () => transforms.correlation(points))
+      timeline: (anime, selected) => metricData("years", () => transforms.timeline(anime, selected))
     };
     function renderGenreChart() {
       clearChart(container);
@@ -114,9 +113,8 @@
         .attr("rx", 5)
         .attr("stroke", item => item.selectedCount ? "white" : "none")
         .attr("stroke-width", 2)
-        .attr("fill", (item) => context.genreColor(item.genre))
+        .attr("fill", "var(--purple)")
         .attr("fill-opacity", 0.8)
-        .style("cursor", "pointer")
         .on("mouseenter", (event, item) => {
           showTooltip(event, `
             <strong>${escapeHTML(item.genre)}</strong>
@@ -132,10 +130,7 @@
           `);
         })
         .on("mousemove", moveTooltip)
-        .on("mouseleave", hideTooltip)
-        .on("click", (_, item) => {
-          context.onFilter({ genre: item.genre });
-        });
+        .on("mouseleave", hideTooltip);
 
       svg.append("g")
         .selectAll("text.value")
@@ -246,8 +241,7 @@
           `);
         })
         .on("mousemove", moveTooltip)
-        .on("mouseleave", hideTooltip)
-        .on("click", (_, item) => context.onFilter({ yearFrom: item.year, yearTo: item.year }));
+        .on("mouseleave", hideTooltip);
 
       const lineData = data.filter((item) => Number.isFinite(item.averageScore));
 
@@ -317,123 +311,54 @@
     }
 
     function renderStudioChart() {
-
       clearChart(container);
 
-      const data = ChartData.studios(context.anime, context.selectedIds)
-        .filter((item) => Number.isFinite(item.averageScore))
-        .sort((a, b) => d3.descending(
-          a.totalPopularity,
-          b.totalPopularity
-        ))
-        .slice(0, 15);
+      const studios = ChartData.studios(context.anime, context.selectedIds)
+        .filter((item) => item.totalPopularity > 0 && Number.isFinite(item.averageScore));
 
-      if (!data.length) {
-        renderEmpty(container, "No studio score data match the filters.");
+      if (!studios.length) {
+        renderEmpty(container, "No studios with score and popularity data match the filters.");
         return;
       }
 
-      const width = Math.max(container.clientWidth, 320);
-      const height = Math.max(container.clientHeight, 480);
-      const margin = { top: 32, right: 35, bottom: 50, left: 120 };
+      // Draw smaller bubbles last so they remain reachable where circles overlap.
+      studios.sort((a, b) => d3.descending(a.count, b.count));
 
-      const svg = d3.select(container)
-        .append("svg")
-        .attr("viewBox", [0, 0, width, height]);
-
-      const scoreExtent = d3.extent(data, (item) => item.averageScore);
-
-      const x = d3.scaleLinear()
-        .domain([
-          Math.max(0, scoreExtent[0] - 5),
-          Math.min(100, scoreExtent[1] + 4)
-        ])
-        .nice()
-        .range([margin.left, width - margin.right]);
-
-      const y = d3.scaleBand()
-        .domain(data.map((item) => item.studio))
-        .range([margin.top, height - margin.bottom])
-        .padding(0.3);
+      const { svg, x, y } = drawPopularityAxes(studios, {
+        popularity: (item) => item.totalPopularity,
+        score: (item) => item.averageScore,
+        label: "Studio score versus popularity bubble chart",
+        popularityLabel: "Total popularity (log scale)"
+      });
 
       const radius = d3.scaleSqrt()
-        .domain([1, d3.max(data, (item) => item.count) || 1])
-        .range([4, 12]);
-
-      svg.append("g")
-        .attr("class", "grid")
-        .attr("transform", `translate(0,${height - margin.bottom})`)
-        .call(
-          d3.axisBottom(x)
-            .ticks(5)
-            .tickSize(-(height - margin.top - margin.bottom))
-            .tickFormat("")
-        );
-
-      svg.append("g")
-        .selectAll("line")
-        .data(data)
-        .join("line")
-        .attr("x1", x.range()[0])
-        .attr("x2", (item) => x(item.averageScore))
-        .attr("y1", (item) => y(item.studio) + y.bandwidth() / 2)
-        .attr("y2", (item) => y(item.studio) + y.bandwidth() / 2)
-        .attr("stroke", "rgba(255,255,255,0.16)")
-        .attr("stroke-width", 2);
+        .domain([0, d3.max(studios, (item) => item.count)])
+        .range([0, 20]);
 
       svg.append("g")
         .selectAll("circle")
-        .data(data)
+        .data(studios, (item) => item.studio)
         .join("circle")
-        .attr("cx", (item) => x(item.averageScore))
-        .attr("cy", (item) => y(item.studio) + y.bandwidth() / 2)
+        .attr("class", "studio-dot")
+        .attr("cx", (item) => x(item.totalPopularity))
+        .attr("cy", (item) => y(item.averageScore))
         .attr("r", (item) => radius(item.count))
-        .attr("fill", (item) => context.genreColor(item.dominantGenre))
+        .attr("fill", "var(--purple)")
+        .attr("fill-opacity", 0.8)
         .attr("stroke", "white")
         .attr("stroke-width", item => item.selectedCount ? 3 : 1)
-        .style("cursor", "pointer")
         .on("mouseenter", (event, item) => {
           showTooltip(event, `
             <strong>${escapeHTML(item.studio)}</strong>
             <span>
-              Titles: ${item.count}<br>
-              Average score: ${item.averageScore.toFixed(1)}<br>
-              Popularity: ${formatNumber(item.totalPopularity)}<br>
-              Dominant genre: ${escapeHTML(item.dominantGenre)}
+              Total popularity: ${formatNumber(item.totalPopularity)}<br>
+              Average score: ${item.averageScore.toFixed(1)}/100<br>
+              Matching titles: ${formatNumber(item.count)}
             </span>
           `);
         })
         .on("mousemove", moveTooltip)
-        .on("mouseleave", hideTooltip)
-        .on("click", (_, item) => {
-          hideTooltip();
-          context.onFilter({ studio: item.studio });
-        });
-
-      svg.append("g")
-        .attr("class", "axis")
-        .attr("transform", `translate(0,${height - margin.bottom})`)
-        .call(d3.axisBottom(x).ticks(5));
-
-      svg.append("g")
-        .attr("class", "axis")
-        .attr("transform", `translate(${margin.left},0)`)
-        .call(
-          d3.axisLeft(y)
-            .tickFormat((value) => truncate(value, 18))
-            .tickSize(0)
-        )
-        .call((group) => group.select(".domain").remove());
-
-      svg.append("text")
-        .attr("class", "axis-label")
-        .attr("x", (margin.left + width - margin.right) / 2)
-        .attr("y", height - 12)
-        .attr("text-anchor", "middle")
-        .text("Average audience score / 100");
-
-      svg.append('text').attr('class', 'axis-label').attr('x', margin.left).attr('y', 14)
-        .text('Size: title count · Color: dominant genre (focus for name)');
+        .on("mouseleave", hideTooltip);
     }
 
     function renderHeatmap() {
@@ -449,7 +374,7 @@
 
       const topStudios = ChartData.studios(anime, context.selectedIds)
         .sort((a, b) => d3.descending(a.count, b.count))
-        .slice(0, 11)
+        .slice(0, 15)
         .map((item) => item.studio);
 
       const topGenres = ChartData.genres(anime, context.selectedIds)
@@ -478,7 +403,7 @@
 
       const width = Math.max(container.clientWidth, 560);
       const height = Math.max(container.clientHeight, 480);
-      const margin = { top: 135, right: 25, bottom: 35, left: 130 };
+      const margin = { top: 64, right: 25, bottom: 20, left: 130 };
 
       const svg = d3.select(container)
         .append("svg")
@@ -514,7 +439,6 @@
         ))
         .attr("stroke", item => item.selectedCount ? "white" : "rgba(255,255,255,0.055)")
         .attr("stroke-width", item => item.selectedCount ? 2 : 1)
-        .style("cursor", (item) => item.count ? "pointer" : "default")
         .on("mouseenter", (event, item) => {
           showTooltip(event, `
             <strong>
@@ -527,14 +451,7 @@
           `);
         })
         .on("mousemove", moveTooltip)
-        .on("mouseleave", hideTooltip)
-        .on("click", (_, item) => {
-          if (!item.count) {
-            return;
-          }
-
-          context.onFilter({ genre: item.genre, studio: item.studio });
-        });
+        .on("mouseleave", hideTooltip);
 
       svg.append("g")
         .attr("class", "axis")
@@ -558,36 +475,18 @@
         .call((group) => group.select(".domain").remove());
     }
 
-    function renderScatterplot() {
-
-      const data = metricData("scored", () => context.anime.filter((item) => (
-        item.popularity > 0
-        && Number.isFinite(item.average_score)
-      )));
-
-      const correlation = ChartData.correlation(
-        data.map((item) => [Math.log10(item.popularity), item.average_score])
-      );
-      if (context.onCorrelation) context.onCorrelation(correlation, data.length);
-
-      clearChart(container);
-
-      if (!data.length) {
-        renderEmpty(container, "No scored anime match the current filters.");
-        return;
-      }
-
+    function drawPopularityAxes(data, { popularity, score, label, popularityLabel }) {
       const width = Math.max(container.clientWidth, 320);
-      const height = Math.max(container.clientHeight, 430);
+      const height = Math.max(container.clientHeight, 473);
       const margin = { top: 28, right: 28, bottom: 58, left: 62 };
 
       const svg = d3.select(container)
         .append("svg")
         .attr("viewBox", [0, 0, width, height])
-        .attr("aria-label", "Score versus popularity scatterplot");
+        .attr("aria-label", label);
 
-      const xExtent = d3.extent(data, (item) => item.popularity);
-      const yExtent = d3.extent(data, (item) => item.average_score);
+      const xExtent = d3.extent(data, popularity);
+      const yExtent = d3.extent(data, score);
 
       const x = d3.scaleLog()
         .domain([
@@ -603,10 +502,6 @@
         ])
         .nice()
         .range([height - margin.bottom, margin.top]);
-
-      const radius = d3.scaleSqrt()
-        .domain([0, d3.max(data, (item) => item.favourites || 0) || 1])
-        .range([4, 20]);
 
       svg.append("g")
         .attr("class", "grid")
@@ -633,7 +528,7 @@
         .attr("transform", `translate(0,${height - margin.bottom})`)
         .call(
           d3.axisBottom(x)
-            .ticks(7, "~s")
+            .ticks(width < 450 ? 5 : 7, "~s")
         );
 
       svg.append("g")
@@ -646,7 +541,7 @@
         .attr("x", (margin.left + width - margin.right) / 2)
         .attr("y", height - 12)
         .attr("text-anchor", "middle")
-        .text("Popularity — AniList list users (log scale)");
+        .text(popularityLabel);
 
       svg.append("text")
         .attr("class", "axis-label")
@@ -656,111 +551,103 @@
         .attr("text-anchor", "middle")
         .text("Average score / 100");
 
-      const regression = linearRegression(
-        data.map((item) => [
-          Math.log10(item.popularity),
-          item.average_score
-        ])
-      );
+      const { correlation, regression } = metricData("popularityTrend", () => {
+        const points = data.map(item => [Math.log10(popularity(item)), score(item)]);
+        return { correlation: transforms.correlation(points), regression: linearRegression(points) };
+      });
 
       if (correlation !== null && regression) {
-        const regressionPoints = x.domain().map((popularity) => ({
-          popularity,
-          score:
-            regression.intercept
-            + regression.slope * Math.log10(popularity)
-        }));
+        svg.append("text")
+          .attr("class", "chart-correlation")
+          .attr("x", (margin.left + width - margin.right) / 2)
+          .attr("y", 16)
+          .attr("text-anchor", "middle")
+          .attr("font-size", 12)
+          .attr("fill", "var(--text-soft)")
+          .text(`Pearson r = ${correlation.toFixed(3)}`);
 
         svg.append("path")
-          .datum(regressionPoints)
+          .attr("class", "chart-trendline")
+          .datum(x.domain())
           .attr("fill", "none")
           .attr("stroke", "rgba(255,255,255,0.42)")
           .attr("stroke-dasharray", "5 5")
           .attr("stroke-width", 1.4)
-          .attr(
-            "d",
-            d3.line()
-              .x((item) => x(item.popularity))
-              .y((item) => y(item.score))
-          );
+          .attr("pointer-events", "none")
+          .attr("d", d3.line()
+            .x(popularity => x(popularity))
+            .y(popularity => y(regression.intercept + regression.slope * Math.log10(popularity))));
       }
 
-      const dots = svg.append("g")
+      return { svg, x, y, correlation };
+    }
+
+    function renderScatterplot() {
+      const data = metricData("scored", () => context.anime.filter((item) => (
+        item.popularity > 0
+        && Number.isFinite(item.average_score)
+      )).sort((a, b) => (b.favourites || 0) - (a.favourites || 0)));
+
+      clearChart(container);
+
+      if (!data.length) {
+        context.onCorrelation?.(null, 0);
+        renderEmpty(container, "No scored anime match the current filters.");
+        return;
+      }
+
+      const { svg, x, y, correlation } = drawPopularityAxes(data, {
+        popularity: (item) => item.popularity,
+        score: (item) => item.average_score,
+        label: "Score versus popularity scatterplot",
+        popularityLabel: "Popularity — AniList list users (log scale)"
+      });
+      context.onCorrelation?.(correlation, data.length);
+
+      const radius = d3.scaleSqrt()
+        .domain([0, d3.max(data, (item) => item.favourites || 0) || 1])
+        .range([0, 20]);
+      // A hollow marker keeps titles with zero or unknown favourites available for selection.
+      const pointRadius = item => item.favourites > 0 ? radius(item.favourites) : 4;
+
+      svg.append("g")
         .selectAll("circle")
         .data(data, (item) => item.id)
         .join("circle")
+        .attr("class", "reception-dot")
         .attr("cx", (item) => x(item.popularity))
         .attr("cy", (item) => y(item.average_score))
-        .attr("r", (item) => Number.isFinite(item.favourites) ? radius(item.favourites) : 4)
-        .attr("fill", (item) => context.genreColor(item.primary_genre))
-        .attr("fill-opacity", 0.72)
-        .attr("stroke", "rgba(255,255,255,0.72)")
-        .attr("stroke-width", item => context.selectedIds.includes(String(item.id)) ? 3 : 0.8)
-        .style("cursor", "pointer")
-        .on("mouseenter", function (event, item) {
-          d3.select(this)
-            .attr("fill-opacity", 1)
-            .attr("stroke-width", 2);
-
+        .attr("r", pointRadius)
+        .attr("fill", item => item.favourites > 0 ? context.dustColor(String(item.id)) : "transparent")
+        .attr("stroke", item => item.favourites > 0 ? "var(--surface-solid)" : context.dustColor(String(item.id)))
+        .attr("stroke-width", 1.5)
+        .on("mouseenter", (event, item) => {
           showTooltip(event, `
             <strong>${escapeHTML(item.title)}</strong>
             <span>
               Score: ${item.average_score}/100<br>
               Popularity: ${formatNumber(item.popularity)}<br>
               Favourites: ${formatNumber(item.favourites)}<br>
-              Genre: ${escapeHTML(item.primary_genre)}<br>
+              Genres: ${escapeHTML(item.genres.join(", ") || "Unknown")}<br>
               Studio: ${escapeHTML(item.studio_names.join(", "))}
             </span>
           `);
         })
         .on("mousemove", moveTooltip)
-        .on("mouseleave", function () {
-          d3.select(this)
-            .attr("fill-opacity", 0.72)
-            .attr("stroke-width", item => context.selectedIds.includes(String(item.id)) ? 3 : 0.8);
-
+        .on("mouseleave", hideTooltip)
+        .on("click", (_, item) => {
           hideTooltip();
-        })
-        .on("click", (_, item) => context.onSelect(String(item.id)));
+          context.onSelect(String(item.id));
+        });
 
-      dots.append("title")
-        .text((item) => item.title);
-
-      renderGenreLegend(svg, data, width, height, margin);
-    }
-
-    function renderGenreLegend(svg, data, width, height, margin) {
-      const genres = d3.rollups(
-        data,
-        (rows) => rows.length,
-        (item) => item.primary_genre
-      )
-        .sort((a, b) => d3.descending(a[1], b[1]))
-        .slice(0, 5)
-        .map((item) => item[0]);
-
-      const legend = svg.append("g")
-        .attr(
-          "transform",
-          `translate(${Math.max(margin.left, width - margin.right - 145)},`
-          + `${height - 160})`
-        );
-
-      genres.forEach((genre, index) => {
-        const row = legend.append("g")
-          .attr("transform", `translate(0,${index * 19})`);
-
-        row.append("circle")
-          .attr("r", 5)
-          .attr("fill", context.genreColor(genre));
-
-        row.append("text")
-          .attr("x", 10)
-          .attr("y", 4)
-          .attr("fill", "#aab3cf")
-          .attr("font-size", 10)
-          .text(truncate(genre, 18));
-      });
+      svg.append("g").attr("aria-hidden", "true")
+        .selectAll("circle")
+        .data(data.filter(item => context.selectedIds.includes(String(item.id))))
+        .join("circle")
+        .attr("class", "reception-selection-ring")
+        .attr("cx", item => x(item.popularity))
+        .attr("cy", item => y(item.average_score))
+        .attr("r", item => pointRadius(item) + 3);
     }
 
     function linearRegression(points) {
@@ -794,29 +681,24 @@
       heatmap: renderHeatmap, reception: renderScatterplot };
     if (!renderers[kind]) throw new Error(`Unknown chart: ${kind}`);
     function keyboardMarks() {
+      const selectable = kind === "reception";
       d3.select(container).selectAll("rect, circle").filter(function () {
-        return Boolean(d3.select(this).on("click"));
-      }).attr("tabindex", 0).attr("role", "button")
-        .attr("aria-pressed", item => item.id !== undefined ? context.selectedIds.includes(String(item.id)) : null)
-        .attr("aria-label", item => item.title && `${item.title}: score ${item.average_score} / 100; popularity ${formatNumber(item.popularity)}; favourites ${Number.isFinite(item.favourites) ? formatNumber(item.favourites) : 'Unknown'}; genre ${item.primary_genre}` || item.genre && item.studio && `${item.studio} × ${item.genre}: ${item.count}`
-          || item.genre && `${item.genre}: ${item.count} titles` || item.studio && `${item.studio}: ${item.count} titles; dominant genre ${item.dominantGenre}`
+        return Boolean(d3.select(this).on("mouseenter"));
+      }).attr("tabindex", 0).attr("role", selectable ? "button" : "img")
+        .attr("aria-pressed", item => selectable ? context.selectedIds.includes(String(item.id)) : null)
+        .attr("aria-label", item => item.title && `${item.title}: score ${item.average_score} / 100; popularity ${formatNumber(item.popularity)}; favourites ${Number.isFinite(item.favourites) ? formatNumber(item.favourites) : 'Unknown'}; genres ${item.genres.join(", ") || "Unknown"}` || item.genre && item.studio && `${item.studio} × ${item.genre}: ${item.count}`
+          || item.genre && `${item.genre}: ${item.count} titles` || item.studio && `${item.studio}: total popularity ${formatNumber(item.totalPopularity)}; average score ${item.averageScore.toFixed(1)} / 100; ${item.count} matching titles`
           || `${item.year}: ${item.count} titles`)
-        .on("keydown", function (event, item) {
+        .on("keydown", selectable ? function (event, item) {
           if (["Enter", " "].includes(event.key)) {
             event.preventDefault(); d3.select(this).on("click").call(this, event, item);
           }
-        });
-      d3.select(container).selectAll('[role="button"]').each(function () {
-        d3.select(this).append('title').text(this.getAttribute('aria-label'));
-        const hover = d3.select(this).on('mouseenter');
-        if (hover) d3.select(this).on('focus', function (event, item) {
+        } : null)
+        .on('focus', function (event, item) {
           const rect = this.getBoundingClientRect();
-          hover.call(this, { clientX: rect.x + rect.width / 2, clientY: rect.y }, item);
-        }).on('blur', function (event, item) {
-          const leave = d3.select(this).on('mouseleave');
-          if (leave) leave.call(this, event, item);
-        });
-      });
+          d3.select(this).on('mouseenter').call(this, { clientX: rect.x + rect.width / 2, clientY: rect.y }, item);
+        })
+        .on('blur', hideTooltip);
     }
     return {
       update(value) {
@@ -824,9 +706,10 @@
         const nextSelection = JSON.stringify(value.selectedIds || []);
         if (value.anime !== dataIdentity || nextSelection !== selectionKey) cached.clear();
         dataIdentity = value.anime; selectionKey = nextSelection;
-        context = { selectedIds: [], onFilter() {}, onSelect() {}, genreColor: () => "#9d7bff", ...value };
+        context = { selectedIds: [], onSelect() {},
+          dustColor: () => "#9d7bff", ...value };
         renderers[kind](); keyboardMarks();
-        if (focused) [...container.querySelectorAll('[role="button"]')].find(node => node.getAttribute('aria-label') === focused)?.focus({ preventScroll: true });
+        if (focused) [...container.querySelectorAll('[tabindex="0"][aria-label]')].find(node => node.getAttribute('aria-label') === focused)?.focus({ preventScroll: true });
       },
       destroy() { container.replaceChildren(); context = null; }
     };

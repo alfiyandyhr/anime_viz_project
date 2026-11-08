@@ -14,7 +14,7 @@ The compact dropdown contains exactly four destinations:
 
 | View | Data and interactions |
 | --- | --- |
-| Dust & Magnet | Movie magnets and 30/60/90 anime dots. Scroll through Similarity connections → Genres / Release years → Studios / Studio × genre → Score vs. popularity → Full anime ranking. All charts are available without selecting a title. |
+| Dust & Magnet | Movie magnets and 30/60/90 anime dots. Scroll through Similarity connections → Score vs. popularity / playground mirror → Genres / Release years → Studios / Studio × genre → Full anime ranking. All charts are available without selecting a title. |
 | History | Six eras, annual Top 10 posters, sticky timeline and period rankings from an independent historical dataset. Popularity is current AniList list popularity, not historical audience figures. |
 | Network | Actor/character/work collaboration graph, defaulting to Current dust when a saved dust context exists, otherwise Catalogue. A local selector switches scopes without changing other views. The 35-work display cap and sampled Japanese cast credits are disclosed. |
 | Full Catalogue | The loaded 1,000-title metadata sample, with its own search, filters, sorting, pagination, details and automatic shortlist comparison. Saved movies never narrow its scope. |
@@ -22,9 +22,10 @@ The compact dropdown contains exactly four destinations:
 Movie search, removable magnet chips and **Field options** sit in the left panel.
 The right panel shows the latest selected anime with its banner, cover, synopsis,
 tags and sampled Japanese cast. Both panels scroll away above the analysis charts.
-Options contain suggestions, dot count, Reset positions and main-view filters.
-Genre, studio, year and heatmap marks filter the **same displayed dusts** across
-the field and supporting charts. Filters narrow the original
+Movie suggestions sit below search. **Field options** contains dot count, Reset
+positions and main-view filters.
+Filters update the **same displayed dusts** across the field and supporting
+charts. They narrow the original
 candidates without refilling them; removable chips and Reset filters undo them.
 The full similarity ranking covers every recommendation record, marks displayed
 rows, and sorts by any active movie or their arithmetic mean. Sorting and magnet
@@ -227,8 +228,9 @@ node --test tests/*.test.cjs
 
 Open the root URL, choose **Dust & Magnet** in the dropdown, or visit
 `frontend/dust-magnet/index.html`. Search for up to three favorite movies and
-remove a magnet with its × button. **Field options** contains suggestions, the
-30/60/90 dot choices, filters, and **Reset positions**. Drag magnets, or focus
+remove a magnet with its × button. Suggested movies appear under **Try a favorite**
+below search. **Field options** contains the 30/60/90 dot choices, filters, and
+**Reset positions**. Drag magnets, or focus
 one and use arrow keys, to rearrange the field. Hover or keyboard-focus an anime
 for its title and cosine scores rounded to three decimals. Click or press Enter
 to show its details in the right panel. Enter/Space or another click toggles selection; two or three
@@ -274,7 +276,7 @@ filters update their membership and ranks; table sorting does not. Curves,
 endpoint dots and scores use each anime's dust color for its highest-scoring
 magnet, including stable movie colors after removal or reordering. The linked
 content, creator, and reception charts summarize the displayed dusts. **Full anime ranking** appears
-after Score vs. popularity, uses the complete recommendation corpus, and supports
+after Studio × genre, uses the complete recommendation corpus, and supports
 sorting by each active movie or average similarity. Its titles open the same right
 detail drawer as Full Catalogue without changing the selected dust comparison.
 Neither ranking sorts nor magnet movement alter the displayed anime membership. The view lazily loads the published similarity JSON and binary

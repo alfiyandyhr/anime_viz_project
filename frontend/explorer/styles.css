@@ -205,17 +205,16 @@ tbody tr:hover {
 .table-wrapper { border-radius: 4px; box-shadow: none; }
 .table-wrapper table { min-width: 720px; }
 th, td { padding: 8px 12px; }
+#chapter-explorer .table-wrapper :is(th, td):nth-child(2) { text-align: right; }
 .anime-cell img { width: 30px; height: 42px; border-radius: 3px; }
 .anime-cell strong { max-width: 340px; }
 .table-sort { width: 180px; }.table-page-size { width: 70px; }
-body[data-chapter="explorer"] .filter-grid { grid-template-columns: minmax(170px, 2fr) repeat(5, minmax(95px, 1fr)); gap: 10px; padding: 8px 0; }
-body[data-chapter="explorer"] .filterbar { margin-bottom: 12px; }
+body[data-chapter="explorer"] .filter-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); gap: 10px; padding: 8px 0; }
 body[data-chapter="explorer"] .range-control { grid-column: span 2; }
 @media(max-width:1000px) { body[data-chapter="explorer"] .filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media(max-width:680px) { body[data-chapter="explorer"] .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.table-sort { width: 150px; } }
 
 .catalogue-tools { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; }
 .catalogue-search { flex: 1 1 240px; max-width: 480px; }
-body[data-chapter="explorer"] .catalogue-tools .filterbar { margin: 0; flex: 0 1 auto; padding: 0; }
-body[data-chapter="explorer"] .catalogue-tools .filterbar[open] { flex: 1 1 100%; }
+body[data-chapter="explorer"] .catalogue-tools .filterbar { margin: 0; flex: 1 1 100%; min-width: 0; }
 @media(max-width:680px) { .catalogue-search { flex-basis: 100%; }.catalogue-tools { gap: 4px; } }

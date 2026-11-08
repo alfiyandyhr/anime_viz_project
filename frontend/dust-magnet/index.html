@@ -80,9 +80,9 @@
               <span id="movie-search-label">Add a movie magnet · up to 3</span>
               <input id="movie-search" type="search" placeholder="Add movie magnet… (up to 3)" autocomplete="off" aria-controls="movie-search-results" disabled>
             </label>
-
           </div>
           <div id="movie-search-results" class="movie-search-results" aria-label="Movie search results" hidden></div>
+          <div id="movie-suggestions" class="movie-suggestions" aria-label="Movies to try"></div>
           <div id="movie-magnets" class="movie-magnets" aria-label="Your movie magnets" hidden></div>
           <details class="field-options" data-field-options>
             <summary>Field options</summary>
@@ -96,15 +96,11 @@
                 </select>
               </label>
               <button id="reset-magnets" class="small-button ghost" type="button">Reset positions</button>
-              <div id="movie-suggestions" class="movie-suggestions" aria-label="Movies to try"></div>
-              <details class="filterbar" id="filterbar">
-                <summary>
-                  <span class="filterbar-title">
-                    <strong>Filter anime</strong>
-                    <span id="filter-summary">Waiting for data…</span>
-                  </span>
-
-                </summary>
+              <section class="filterbar" id="filterbar" aria-labelledby="filter-title">
+                <div class="filterbar-title">
+                  <strong id="filter-title">Filter anime</strong>
+                  <span id="filter-summary">Waiting for data…</span>
+                </div>
 
                 <div class="filter-grid">
                   <label>
@@ -169,7 +165,7 @@
                     </button>
                   </div>
                 </div>
-              </details>
+              </section>
             </div>
           </details>
 
@@ -213,6 +209,15 @@
             <h3>Which stories are similar—and which differ?</h3>
             <p>Each movie connects to its top 5 and bottom 5 anime within the displayed dust. Ranks update with the dot count and filters. Curves and scores use each anime’s dust color, identifying its closest magnet. Thicker curves mean higher similarity. Select a title to open its anime card.</p>
             <p data-coverage="connections"></p><div class="dust-linked-chart" role="region" aria-label="Movie and anime similarity connections" data-dust-chart="connections"></div></article>
+          <div class="dust-analysis-wide dust-reception">
+            <article class="chart-card" id="reception"><h3>Score vs. popularity</h3>
+              <p data-coverage="reception"></p><div class="dust-linked-chart" data-dust-chart="reception"></div></article>
+            <article class="chart-card" aria-labelledby="dust-mirror-title">
+              <h3 id="dust-mirror-title">Dust &amp; Magnet mirror</h3>
+              <p>Drag magnets or use arrow keys on a focused magnet. Select dots to compare anime, or click empty space to remove the latest selection.</p>
+              <div class="dust-linked-chart" id="dust-mirror"></div>
+            </article>
+          </div>
           <article class="chart-card" id="content"><h3>Genres</h3>
             <label class="dust-analysis-control">Metric <select data-dust-genre-metric><option value="count">Titles</option><option value="score">Average score</option><option value="popularity">Popularity</option></select></label>
             <p data-coverage="genres"></p><div class="dust-linked-chart" data-dust-chart="genres"></div></article>
@@ -222,11 +227,13 @@
             <p data-coverage="studios"></p><div class="dust-linked-chart" data-dust-chart="studios"></div></article>
           <article class="chart-card"><h3>Studio × genre</h3>
             <p data-coverage="heatmap"></p><div class="dust-linked-chart" role="region" tabindex="0" aria-label="Studio genre chart, scroll horizontally" data-dust-chart="heatmap"></div></article>
-          <article class="chart-card" id="reception"><h3>Score vs. popularity</h3>
-            <p data-coverage="reception"></p><div class="dust-linked-chart" data-dust-chart="reception"></div></article>
           <article class="chart-card dust-analysis-wide"><h3>Full anime ranking</h3>
             <p data-dust-ranking-note></p>
             <label class="dust-analysis-control">Rank by <select data-dust-ranking-sort><option value="average">Average similarity</option></select></label>
+            <label class="dust-analysis-control">Rank order <select data-dust-ranking-order>
+              <option value="ascending">Ascending (rank 1 first)</option>
+              <option value="descending">Descending (last rank first)</option>
+            </select></label>
             <div class="table-wrapper" role="region" tabindex="0" aria-label="Full similarity ranking, scroll horizontally">
               <table><thead data-dust-ranking-head></thead><tbody data-dust-ranking-body></tbody></table>
             </div><nav data-dust-ranking-pages aria-label="Full similarity ranking pages"></nav>

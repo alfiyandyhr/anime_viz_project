@@ -9,7 +9,7 @@ const url=route=>new URL(route,base).href;
     page.on('pageerror',e=>errors.push(e.message));
     for(const [route,section] of [['#content','content'],['frontend/reception/index.html?mode=catalogue','reception'],['frontend/creators/index.html?mode=matches','creators']]) {
       await page.goto(url(route));await page.waitForSelector('.dust-node');
-      assert.equal(await page.locator('.dust-node').count(),60);
+      assert.equal(await page.locator('#recommendation-chart .dust-node').count(),60);
       assert.equal(new URL(page.url()).pathname,new URL(`frontend/dust-magnet/index.html`,base).pathname);
       assert.equal(new URL(page.url()).hash,`#${section}`);
       await page.waitForFunction(id=>{const r=document.getElementById(id).getBoundingClientRect();return r.top>=48&&r.top<innerHeight/2},section);

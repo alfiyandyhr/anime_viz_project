@@ -10,8 +10,8 @@ below this section are historical records of earlier implementation stages.
    Inception example and 60 dots. Use the four-item dropdown with keyboard arrows,
    Tab/Enter and Escape. Add Interstellar and The Matrix in the search input;
    exercise 30, 60 and 90 dots under Field options and remove movies directly.
-2. Scroll through Similarity connections → Genres → Release years → Studios →
-   Studio × genre → Score vs. popularity → Full anime ranking. No task, show-chart or
+2. Scroll through Similarity connections → Score vs. popularity / playground mirror →
+   Genres → Release years → Studios → Studio × genre → Full anime ranking. No task, show-chart or
    comparison action is needed. Each movie map shows its displayed-dust top 5 and bottom 5
    with curved, score-weighted links (ranks 1–5 and 56–60 with 60 visible dots).
    Curves, endpoint dots and scores match the anime's dust color for its closest magnet;

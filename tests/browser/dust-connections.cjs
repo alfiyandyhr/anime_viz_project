@@ -25,7 +25,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       });
       const evidence = await page.evaluate(() => {
         const s = AnivizMain.snapshot();
-        const dustColors = new Map([...document.querySelectorAll('.dust-node')].map(el =>
+        const dustColors = new Map([...document.querySelectorAll('#recommendation-chart .dust-node')].map(el =>
           [String(el.__data__.anime.id),getComputedStyle(el.querySelector('.dust-grain')).fill]));
         return {count:s.displayedDust.length, corpus:s.ranking.length,
           coverage:document.querySelector('[data-coverage="connections"]').textContent,

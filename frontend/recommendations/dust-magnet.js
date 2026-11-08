@@ -265,13 +265,16 @@ function selectedMagnetMovies() {
 }
 
 function bindDustControls() {
-  document.querySelector("#recommendation-chart").addEventListener("click", event => {
+  const deselectOnBackground = event => {
     if (recommendationState.viz !== "magnets" || event.defaultPrevented
       || event.target.closest(".dust-node, .dust-magnet, button")) return;
     hideTooltip();
     if (globalThis.AnivizMain) AnivizMain.deselectLast();
     else clearDustSelection();
-  });
+  };
+  for (const selector of ["#recommendation-chart", "#dust-mirror"]) {
+    document.querySelector(selector).addEventListener("click", deselectOnBackground);
+  }
   document.querySelector("#dust-limit").addEventListener("change", (event) => {
     recommendationState.dustLimit = Number(event.target.value);
     renderRecommendations();
@@ -308,6 +311,7 @@ function renderDustRecommendations() {
   const movies = selectedMagnetMovies();
   const data = recommendationState.data;
   const container = document.querySelector("#recommendation-chart");
+  const mirror = document.querySelector("#dust-mirror");
   const legend = document.querySelector("#dust-legend");
   legend.hidden = !movies.length;
   legend.innerHTML = movies.map((movie, index) => `
@@ -333,15 +337,19 @@ function renderDustRecommendations() {
   });
   document.querySelector("#reset-magnets").disabled = !movies.length;
   if (!movies.length) {
-    container.innerHTML = `<div class="dust-empty"><p>Add a movie in the search panel to find anime with similar stories.</p></div>`;
+    const message = "Add a movie in the search panel to find anime with similar stories.";
+    container.innerHTML = `<div class="dust-empty"><p>${message}</p></div>`;
+    renderEmpty(mirror, message);
     recommendationState.dustMatches = [];
     renderDustDetail();
     document.querySelector("#recommendation-status").textContent = "No magnets selected. Search for a movie or choose a suggestion.";
     return;
   }
   if (!recommendationState.scores) {
-    container.innerHTML = `<div class="dust-empty" role="status"><p>${recommendationState.scoresError
-      ? `Could not load full similarities: ${escapeHTML(recommendationState.scoresError)}` : "Gathering the anime dust…"}</p>${recommendationState.scoresError ? `<button type="button" class="small-button ghost" id="dust-retry">Retry full scores</button>` : ""}</div>`;
+    const message = recommendationState.scoresError
+      ? `Could not load full similarities: ${recommendationState.scoresError}` : "Gathering the anime dust…";
+    container.innerHTML = `<div class="dust-empty" role="status"><p>${escapeHTML(message)}</p>${recommendationState.scoresError ? `<button type="button" class="small-button ghost" id="dust-retry">Retry full scores</button>` : ""}</div>`;
+    renderEmpty(mirror, message);
     recommendationState.dustMatches = [];
     renderDustDetail();
     document.querySelector("#dust-retry")?.addEventListener("click", () => {
@@ -357,38 +365,26 @@ function renderDustRecommendations() {
   if (!matches.some((match) => match.anime.id === recommendationState.animeId)) recommendationState.animeId = null;
   if (!document.querySelector("#movie-search").value) document.querySelector("#recommendation-status").textContent =
     "";
-  renderDustChart(container, movies, matches);
+  renderDustChart(container, mirror, movies, matches);
   renderDustDetail();
   highlightRecommendation();
 }
 
-function renderDustChart(container, movies, matches) {
-  container.innerHTML = "";
-  const width = Math.max(240, container.clientWidth);
-  const height = Math.max(260, container.clientHeight || (width < 400 ? 440 : 500));
-  const initial = defaultMagnetPositions(movies.length, width, height);
-  const anchors = movies.map((movie, index) => {
-    const saved = recommendationState.magnetPositions[`${movies.length}:${movie.id}`];
-    return { movie, color: (globalThis.AnivizMain?.color(movies[index].id) || MAGNET_COLORS[index]), ...(saved ? { x: saved.x * width, y: saved.y * height } : initial[index]) };
-  });
-  for (const anchor of anchors) {
-    Object.assign(anchor, constrainMagnetPosition(anchor, anchor.x, anchor.y, anchors, width, height));
-  }
+function createDustView(container, matches, anchors, width, height, onMove, label) {
   const svg = d3.select(container).append("svg").attr("viewBox", `0 0 ${width} ${height}`)
     .attr("width", width).attr("height", height).attr("class", "dust-map").attr("role", "group")
-    .attr("aria-label", `Anime similarity to ${movies.map((movie) => movie.title).join(", ")}`);
-  const paths = svg.append("g").attr("aria-hidden", "true").selectAll("line").data(anchors).join("line")
-    .attr("class", "dust-selected-link").attr("visibility", "hidden").attr("stroke", (anchor) => anchor.color);
+    .attr("aria-label", `${label} similarity to ${anchors.map(({ movie }) => movie.title).join(", ")}`);
+  const paths = svg.append("g").attr("aria-hidden", "true");
   const dots = svg.append("g").selectAll("g").data(matches, (match) => match.anime.id).join("g")
     .attr("class", "dust-node").attr("data-match-id", (match) => match.anime.id)
     .attr("role", "button").attr("tabindex", 0).attr("aria-controls", "dust-focus recommendation-detail")
-    .attr("aria-label", (match) => `${match.anime.title}. ${movies.map((movie, index) => `${movie.title}: cosine ${match.scores[index].toFixed(3)}`).join(". ")}. Toggle selection for details or comparison.`)
+    .attr("aria-label", (match) => `${match.anime.title}. ${anchors.map(({ movie }, index) => `${movie.title}: cosine ${match.scores[index].toFixed(3)}`).join(". ")}. Toggle selection for details or comparison.`)
     .on("mouseenter focus", (event, match) => {
       const rect = event.currentTarget.getBoundingClientRect();
       const pointer = event.type === "focus" ? { clientX: rect.x + rect.width / 2, clientY: rect.y + rect.height / 2 } : event;
       showTooltip(pointer, `<strong>${escapeHTML(match.anime.title)}</strong><span>${escapeHTML(humanize(match.anime.format))} · ${match.anime.year || "Year unknown"}</span>`
-        + movies.map((movie, index) => `<span class="dust-tooltip-score"><i style="background:${(globalThis.AnivizMain?.color(movies[index].id) || MAGNET_COLORS[index])}"></i>${escapeHTML(movie.title)} <b>${match.scores[index].toFixed(3)}</b></span>`).join("")
-        + `<span>Click to toggle selection</span>`);
+        + anchors.map(({ movie, color }, index) => `<span class="dust-tooltip-score"><i style="background:${color}"></i>${escapeHTML(movie.title)} <b>${match.scores[index].toFixed(3)}</b></span>`).join("")
+        + "<span>Click to toggle selection</span>");
     })
     .on("mousemove", moveTooltip)
     .on("mouseleave blur", hideTooltip)
@@ -398,7 +394,7 @@ function renderDustChart(container, movies, matches) {
       if (event.key === "Escape") hideTooltip();
     });
   dots.append("circle").attr("class", "dust-hit-area").attr("r", 9);
-  dots.append("circle").attr("class", "dust-grain").attr("r", 4.5).attr("fill", (match) => (globalThis.AnivizMain?.color(movies[match.closest].id) || MAGNET_COLORS[match.closest]));
+  dots.append("circle").attr("class", "dust-grain").attr("r", 4.5).attr("fill", (match) => anchors[match.closest].color);
   const magnets = svg.append("g").selectAll("g").data(anchors).join("g").attr("class", "dust-magnet")
     .attr("role", "group").attr("tabindex", 0)
     .attr("aria-label", (anchor) => `${anchor.movie.title} magnet. Drag or use arrow keys to move.`)
@@ -406,10 +402,10 @@ function renderDustChart(container, movies, matches) {
       const delta = { ArrowLeft: [-12, 0], ArrowRight: [12, 0], ArrowUp: [0, -12], ArrowDown: [0, 12] }[event.key];
       if (!delta) return;
       event.preventDefault();
-      moveAnchor(anchor, anchor.x + delta[0], anchor.y + delta[1]);
+      onMove(anchor, anchor.x + delta[0], anchor.y + delta[1]);
     })
     .call(d3.drag().on("start", hideTooltip)
-      .on("drag", (event, anchor) => moveAnchor(anchor, event.x, event.y)));
+      .on("drag", (event, anchor) => onMove(anchor, event.x, event.y)));
   magnets.append("circle").attr("class", "magnet-halo").attr("r", 34).attr("stroke", (anchor) => anchor.color);
   magnets.append("circle").attr("class", "magnet-core").attr("r", 25).attr("stroke", (anchor) => anchor.color);
   magnets.append("text").attr("class", "magnet-number").attr("text-anchor", "middle").attr("dy", 5)
@@ -418,13 +414,44 @@ function renderDustChart(container, movies, matches) {
     .text((anchor) => truncate(anchor.movie.title, width < 400 ? 16 : 23));
   magnets.append("title").text((anchor) => `${anchor.movie.title} (${anchor.movie.year || "Year unknown"})`);
 
+  return {
+    draw(positions) {
+      dots.attr("transform", (match) => { const node = positions.get(match.anime.id); return `translate(${node.x},${node.y})`; });
+      magnets.attr("transform", (anchor) => `translate(${anchor.x},${anchor.y})`);
+    },
+    drawLinks(links) {
+      paths.selectAll("line").data(links).join("line")
+        .attr("class", "dust-selected-link")
+        .attr("stroke", link => link.anchor.color)
+        .attr("x1", link => link.anchor.x).attr("y1", link => link.anchor.y)
+        .attr("x2", link => link.node.x).attr("y2", link => link.node.y);
+    }
+  };
+}
+
+function renderDustChart(container, mirror, movies, matches) {
+  // Clear the field before measuring so the old SVG cannot size the flex item.
+  container.innerHTML = "";
+  mirror.innerHTML = "";
+  const width = Math.max(240, container.clientWidth);
+  const height = Math.max(260, container.clientHeight || (width < 400 ? 440 : 500));
+  const initial = defaultMagnetPositions(movies.length, width, height);
+  const anchors = movies.map((movie, index) => {
+    const saved = recommendationState.magnetPositions[`${movies.length}:${movie.id}`];
+    return { movie, color: (globalThis.AnivizMain?.color(movie.id) || MAGNET_COLORS[index]), ...(saved ? { x: saved.x * width, y: saved.y * height } : initial[index]) };
+  });
+  for (const anchor of anchors) {
+    Object.assign(anchor, constrainMagnetPosition(anchor, anchor.x, anchor.y, anchors, width, height));
+  }
+  const views = [createDustView(container, matches, anchors, width, height, moveAnchor, "Anime"),
+    createDustView(mirror, matches, anchors, width, height, moveAnchor, "Mirror of anime")];
   const nodes = createDustNodes(matches, anchors, width, height, dustChart);
   // First entry is already gathered; subsequent changes retain the same grains.
   if (!dustChart) for (let tick = 0; tick < 360; tick++) stepDust(nodes, anchors, width, height);
   const positions = new Map(nodes.map((node) => [node.anime.id, node]));
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let frame = null, lastTime = null, quietFrames = 0;
-  dustChart = { paths, positions, anchors, width, height, stop() {
+  dustChart = { views, positions, anchors, width, height, stop() {
     if (frame !== null) cancelAnimationFrame(frame);
     frame = null; lastTime = null;
   } };
@@ -439,8 +466,7 @@ function renderDustChart(container, movies, matches) {
     globalThis.AnivizMain?.saveLayout();
   }
   function draw() {
-    dots.attr("transform", (match) => { const node = positions.get(match.anime.id); return `translate(${node.x},${node.y})`; });
-    magnets.attr("transform", (anchor) => `translate(${anchor.x},${anchor.y})`);
+    views.forEach(view => view.draw(positions));
     highlightDustConnections(recommendationState.animeId);
     const status = document.querySelector("#dust-layout-status");
     const approximate = nodes.some((node) => node.scoreLayout?.approximate);
@@ -452,7 +478,7 @@ function renderDustChart(container, movies, matches) {
   }
   function animate(time) {
     frame = null;
-    if (!svg.node().isConnected) return;
+    if (!container.isConnected) return;
     const movement = stepDust(nodes, anchors, width, height, lastTime === null ? 1 / 60 : (time - lastTime) / 1000);
     lastTime = time;
     draw();
@@ -473,17 +499,13 @@ function renderDustChart(container, movies, matches) {
 }
 
 function highlightDustConnections(id) {
-  if (!dustChart?.paths) return;
+  if (!dustChart?.views) return;
   const selected = globalThis.AnivizMain?.snapshot()?.selectedAnimeIds || (id ? [id] : []);
   const links = selected.flatMap(key => {
     const node = dustChart.positions.get(key);
     return node ? dustChart.anchors.map(anchor => ({ anchor, node })) : [];
   });
-  dustChart.paths = dustChart.paths.data(links).join('line')
-    .attr('class', 'dust-selected-link').attr('visibility', 'visible')
-    .attr('stroke', link => link.anchor.color)
-    .attr('x1', link => link.anchor.x).attr('y1', link => link.anchor.y)
-    .attr('x2', link => link.node.x).attr('y2', link => link.node.y);
+  dustChart.views.forEach(view => view.drawLinks(links));
 }
 
 function renderDustDetail() {
