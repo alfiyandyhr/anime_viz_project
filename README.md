@@ -149,6 +149,13 @@ across the 1,000-title TMDB corpus. Open either synopsis for the full introducti
 Popularity uses AniList user-list counts from the published snapshot. Both axes
 share the same release-year scale.
 
+Switch from **Anime Timeline** to **Movie Timeline** to start with the top movie
+by TMDB popularity in each represented release year. Each movie links to its
+highest-scoring match in the published 1,000-title AniList similarity catalogue.
+The selector keeps the current release year when available and moves to the
+nearest represented year otherwise. Movie Timeline loads the existing movie
+recommendation and popularity snapshots on first use.
+
 History reads the published `story.json` and `data/history_movie_matches.json` on
 Flask and GitHub Pages. Regenerate them together so the annual winners and their
 scores stay in sync:

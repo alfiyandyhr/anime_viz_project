@@ -38,7 +38,7 @@ body[data-chapter="story"] { overflow-x: clip; }
   padding-bottom: clamp(12px, 3vh, 30px);
 }
 
-.history-kicker, .history-card-label, .history-controls label {
+.history-kicker, .history-card-label, .history-year-control > label {
   margin: 0;
   color: var(--text-soft);
   font-size: .69rem;
@@ -60,7 +60,46 @@ body[data-chapter="story"] { overflow-x: clip; }
 }
 
 .history-intro { margin: 0; font-size: clamp(.81rem, 1.4vw, .97rem); color: var(--text-soft); }
-.history-controls > div { display: flex; gap: 5px; margin-top: 4px; }
+.history-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 14px; }
+.history-year-buttons { display: flex; gap: 5px; margin-top: 4px; }
+
+.history-perspective {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  padding: 3px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--surface-solid);
+}
+.history-perspective label { position: relative; cursor: pointer; }
+.history-perspective input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+}
+.history-perspective span {
+  display: block;
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-soft);
+  font-size: .76rem;
+  white-space: nowrap;
+}
+.history-perspective input:checked + span {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--surface-light);
+}
+.history-perspective input:focus-visible + span { outline: 2px solid var(--cyan); outline-offset: -2px; }
+.history-perspective label:hover span { color: var(--text); }
 
 .history-controls button, .history-controls select, .history-load button, .history-dialog button {
   min-height: 36px;
@@ -200,10 +239,11 @@ body[data-chapter="story"] { overflow-x: clip; }
     padding-top: 6px;
     overflow-y: auto;
   }
-  .history-header { gap: 7px 14px; }
+  .history-header { gap: 7px 14px; padding-bottom: 12px; }
   .history-header h1 { margin-top: 4px; }
-  .history-controls { display: flex; align-items: center; gap: 10px; }
-  .history-controls > div { margin: 0; }
+  .history-controls { align-items: center; gap: 6px 12px; }
+  .history-year-control { display: flex; align-items: center; gap: 10px; }
+  .history-year-buttons { margin: 0; }
   .history-pair {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-areas: "timelines timelines" "anime movie";
@@ -212,14 +252,14 @@ body[data-chapter="story"] { overflow-x: clip; }
     min-height: 0;
     padding: 8px;
   }
-  #history-timeline { height: clamp(130px, 23svh, 214px); }
+  #history-timeline { height: clamp(130px, 21svh, 200px); }
   #history-timeline text { font-size: 13px; }
   #history-timeline .history-point-label { font-size: 15px; }
   .history-score { margin-bottom: 4px; }
   .history-card { padding: 9px; }
   .history-card-label { letter-spacing: .025em; }
   .history-card-label, .history-card-meta { font-size: .65rem; }
-  .history-card h2 { margin-top: 5px; }
+  .history-card h2 { margin-top: 5px; -webkit-line-clamp: 2; }
   .history-card-meta { margin-bottom: 7px; }
   .history-card-summary { min-height: 0; font-size: .74rem; }
   .history-cover { display: none; }
@@ -230,15 +270,21 @@ body[data-chapter="story"] { overflow-x: clip; }
 @media (max-width: 710px) and (max-height: 680px) {
   .history-header { padding-bottom: 9px; }
   .history-header h1 { font-size: clamp(1.65rem, 7vw, 2rem); }
-  .history-controls label { letter-spacing: .03em; white-space: nowrap; }
-  .history-controls button, .history-controls select { min-height: 32px; padding-inline: 7px; }
-  .history-controls button { min-width: 32px; }
-  #history-timeline { height: clamp(115px, 22svh, 152px); }
+  .history-controls { gap: 6px; }
+  .history-year-control > label { position: absolute; clip-path: inset(50%); }
+  .history-perspective { padding: 2px; gap: 1px; }
+  .history-perspective span { padding: 3px 5px; font-size: .67rem; }
+  .history-year-buttons { gap: 3px; }
+  .history-controls button, .history-controls select { min-height: 32px; padding-inline: 5px; font-size: .78rem; }
+  .history-controls button { min-width: 28px; }
+  #history-timeline { height: clamp(104px, 20svh, 138px); }
   #history-timeline text { font-size: 16px; }
   #history-timeline .history-point-label { font-size: 18px; }
-  .history-card h2, .history-card-meta { -webkit-line-clamp: 2; }
-  .history-card-meta { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+  .history-card h2 { font-size: 1rem; }
+  .history-card-label { font-size: .6rem; }
+  .history-card-meta { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
   .history-card-summary p { -webkit-line-clamp: 3; }
+  .history-note p:last-child { display: none; }
 }
 
 @media (min-width: 711px) and (max-height: 520px) {

@@ -34,6 +34,7 @@
 
   <script src="../common/navigation.js" defer></script>
   <script src="../common/api.js" defer></script>
+  <script src="../common/data-loader.js" defer></script>
   <script src="data.js" defer></script>
   <script src="app.js" defer></script>
 </head>
@@ -63,14 +64,20 @@
             <div>
               <p class="history-kicker">The AnIViz archive <span id="history-range"></span></p>
               <h1>Anime through time</h1>
-              <p class="history-intro">Scroll to pair each year’s most popular anime with its closest movie match.</p>
+              <p class="history-intro" id="history-intro">Scroll to pair each year’s most popular anime with its closest movie match.</p>
             </div>
             <div class="history-controls" id="history-controls" hidden>
-              <label for="year-picker">Anime release year</label>
-              <div>
-                <button type="button" id="previous-year" aria-label="Previous year">←</button>
-                <select id="year-picker" aria-label="Anime release year"></select>
-                <button type="button" id="next-year" aria-label="Next year">→</button>
+              <fieldset class="history-perspective" aria-label="Timeline perspective">
+                <label><input type="radio" name="history-perspective" value="anime" checked><span>Anime Timeline</span></label>
+                <label><input type="radio" name="history-perspective" value="movie"><span>Movie Timeline</span></label>
+              </fieldset>
+              <div class="history-year-control">
+                <label id="year-label" for="year-picker">Anime release year</label>
+                <div class="history-year-buttons">
+                  <button type="button" id="previous-year" aria-label="Previous year">←</button>
+                  <select id="year-picker"></select>
+                  <button type="button" id="next-year" aria-label="Next year">→</button>
+                </div>
               </div>
             </div>
           </header>
@@ -108,7 +115,7 @@
           </section>
 
           <footer class="history-note" id="history-note" hidden>
-            <p>Popularity uses current AniList list counts. Movie matches use cosine similarity across <span id="movie-count"></span> TMDB titles.</p>
+            <p id="history-method"></p>
             <p><span aria-hidden="true">↓</span> Scroll to explore by year</p>
           </footer>
         </div>

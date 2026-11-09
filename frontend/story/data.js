@@ -112,6 +112,33 @@ const StoryData = (() => {
     });
   }
 
-  return { validate, summarizePeriod, topAnime, locatePeriod, yearScrollProgress, yearPairs };
+  function movieYearPairs(catalogue, { popularity }) {
+    const winners = new Map();
+    for (const movie of catalogue.movies) {
+      const value = popularity[movie.id];
+      if (!Number.isInteger(movie.year) || !Number.isFinite(value)) continue;
+      const current = winners.get(movie.year);
+      if (!current || value > popularity[current.id]) winners.set(movie.year, movie);
+    }
+    if (!winners.size) throw new Error("No movies with a release year and popularity score");
+
+    return [...winners.values()].sort((a, b) => a.year - b.year).map(movie => {
+      // The exporter ranks each movie against the entire anime catalogue.
+      const [index, score] = movie.matches?.[0] || [];
+      const anime = catalogue.anime[index];
+      if (!Number.isInteger(index) || !Number.isInteger(anime?.year)
+        || !Number.isFinite(score) || Math.abs(score) > 1) {
+        throw new Error(`Invalid best match for movie ${movie.id}`);
+      }
+      return {
+        year: movie.year,
+        movie: { ...movie, popularity: popularity[movie.id] },
+        anime: { ...anime, description: anime.synopsis, site_url: anime.url },
+        score
+      };
+    });
+  }
+
+  return { validate, summarizePeriod, topAnime, locatePeriod, yearScrollProgress, yearPairs, movieYearPairs };
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = StoryData;

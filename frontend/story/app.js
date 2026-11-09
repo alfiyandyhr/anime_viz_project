@@ -8,15 +8,21 @@
   const yearPicker = $("#year-picker");
   const previous = $("#previous-year");
   const next = $("#next-year");
+  const perspective = $(".history-perspective");
+  const status = $("#history-load");
+  const message = status.querySelector("span");
   const dialog = $("#history-dialog");
   const retry = $("#retry-data");
   const yearTravel = 76;
-  const number = new Intl.NumberFormat("en");
+  const number = new Intl.NumberFormat("en", { maximumFractionDigits: 2 });
   const svgNamespace = "http://www.w3.org/2000/svg";
   const legacyYears = new Map([
     ["#birth", 1963], ["#expansion", 1980], ["#global", 1990],
     ["#digital", 2000], ["#streaming", 2010], ["#modern", 2020]
   ]);
+  const timelines = new Map();
+  let activePerspective = "anime";
+  let perspectiveRequest = 0;
   let pairs = [];
   let chartStart;
   let chartEnd;
@@ -32,7 +38,7 @@
     }
   }
 
-  function makeCard(id, label, sourceName) {
+  function makeCard(id, sourceName) {
     const card = $(id);
     card.append($("#history-card-template").content.cloneNode(true));
     const kind = card.querySelector(".history-card-kind");
@@ -42,11 +48,10 @@
     const summary = card.querySelector(".history-card-summary p");
     const cover = card.querySelector(".history-cover");
     const button = card.querySelector(".synopsis-button");
-    kind.textContent = label;
     let entry;
 
     button.addEventListener("click", () => {
-      $("#synopsis-kind").textContent = `${label} · ${entry.year}`;
+      $("#synopsis-kind").textContent = `${kind.textContent} · ${entry.year}`;
       $("#synopsis-title").textContent = entry.title;
       $("#synopsis-text").textContent = entry.description;
       const source = $("#synopsis-source");
@@ -58,8 +63,9 @@
     });
     cover.addEventListener("error", () => { cover.hidden = true; });
 
-    return (work, emptyMessage) => {
+    return (work, label, emptyMessage) => {
       entry = work;
+      kind.textContent = label;
       year.textContent = work?.year ?? "";
       title.textContent = work?.title || emptyMessage;
       meta.textContent = work?.meta || "";
@@ -74,8 +80,8 @@
     };
   }
 
-  const updateAnime = makeCard("#history-anime", "Top anime", "AniList");
-  const updateMovie = makeCard("#history-movie", "Movie match", "TMDB");
+  const updateAnime = makeCard("#history-anime", "AniList");
+  const updateMovie = makeCard("#history-movie", "TMDB");
 
   function yFor(year) {
     return 34 + 234 * (year - chartStart) / Math.max(1, chartEnd - chartStart);
@@ -120,6 +126,7 @@
     if (activeIndex === index) return;
     activeIndex = index;
     const { year, anime, movie, score } = pairs[index];
+    const moviePerspective = activePerspective === "movie";
     yearPicker.value = year;
     previous.disabled = index === 0;
     next.disabled = index === pairs.length - 1;
@@ -129,24 +136,28 @@
         ...(anime.genres || []).slice(0, 2)].filter(Boolean).join(" · "),
       url: anime.site_url,
       cover: anime.cover?.large || anime.cover?.medium
-    }, "No anime data for this year");
+    }, moviePerspective ? "Anime match" : "Top anime", "No anime data for this year");
     updateMovie(movie && {
-      ...movie, description: movie.synopsis, meta: (movie.genres || []).slice(0, 3).join(" · ")
-    }, anime ? "No movie match available" : "No anime to match");
+      ...movie,
+      description: movie.synopsis,
+      meta: [moviePerspective ? `TMDB popularity ${number.format(movie.popularity)}` : "",
+        ...(movie.genres || []).slice(0, moviePerspective ? 2 : 3)].filter(Boolean).join(" · ")
+    }, moviePerspective ? "Top movie" : "Movie match", anime ? "No movie match available" : "No anime to match");
 
     updatePoint("anime", anime?.year);
     updatePoint("movie", movie?.year);
     const line = $("#history-connection");
-    line.toggleAttribute("hidden", !movie);
+    line.toggleAttribute("hidden", !anime || !movie);
     const caption = $("#history-score");
-    if (movie) {
-      const from = yFor(year);
+    if (anime && movie) {
+      const from = yFor(anime.year);
       const to = yFor(movie.year);
       line.setAttribute("d", `M66 ${from} C120 ${from} 144 ${to} 198 ${to}`);
       const value = document.createElement("strong");
       value.textContent = score.toFixed(3);
       caption.replaceChildren("Cosine similarity ", value);
-      $("#timeline-title").textContent = `${anime.title} (${year}) connected to ${movie.title} (${movie.year})`;
+      const ordered = moviePerspective ? [movie, anime] : [anime, movie];
+      $("#timeline-title").textContent = ordered.map(work => `${work.title} (${work.year})`).join(" connected to ");
     } else {
       caption.textContent = `No match for ${year}`;
       $("#timeline-title").textContent = `Anime and movie release timelines for ${year}`;
@@ -176,42 +187,98 @@
     syncScroll();
   }
 
+  function goToYear(year) {
+    const index = pairs.reduce((best, pair, i) =>
+      Math.abs(pair.year - year) < Math.abs(pairs[best].year - year) ? i : best, 0);
+    goTo(index);
+  }
+
   function followLegacyHash() {
     const year = legacyYears.get(location.hash);
-    if (year && pairs.length) goTo(year - pairs[0].year);
+    if (year && pairs.length) goToYear(year);
+  }
+
+  function showStatus(text = "", onRetry = null) {
+    status.hidden = !text;
+    message.textContent = text;
+    retry.hidden = !onRetry;
+    retry.onclick = onRetry;
+  }
+
+  function activateTimeline(mode, selectedYear) {
+    const timeline = timelines.get(mode);
+    pairs = timeline.pairs;
+    activePerspective = mode;
+    activeIndex = -1;
+    const moviePerspective = mode === "movie";
+    const first = pairs[0].year;
+    const last = pairs.at(-1).year;
+    const years = pairs.flatMap(({ anime, movie }) => [anime?.year, movie?.year].filter(Number.isInteger));
+    chartStart = Math.min(first, ...years);
+    chartEnd = Math.max(last, ...years);
+    drawTicks();
+
+    yearPicker.replaceChildren(...pairs.map(({ year }) => new Option(year, year)));
+    $("#history-range").textContent = `${first}–${last}`;
+    $("#year-label").textContent = moviePerspective ? "Movie release year" : "Anime release year";
+    $("#history-intro").textContent = moviePerspective
+      ? "Scroll to pair each year’s most popular movie with its closest anime match."
+      : "Scroll to pair each year’s most popular anime with its closest movie match.";
+    const count = number.format(timeline.matchCount);
+    $("#history-method").textContent = moviePerspective
+      ? `Top movies use TMDB popularity in the published movie sample. Anime matches use cosine similarity across ${count} AniList titles.`
+      : `Popularity uses current AniList list counts. Movie matches use cosine similarity across ${count} TMDB titles.`;
+    $("#history-travel").style.height = `${(pairs.length - 1) * yearTravel}px`;
+    for (const id of ["history-controls", "history-pair", "history-note"]) $(`#${id}`).hidden = false;
+    showStatus();
+
+    if (selectedYear == null) {
+      syncScroll();
+      followLegacyHash();
+    } else {
+      goToYear(selectedYear);
+    }
+  }
+
+  async function changePerspective() {
+    const request = ++perspectiveRequest;
+    const selected = perspective.querySelector(":checked");
+    const mode = selected.value;
+    if (!timelines.has(mode)) {
+      showStatus("Loading Movie Timeline…");
+      try {
+        const catalogue = await AnivizData.recommendations();
+        const popularity = await AnivizData.moviePopularity(catalogue);
+        timelines.set(mode, { pairs: StoryData.movieYearPairs(catalogue, popularity), matchCount: catalogue.anime.length });
+      } catch (error) {
+        if (request !== perspectiveRequest) return;
+        perspective.querySelector(`[value="${activePerspective}"]`).checked = true;
+        showStatus("Movie Timeline could not be loaded. Try again.", () => {
+          selected.checked = true;
+          selected.focus({ preventScroll: true });
+          changePerspective();
+        });
+        console.warn("Movie Timeline data unavailable", error);
+        return;
+      }
+    }
+    if (request !== perspectiveRequest) return;
+    showStatus();
+    if (mode !== activePerspective) activateTimeline(mode, pairs[activeIndex].year);
   }
 
   async function load() {
-    const status = $("#history-load");
-    const message = status.querySelector("span");
-    status.hidden = false;
-    retry.hidden = true;
-    message.textContent = "Loading annual anime and movie matches…";
+    showStatus("Loading annual anime and movie matches…");
     try {
       // Use the published archive so its annual winners match the offline score export.
       const [archive, bundle] = await Promise.all([
         AnivizAPI.fetchJSON(new URL("story.json", project), { timeout: 15000 }),
         AnivizAPI.fetchJSON(new URL("data/history_movie_matches.json", project), { timeout: 15000 })
       ]);
-      pairs = StoryData.yearPairs(StoryData.validate(archive), bundle);
-      const first = pairs[0].year;
-      const last = pairs.at(-1).year;
-      const years = pairs.flatMap(pair => pair.movie ? [pair.movie.year] : []);
-      chartStart = Math.min(first, ...years);
-      chartEnd = Math.max(last, ...years);
-      drawTicks();
-
-      yearPicker.replaceChildren(...pairs.map(({ year }) => new Option(year, year)));
-      $("#history-range").textContent = `${first}–${last}`;
-      $("#movie-count").textContent = number.format(bundle.meta.movie_count);
-      $("#history-travel").style.height = `${(pairs.length - 1) * yearTravel}px`;
-      for (const id of ["history-controls", "history-pair", "history-note"]) $(`#${id}`).hidden = false;
-      status.hidden = true;
-      syncScroll();
-      followLegacyHash();
+      timelines.set("anime", { pairs: StoryData.yearPairs(StoryData.validate(archive), bundle), matchCount: bundle.meta.movie_count });
+      activateTimeline("anime");
     } catch (error) {
-      message.textContent = "The annual archive could not be loaded. Try again to open the timelines.";
-      retry.hidden = false;
+      showStatus("The annual archive could not be loaded. Try again to open the timelines.", load);
       console.warn("History data unavailable", error);
     }
   }
@@ -220,9 +287,10 @@
   window.addEventListener("resize", queueSync);
   window.addEventListener("pageshow", queueSync);
   window.addEventListener("hashchange", followLegacyHash);
+  perspective.addEventListener("change", changePerspective);
   yearPicker.addEventListener("change", () => goTo(yearPicker.selectedIndex));
   previous.addEventListener("click", () => goTo(activeIndex - 1));
   next.addEventListener("click", () => goTo(activeIndex + 1));
-  retry.addEventListener("click", load);
+  perspective.querySelector('[value="anime"]').checked = true;
   load();
 })();

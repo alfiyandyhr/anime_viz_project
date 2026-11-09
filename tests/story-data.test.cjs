@@ -115,3 +115,24 @@ test('the annual timeline pairs every published winner with its highest-scoring 
     assert.equal(score, highest);
   }
 });
+
+test('the movie timeline ranks by TMDB popularity and matches against the full anime catalogue', () => {
+  const catalogue = require('../data/movie_recommendations.json');
+  const popularity = require('../data/movie_popularity.json');
+  const matrix = readFileSync(require.resolve('../data/movie_anime_scores.bin'));
+  const pairs = model.movieYearPairs(catalogue, popularity);
+  const years = [...new Set(catalogue.movies.map(movie => movie.year))].sort((a, b) => a - b);
+  assert.deepEqual(pairs.map(pair => pair.year), years);
+  for (const { year, movie, anime, score } of pairs) {
+    const ranked = catalogue.movies.filter(movie => movie.year === year)
+      .sort((a, b) => popularity.popularity[b.id] - popularity.popularity[a.id]);
+    assert.equal(movie.id, ranked[0].id);
+    const row = catalogue.movies.findIndex(record => record.id === movie.id);
+    const scores = catalogue.anime.map((_, index) =>
+      matrix.readFloatLE((row * catalogue.anime.length + index) * 4));
+    const highest = Math.max(...scores);
+    assert.equal(anime.id, catalogue.anime[scores.indexOf(highest)].id);
+    assert.equal(anime.description, anime.synopsis);
+    assert.equal(Math.fround(score), highest);
+  }
+});
