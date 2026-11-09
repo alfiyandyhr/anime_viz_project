@@ -87,3 +87,31 @@ test('validation rejects dashboard data, duplicate years and cross-year records'
   assert.throws(() => model.validate({ ...payload, years: [...payload.years, payload.years[0]] }));
   assert.throws(() => model.validate({ ...payload, years: [{ year: 1963, anime: [{ id: 1, title: 'Wrong year', year: 1964 }] }] }));
 });
+
+test('the annual timeline pairs every published winner with its highest-scoring movie', () => {
+  const archive = model.validate(require('../story.json'));
+  const bundle = require('../data/history_movie_matches.json');
+  const catalogue = require('../data/movie_recommendations.json');
+  const matrix = readFileSync(require.resolve('../data/movie_anime_scores.bin'));
+  const animeIndices = new Map(catalogue.anime.map((anime, index) => [Number(anime.id), index]));
+  const pairs = model.yearPairs(archive, bundle);
+  assert.equal(pairs.length, archive.years.length);
+  for (const { year, anime, movie, score } of pairs) {
+    assert.equal(anime.id, model.topAnime(archive, { start: year, end: year }, 1)[0].id);
+    assert.ok(movie.synopsis, `Movie synopsis for ${year}`);
+    assert.ok(Number.isFinite(score));
+    const index = animeIndices.get(anime.id);
+    if (index === undefined) continue;
+    let best = 0;
+    let highest = -Infinity;
+    catalogue.movies.forEach((_, movieIndex) => {
+      const value = matrix.readFloatLE((movieIndex * catalogue.anime.length + index) * 4);
+      if (value > highest) {
+        highest = value;
+        best = movieIndex;
+      }
+    });
+    assert.equal(movie.id, catalogue.movies[best].id);
+    assert.equal(score, highest);
+  }
+});

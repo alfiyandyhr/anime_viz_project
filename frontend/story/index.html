@@ -10,7 +10,7 @@
 
   <meta
     name="description"
-    content="A scroll-driven journey through Japanese anime from 1963 to today, with annual AniList Top 10 rankings, genres, and studios."
+    content="Scroll through anime history and discover the closest movie match for each year’s most popular anime."
   >
 
   <title>AnIViz — History</title>
@@ -33,14 +33,13 @@
   <link rel="stylesheet" href="styles.css">
 
   <script src="../common/navigation.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
   <script src="../common/api.js" defer></script>
   <script src="data.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 
 <body data-chapter="story">
-  <a class="skip-story" href="#story-narrative">Skip to the history</a>
+  <a class="skip-story" href="#story-main">Skip to History</a>
 
   <div class="app-shell">
     <!-- Shared view navigation -->
@@ -57,121 +56,84 @@
       </details>
     </header>
 
-    <main class="stage story-stage" id="story-main">
-      <header class="history-heading"><h1>History</h1><p>1963–<span data-present-year>present</span> · Six eras</p></header>
-      <p class="story-lens">Annual Top 10 by <strong>current AniList list users</strong>, not historical audiences. Genres and studios describe this sample.</p>
-      <div class="story-load" id="story-load" role="status" aria-live="polite">
-        <span>Opening the archive… You can start reading while the data loads.</span>
-        <button type="button" class="small-button ghost" id="retry-data" hidden>Retry data</button>
-      </div>
-      <noscript><p class="story-load">The historical narrative is available below. Enable JavaScript for the interactive timeline and AniList data.</p></noscript>
+    <main class="stage history-stage" id="story-main" tabindex="-1">
+      <div class="history-journey" id="history-journey">
+        <div class="history-panel">
+          <header class="history-header">
+            <div>
+              <p class="history-kicker">The AnIViz archive <span id="history-range"></span></p>
+              <h1>Anime through time</h1>
+              <p class="history-intro">Scroll to pair each year’s most popular anime with its closest movie match.</p>
+            </div>
+            <div class="history-controls" id="history-controls" hidden>
+              <label for="year-picker">Anime release year</label>
+              <div>
+                <button type="button" id="previous-year" aria-label="Previous year">←</button>
+                <select id="year-picker" aria-label="Anime release year"></select>
+                <button type="button" id="next-year" aria-label="Next year">→</button>
+              </div>
+            </div>
+          </header>
 
-      <div class="story-journey" id="story-journey">
-        <figure class="sticky-stage" id="visual-stage" aria-label="Anime archive for the active historical period">
-          <div class="visual-topline"><span><i aria-hidden="true"></i> Annual archive</span><span id="act-indicator">ERA 01 / 06</span></div>
-          <div class="period-heading"><div><p id="active-theme">The Birth of Modern Anime</p><h2 id="active-period">1963–1979</h2></div><span id="active-year">1963</span></div>
-          <nav class="era-nav" aria-label="Jump to a historical era">
-            <a href="#birth" aria-current="step">1963–79</a><a href="#expansion">1980s</a><a href="#global">1990s</a><a href="#digital">2000s</a><a href="#streaming">2010s</a><a href="#modern">2020s</a>
-          </nav>
-          <div id="story-timeline" class="story-timeline" aria-label="Timeline of annual sample coverage"></div>
-          <div class="showcase-heading"><h3>Top anime of <span id="showcase-year">1963</span></h3><span id="year-count">Waiting for data</span><select id="year-picker" aria-label="Explore a first-release year" disabled><option>1963</option></select></div>
-          <p class="showcase-caption">Current AniList list users · select a poster for details</p>
-          <div id="poster-shelf" class="poster-shelf" aria-label="Annual anime rankings"></div>
-          <div class="period-rankings">
-            <section aria-labelledby="genres-title">
-              <div class="ranking-heading"><h3 id="genres-title">Genres in this period</h3></div>
-              <div id="genres-ranking" class="story-ranking"></div>
-            </section>
-            <section aria-labelledby="studios-title">
-              <div class="ranking-heading"><h3 id="studios-title">Studios in this period</h3></div>
-              <div id="studios-ranking" class="story-ranking"></div>
-            </section>
+          <div class="history-load" id="history-load" role="status" hidden>
+            <span></span>
+            <button type="button" id="retry-data" hidden>Retry</button>
           </div>
-          <figcaption id="ranking-caption">Share of titles in the period’s annual Top 10 samples. Genre and studio shares can overlap; unknown main-studio credits excluded.</figcaption>
-          <p class="period-sample" id="period-sample">Loading period sample…</p>
-          <div class="chapter-track" aria-hidden="true"><span id="chapter-progress"></span></div>
-        </figure>
+          <noscript><p>Enable JavaScript to explore the anime and movie timelines.</p></noscript>
 
-        <div class="story-narrative" id="story-narrative">
-          <section class="story-step is-active" id="birth" data-start="1963" data-end="1979" data-color="#9d7bff" data-theme="The Birth of Modern Anime" aria-labelledby="birth-title">
-            <p class="act-label">ERA 01 <span>1963–1979</span></p>
-            <h2 id="birth-title">A new ritual.<br>A story every week.</h2>
-            <p class="step-lede">Japanese animation existed before television. In 1963, a robot boy helped bring it into the weekly rhythm of everyday life.</p>
-            <p>Osamu Tezuka’s <em>Astro Boy</em> began its Japanese television run on January 1, 1963. Its half-hour serial format became an important model for television anime. The series also reached overseas audiences during the 1960s, including a US broadcast in 1963.</p>
-            <div class="history-milestone"><span>1963</span><div><strong>Astro Boy arrives on television</strong><p>A milestone in the development of modern TV anime, rather than the beginning of Japanese animation itself.</p></div></div>
-            <a class="history-source" href="https://tezukaosamu.net/en/anime/30.html" target="_blank" rel="noopener noreferrer">Historical source: Tezuka Productions ↗</a>
+          <section class="history-pair" id="history-pair" aria-label="Anime and movie pair" hidden>
+            <article class="history-card history-anime" id="history-anime"></article>
+            <figure class="history-visual">
+              <svg id="history-timeline" role="img" aria-labelledby="timeline-title" viewBox="0 0 264 286">
+                <title id="timeline-title">Anime and movie release timelines</title>
+                <defs>
+                  <linearGradient id="history-link-gradient" gradientUnits="userSpaceOnUse" x1="66" y1="0" x2="198" y2="0">
+                    <stop stop-color="var(--anime-color)"></stop>
+                    <stop offset="1" stop-color="var(--movie-color)"></stop>
+                  </linearGradient>
+                </defs>
+                <text class="anime-track" x="66" y="15" text-anchor="middle">ANIME</text>
+                <text class="movie-track" x="198" y="15" text-anchor="middle">MOVIES</text>
+                <path class="history-axis" d="M66 34 V268 M198 34 V268"></path>
+                <g id="history-ticks" aria-hidden="true"></g>
+                <path id="history-connection" class="history-connection"></path>
+                <circle id="anime-point" class="anime-track history-point" cx="66" r="5"></circle>
+                <circle id="movie-point" class="movie-track history-point" cx="198" r="5"></circle>
+                <text id="anime-point-year" class="anime-track history-point-label" x="82" text-anchor="start"></text>
+                <text id="movie-point-year" class="movie-track history-point-label" x="182" text-anchor="end"></text>
+              </svg>
+              <figcaption class="history-score" id="history-score"></figcaption>
+            </figure>
+            <article class="history-card history-movie" id="history-movie"></article>
           </section>
 
-          <section class="story-step" id="expansion" data-start="1980" data-end="1989" data-color="#ffcc70" data-theme="The Expansion of Anime" aria-labelledby="expansion-title">
-            <p class="act-label">ERA 02 <span>1980–1989</span></p>
-            <h2 id="expansion-title">The screen<br>gets bigger.</h2>
-            <p class="step-lede">Television was only one home for anime. The 1980s also left a distinctive legacy of theatrical animation.</p>
-            <p>Studio Ghibli began in 1985, after the release of <em>Nausicaä of the Valley of the Wind</em> in 1984. Its official chronology places <em>Castle in the Sky</em> in 1986, followed by <em>My Neighbor Totoro</em> and <em>Grave of the Fireflies</em> in 1988.</p>
-            <div class="history-milestone"><span>1985</span><div><strong>A new studio takes shape</strong><p>Ghibli’s filmography would make room for fantasy, childhood, and the memory of war.</p></div></div>
-            <a class="history-source" href="https://www.ghibli.jp/chronology/" target="_blank" rel="noopener noreferrer">Historical source: Studio Ghibli chronology ↗</a>
-          </section>
-
-          <section class="story-step" id="global" data-start="1990" data-end="1999" data-color="#ff6fae" data-theme="Anime Goes Global" aria-labelledby="global-title">
-            <p class="act-label">ERA 03 <span>1990–1999</span></p>
-            <h2 id="global-title">Stories cross<br>more borders.</h2>
-            <p class="step-lede">Anime’s international circulation did not begin in the 1990s. But this decade supplied another generation of shared reference points.</p>
-            <p>One documented example is <em>Pokémon</em>: the franchise’s official history records the animated series’ North American premiere in 1998. It joined a longer history of Japanese animation being translated and distributed beyond Japan.</p>
-            <div class="history-milestone"><span>1998</span><div><strong>Pokémon reaches North American TV</strong><p>A concrete moment in international distribution, not evidence that every anime travelled in the same way.</p></div></div>
-            <a class="history-source" href="https://corporate.pokemon.com/en-us/about/" target="_blank" rel="noopener noreferrer">Historical source: The Pokémon Company ↗</a>
-          </section>
-
-          <section class="story-step" id="digital" data-start="2000" data-end="2009" data-color="#43d9e6" data-theme="The Digital Transformation" aria-labelledby="digital-title">
-            <p class="act-label">ERA 04 <span>2000–2009</span></p>
-            <h2 id="digital-title">New tools.<br>The same imagination.</h2>
-            <p class="step-lede">Digital production was a transition across years and studios, not a switch flipped at the start of a decade.</p>
-            <p>Toei Animation’s company history dates the beginning of its TV production digitization using RETAS software to 1997. That change provides context for the 2000s: drawing, colouring, and compositing could take different routes to the finished frame. “Digital” does not necessarily mean 3D animation.</p>
-            <div class="history-milestone"><span>2003</span><div><strong>Spirited Away wins an Academy Award</strong><p>The 2001 film won Animated Feature at the 2003 Oscars, another point of international recognition.</p></div></div>
-            <p>These title, genre, and studio records do not capture production pipelines; the charts cannot measure digitization directly.</p>
-            <div class="source-pair"><a class="history-source" href="https://corp.toei-anim.co.jp/ja/company/history.html" target="_blank" rel="noopener noreferrer">Toei company history ↗</a><a class="history-source" href="https://www.oscars.org/oscars/ceremonies/2003" target="_blank" rel="noopener noreferrer">The Academy, 2003 ↗</a></div>
-          </section>
-
-          <section class="story-step" id="streaming" data-start="2010" data-end="2019" data-color="#6be6a8" data-theme="The Streaming Era" aria-labelledby="streaming-title">
-            <p class="act-label">ERA 05 <span>2010–2019</span></p>
-            <h2 id="streaming-title">A season in Japan.<br>A conversation elsewhere.</h2>
-            <p class="step-lede">Online distribution opened another route between a Japanese release and an overseas audience.</p>
-            <p>Crunchyroll announced streaming for <em>Attack on Titan</em> in April 2013, a concrete example of a seasonal series reaching viewers through a licensed online service. Availability still depended on region and rights; streaming did not remove every border.</p>
-            <div class="history-milestone"><span>2013</span><div><strong>A seasonal title reaches streaming viewers</strong><p>Attack on Titan’s licensing is one example of the decade’s distribution landscape.</p></div></div>
-            <a class="history-source" href="https://www.crunchyroll.com/news/latest/2013/4/12/crunchyroll-to-stream-attack-on-titan-anime" target="_blank" rel="noopener noreferrer">Historical source: Crunchyroll’s 2013 announcement ↗</a>
-          </section>
-
-          <section class="story-step" id="modern" data-start="2020" data-end="present" data-color="#a9b7ff" data-theme="The Modern Anime Landscape" aria-labelledby="modern-title">
-            <p class="act-label">ERA 06 <span>2020–PRESENT</span></p>
-            <h2 id="modern-title">The next era<br>is still being drawn.</h2>
-            <p class="step-lede">Today’s anime landscape has more than one measure: what gets made, how it travels, and what viewers remember.</p>
-            <p>The Association of Japanese Animations publishes industry reports that examine markets and distribution, including overseas activity. That wider economic picture is different from this archive’s view of current AniList list users.</p>
-            <div class="history-milestone"><span>NOW</span><div><strong>An unfinished year, an unfinished story</strong><p>The current year includes only released entries available when the archive was fetched. Rankings and scores can still change.</p></div></div>
-            <a class="history-source" href="https://aja.gr.jp/english/japan-anime-data" target="_blank" rel="noopener noreferrer">Further context: AJA industry reports ↗</a>
-          </section>
+          <footer class="history-note" id="history-note" hidden>
+            <p>Popularity uses current AniList list counts. Movie matches use cosine similarity across <span id="movie-count"></span> TMDB titles.</p>
+            <p><span aria-hidden="true">↓</span> Scroll to explore by year</p>
+          </footer>
         </div>
+        <div id="history-travel" aria-hidden="true"></div>
       </div>
-
-      <section class="story-ending" aria-labelledby="ending-title">
-        <details class="story-methodology"><summary>About / Data</summary><div>
-          <p><strong>Selection.</strong> AniList’s GraphQL API returns up to 10 non-adult anime with Japan as country of origin for each first-release year, sorted by current popularity. Unreleased entries are excluded. Seasons, films, specials, OVA, and ONA entries are distinct records; franchises are not collapsed.</p>
-          <p><strong>What the numbers mean.</strong> Popularity counts current AniList user lists, including planning and completed lists. Scores are current AniList averages, not contemporaneous reviews. Genre percentages divide appearances by selected titles in the period; multiple genres per title mean they need not sum to 100%. Main-studio appearances count a title once for each credited main studio, so co-productions can overlap.</p>
-          <p><strong>Gaps.</strong> Some early years contain fewer than 10 eligible records. A confirmed empty year is distinct from an unavailable query. Missing scores, artwork, genres, and studio credits are shown as unknown. The current year is provisional. Cached data’s retrieval date and any unavailable or stale years are displayed beside the archive.</p>
-          <p><strong>Historical context.</strong> The linked sources alongside each era document specific milestones. Era names are editorial framing; AniList data does not establish historical audience sizes, market shares, or causes of change.</p>
-          <p id="snapshot-description">Retrieval details will appear when data loads.</p>
-        <div class="data-freshness"><span id="footer-generated">Data not loaded</span> · <span id="footer-cache"></span></div></div></details>
-      </section>
-    <footer class="data-footer">
-        <div class="data-status" role="status" aria-live="polite">
-          <span id="status-dot" class="status-dot loading"></span>
-          <span id="data-status">Loading the anime archive…</span>
-        </div>
-        <span class="source-credit">AniList × Python × D3.js</span>
-      </footer>
     </main>
   </div>
-  <div class="tooltip" id="story-tooltip" role="tooltip" aria-hidden="true"></div>
-  <dialog class="story-dialog" id="anime-dialog" aria-labelledby="dialog-title">
-    <button class="drawer-close" type="button" id="close-dialog" aria-label="Close details">×</button>
-    <div id="dialog-content"></div>
+
+  <dialog class="history-dialog" id="history-dialog" aria-labelledby="synopsis-title">
+    <form method="dialog"><button type="submit" autofocus>Close</button></form>
+    <p class="history-kicker" id="synopsis-kind"></p>
+    <h2 id="synopsis-title"></h2>
+    <p id="synopsis-text"></p>
+    <a id="synopsis-source" target="_blank" rel="noopener noreferrer"></a>
   </dialog>
+
+  <template id="history-card-template">
+    <p class="history-card-label"><span class="history-card-kind"></span><span class="history-card-year"></span></p>
+    <h2></h2>
+    <p class="history-card-meta"></p>
+    <div class="history-card-summary">
+      <img class="history-cover" alt="" hidden>
+      <p></p>
+    </div>
+    <button type="button" class="synopsis-button" hidden>Read synopsis <span aria-hidden="true">↗</span></button>
+  </template>
 </body>
 </html>

@@ -18,7 +18,7 @@ const url=route=>new URL(route,base).href;
     assert.equal(await page.inputValue('#network-scope'),'catalogue');
     await page.goto(url('frontend/explorer/index.html?mode=matches'));await page.waitForSelector('#anime-table-body tr');
     assert.equal(await page.evaluate(()=>state.filteredAnime.length),1000);
-    await page.goto(url('frontend/story/index.html'));await page.waitForSelector('.poster-card');
+    await page.goto(url('frontend/story/index.html'));await page.waitForSelector('#history-pair');
     const nojs=await browser.newContext({javaScriptEnabled:false});const fallback=await nojs.newPage();
     await fallback.goto(url(''));await fallback.waitForURL('**/frontend/dust-magnet/index.html');
     await fallback.goto(url('frontend/content/index.html'));await fallback.waitForURL('**/frontend/dust-magnet/index.html#content');
@@ -26,7 +26,7 @@ const url=route=>new URL(route,base).href;
     if(process.env.ANIVIZ_FLASK==='1') {
       for(const route of ['content?mode=matches','creators?mode=catalogue#network-chart','history','catalogue?mode=matches']) {
         await page.goto(url(route));
-        await page.waitForSelector(route.startsWith('content')?'.dust-node':route.startsWith('creators')?'.network-nodes g':route==='history'?'.poster-card':'#anime-table-body tr');
+        await page.waitForSelector(route.startsWith('content')?'.dust-node':route.startsWith('creators')?'.network-nodes g':route==='history'?'#history-pair':'#anime-table-body tr');
       }
     }
     assert.deepEqual(errors,[]);console.log(`Passed relative assets, legacy routes, independent direct views and no-JavaScript fallbacks at ${base}`);

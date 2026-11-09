@@ -1,8 +1,9 @@
 "use strict";
 
 // Pure data transformations, kept separate from scrolling and DOM rendering.
-// Chapter metadata lives on .story-step elements in index.html.
 const StoryData = (() => {
+  const byPopularity = (a, b) => (b.popularity || 0) - (a.popularity || 0) || a.id - b.id;
+
   function validate(payload) {
     const meta = payload?.meta;
     if (meta?.schema_version !== 1 || meta.start_year !== 1963
@@ -53,8 +54,7 @@ const StoryData = (() => {
     const works = new Map(payload.years.filter(row => row.status !== "unavailable"
       && row.year >= period.start && row.year <= period.end)
       .flatMap(row => row.anime).map(work => [work.id, work]));
-    return [...works.values()].sort((a, b) => (b.popularity || 0) - (a.popularity || 0) || a.id - b.id)
-      .slice(0, limit);
+    return [...works.values()].sort(byPopularity).slice(0, limit);
   }
 
   // Finish before the next chapter starts, leaving time to view its last year.
@@ -77,6 +77,41 @@ const StoryData = (() => {
     return { index, progress, year };
   }
 
-  return { validate, summarizePeriod, topAnime, locatePeriod, yearScrollProgress };
+  function yearPairs(archive, bundle) {
+    if (bundle?.schema_version !== 1 || !Array.isArray(bundle.years) || !Array.isArray(bundle.movies)
+      || !Number.isInteger(bundle.meta?.movie_count) || bundle.meta.movie_count < bundle.movies.length) {
+      throw new Error("Invalid annual movie matches");
+    }
+    const movies = new Map();
+    for (const movie of bundle.movies) {
+      if (typeof movie.id !== "string" || movies.has(movie.id)
+        || typeof movie.title !== "string" || !Number.isInteger(movie.year)) {
+        throw new Error("Invalid movie record");
+      }
+      movies.set(movie.id, movie);
+    }
+    const matches = new Map();
+    for (const match of bundle.years) {
+      if (!Number.isInteger(match.year) || matches.has(match.year) || !Number.isInteger(match.anime_id)
+        || !movies.has(match.movie_id) || !Number.isFinite(match.score) || Math.abs(match.score) > 1) {
+        throw new Error("Invalid annual movie match");
+      }
+      matches.set(match.year, match);
+    }
+    const rows = new Map(archive.years.map(row => [row.year, row]));
+    const { start_year: start, end_year: end } = archive.meta;
+    return Array.from({ length: end - start + 1 }, (_, index) => {
+      const year = start + index;
+      const row = rows.get(year);
+      const anime = row && row.status !== "unavailable" ? [...row.anime].sort(byPopularity)[0] || null : null;
+      const match = matches.get(year);
+      if (anime && anime.id === match?.anime_id) {
+        return { year, anime, movie: movies.get(match.movie_id), score: match.score };
+      }
+      return { year, anime, movie: null, score: null };
+    });
+  }
+
+  return { validate, summarizePeriod, topAnime, locatePeriod, yearScrollProgress, yearPairs };
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = StoryData;

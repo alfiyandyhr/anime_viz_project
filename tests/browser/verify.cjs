@@ -233,8 +233,23 @@ const url = route => new URL(route, base).href;
     await page.evaluate(()=>scrollTo(0,2300));const anchoredScroll=await page.evaluate(()=>scrollY);
     await goView('Network');await page.waitForSelector('.network-nodes g');await page.goBack();await dustReady();
     assert.ok(Math.abs(await page.evaluate(()=>scrollY)-anchoredScroll)<5,'Back restores scroll even on anchored URLs');
-    await page.goto(url('frontend/story/index.html'));await page.waitForSelector('.poster-card');
-    assert.equal(await page.locator('.story-step').count(),6);
+    await page.goto(url('frontend/story/index.html'));await page.waitForSelector('#history-pair');
+    assert.equal(await page.inputValue('#year-picker'), '1963');
+    assert.equal(await page.locator('#history-anime h2').innerText(), 'Astro Boy');
+    assert.ok(await page.locator('#history-connection').isVisible());
+    const firstPair = await page.locator('#history-movie h2').innerText();
+    await page.mouse.move(120, 150);
+    await page.mouse.wheel(0, 80);
+    await page.waitForFunction(() => document.querySelector('#year-picker').value === '1964');
+    assert.notEqual(await page.locator('#history-movie h2').innerText(), firstPair);
+    await page.selectOption('#year-picker', '1995');
+    assert.equal(await page.locator('#anime-point-year').textContent(), '1995');
+    assert.equal(await page.locator('#history-movie .history-card-year').textContent(),
+      await page.locator('#movie-point-year').textContent());
+    await page.locator('#history-movie .synopsis-button').click();
+    assert.ok(await page.locator('#history-dialog').isVisible());
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#history-dialog').isVisible(), false);
     assert.equal(await page.evaluate(()=>typeof AnivizMain),'undefined');
 
     console.log('Verified legacy bookmarks, explicit anchors and anchored Back scroll');
@@ -284,7 +299,7 @@ const url = route => new URL(route, base).href;
       }
       for(const view of ['network','story','explorer']) {
         await page.goto(url(`frontend/${view}/index.html`));
-        await page.waitForSelector(view==='network'?'.network-nodes g':view==='story'?'.poster-card':'#anime-table-body tr');
+        await page.waitForSelector(view==='network'?'.network-nodes g':view==='story'?'#history-pair':'#anime-table-body tr');
         await overflow();
         if(output) await page.screenshot({path:path.join(output,`verified-${view}-${width}.png`)});
       }

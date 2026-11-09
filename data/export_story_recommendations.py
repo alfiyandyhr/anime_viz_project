@@ -1,4 +1,4 @@
-"""Build period anime -> movie recommendations, reusing every existing pair score.
+"""Build historical anime -> movie recommendations, reusing existing pair scores.
 
 Only missing anime are encoded. The movie corpus and preprocessing are the same
 as the published Movie -> Anime run. Raw vectors/weights stay in ignored output/.
@@ -14,12 +14,16 @@ import math
 import struct
 import sys
 from datetime import datetime, timezone
-from html.parser import HTMLParser
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "data/semantic_similarity"))
 import compute_similarity as embedding
+
+PERIODS = (
+    ("birth", 1963, 1979), ("expansion", 1980, 1989), ("global", 1990, 1999),
+    ("digital", 2000, 2009), ("streaming", 2010, 2019), ("modern", 2020, None),
+)
 
 
 def digest(path):
@@ -44,32 +48,28 @@ def save_json(path, value):
     temporary.replace(path)
 
 
-class PeriodParser(HTMLParser):
-    def __init__(self, end_year):
-        super().__init__()
-        self.end_year, self.periods = end_year, []
-
-    def handle_starttag(self, tag, attrs):
-        attrs = dict(attrs)
-        if tag == "section" and "story-step" in attrs.get("class", "").split():
-            self.periods.append({"id": attrs["id"], "start": int(attrs["data-start"]),
-                                 "end": self.end_year if attrs["data-end"] == "present"
-                                 else int(attrs["data-end"])})
+def popularity_rank(work):
+    return (-(work.get("popularity") or 0), work["id"])
 
 
-def select_periods(archive, html, limit=10):
-    parser = PeriodParser(archive["meta"]["end_year"])
-    parser.feed(html)
+def select_periods(archive, limit=10):
     result = []
-    for period in parser.periods:
+    for period_id, start, end in PERIODS:
+        end = end or archive["meta"]["end_year"]
+        if start > end:
+            continue
         works = {work["id"]: work for row in archive["years"]
-                 if period["start"] <= row["year"] <= period["end"]
+                 if start <= row["year"] <= end
                  and row.get("status") != "unavailable" for work in row["anime"]}
-        ranked = sorted(works.values(), key=lambda work: (-(work.get("popularity") or 0), work["id"]))
-        result.append({**period, "anime": ranked[:limit]})
-    if not result:
-        raise ValueError("No Story periods found")
+        result.append({"id": period_id, "start": start, "end": end,
+                       "anime": sorted(works.values(), key=popularity_rank)[:limit]})
     return result
+
+
+def select_years(archive):
+    return [{"year": row["year"], "anime": [min(row["anime"], key=popularity_rank)]}
+            for row in sorted(archive["years"], key=lambda row: row["year"])
+            if row.get("status") != "unavailable" and row["anime"]]
 
 
 def read_base_scores(bundle, matrix):
@@ -207,7 +207,12 @@ def compute_missing(works, movies, args, corpus_hash):
         device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
     torch.manual_seed(0)
     print(f"Loading {spec['id']}@{spec['revision']} on {device}", flush=True)
-    model = SentenceTransformer(spec["id"], revision=spec["revision"], device=device,
+    model_path = spec["id"]
+    if args.offline:
+        from huggingface_hub import snapshot_download
+        model_path = snapshot_download(spec["id"], revision=spec["revision"],
+                                       cache_dir=args.model_cache, local_files_only=True)
+    model = SentenceTransformer(model_path, revision=spec["revision"], device=device,
         cache_folder=str(args.model_cache), local_files_only=args.offline, trust_remote_code=False,
         model_kwargs={"torch_dtype": torch.float16, "attn_implementation": "eager"},
         tokenizer_kwargs={"padding_side": "left", "truncation_side": "right"})
@@ -238,13 +243,13 @@ def compute_missing(works, movies, args, corpus_hash):
     return result
 
 
-def build_bundle(archive, periods, base, get_scores, additional, hashes):
+def build_bundle(archive, groups, base, get_scores, additional, hashes, *, annual=False):
     movie_fields = ("id", "title", "year", "genres", "tags", "synopsis", "url")
     used_movies, result = {}, []
     reused = computed = 0
-    for period in periods:
+    for group in groups:
         anime = []
-        for rank, work in enumerate(period["anime"], 1):
+        for rank, work in enumerate(group["anime"], 1):
             scores = get_scores(work["id"])
             source = "published_matrix" if scores is not None else "supplemental_cache"
             if scores is None:
@@ -255,7 +260,7 @@ def build_bundle(archive, periods, base, get_scores, additional, hashes):
             if scores is None:
                 raise ValueError(f"Missing scores for {work['id']}: {work['title']}; run with --compute-missing")
             validate_scores(scores, len(base["movies"]))
-            order = sorted(range(len(scores)), key=lambda i: (-scores[i], i))[:3]
+            order = sorted(range(len(scores)), key=lambda i: (-scores[i], i))[:1 if annual else 3]
             matches = []
             for i in order:
                 movie = base["movies"][i]
@@ -264,7 +269,10 @@ def build_bundle(archive, periods, base, get_scores, additional, hashes):
             anime.append({"id": work["id"], "title": work["title"], "year": work["year"],
                           "popularity": work.get("popularity", 0), "rank": rank,
                           "score_source": source, "matches": matches})
-        result.append({key: value for key, value in period.items() if key != "anime"} | {"anime": anime})
+        if annual:
+            result.append({"year": group["year"], "anime_id": anime[0]["id"], **anime[0]["matches"][0]})
+        else:
+            result.append({**group, "anime": anime})
     return {"schema_version": 1, "meta": {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "model": model_spec(), "movie_count": len(base["movies"]),
@@ -272,10 +280,11 @@ def build_bundle(archive, periods, base, get_scores, additional, hashes):
         "reused_pair_count": reused * len(base["movies"]),
         "supplemental_pair_count": computed * len(base["movies"]),
         "supplemental_scores_sha256": fingerprint(additional),
-        "selection": "Current AniList popularity descending, ID ascending, within each period's annual Top 10 sample",
+        "selection": ("Current AniList popularity descending, ID ascending, within each "
+                      + ("year's sample" if annual else "period's annual Top 10 sample")),
         "movie_ties": "Original published movie record order", "sources": hashes,
         "archive_generated_at": archive["meta"].get("generated_at")},
-        "periods": result, "movies": list(used_movies.values())}
+        ("years" if annual else "periods"): result, "movies": list(used_movies.values())}
 
 
 def main():
@@ -283,7 +292,8 @@ def main():
     parser.add_argument("--archive", type=Path, default=ROOT / "story.json")
     parser.add_argument("--base", type=Path, default=ROOT / "data/movie_recommendations.json")
     parser.add_argument("--matrix", type=Path, default=ROOT / "data/movie_anime_scores.bin")
-    parser.add_argument("--output", type=Path, default=ROOT / "data/story_movie_recommendations.json")
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--annual", action="store_true", help="Export the best movie match for each annual winner")
     parser.add_argument("--cache-dir", type=Path, default=ROOT / "data/semantic_similarity/output/story")
     parser.add_argument("--model-cache", type=Path, default=ROOT / "data/semantic_similarity/output/model-cache")
     parser.add_argument("--similarity-dir", type=Path, help="Optional original completed similarity run with movie vectors")
@@ -293,16 +303,19 @@ def main():
     parser.add_argument("--batch-size", type=embedding.positive_int, default=1)
     args = parser.parse_args()
     archive, base = read_json(args.archive), read_json(args.base)
-    periods = select_periods(archive, (ROOT / "frontend/story/index.html").read_text())
+    groups = select_years(archive) if args.annual else select_periods(archive)
+    filename = "history_movie_matches.json" if args.annual else "story_movie_recommendations.json"
+    output = args.output or ROOT / "data" / filename
     get_scores = read_base_scores(base, args.matrix)
-    missing = {work["id"]: work for p in periods for work in p["anime"] if get_scores(work["id"]) is None}
-    print(f"{sum(len(p['anime']) for p in periods)} period anime; {len(missing)} missing rows; unchanged {len(base['movies'])} movies", flush=True)
+    missing = {work["id"]: work for group in groups for work in group["anime"] if get_scores(work["id"]) is None}
+    print(f"{sum(len(group['anime']) for group in groups)} anime; {len(missing)} missing rows; {len(base['movies'])} movies", flush=True)
     additional = compute_missing(list(missing.values()), base["movies"], args,
         fingerprint(movie_rows(base["movies"]))) if missing and args.compute_missing else {}
-    bundle = build_bundle(archive, periods, base, get_scores, additional, {
-        "story_sha256": digest(args.archive), "base_sha256": digest(args.base), "matrix_sha256": digest(args.matrix)})
-    save_json(args.output, bundle)
-    print(f"Exported {len(bundle['periods'])} periods; reused {bundle['meta']['reused_anime']} anime rows; supplemental {bundle['meta']['supplemental_anime']}", flush=True)
+    bundle = build_bundle(archive, groups, base, get_scores, additional, {
+        "story_sha256": digest(args.archive), "base_sha256": digest(args.base), "matrix_sha256": digest(args.matrix)
+    }, annual=args.annual)
+    save_json(output, bundle)
+    print(f"Exported {len(groups)} groups; reused {bundle['meta']['reused_anime']} anime rows; supplemental {bundle['meta']['supplemental_anime']}", flush=True)
 
 
 if __name__ == "__main__":

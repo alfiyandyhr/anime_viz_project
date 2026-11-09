@@ -19,11 +19,12 @@ class StoryRecommendationsTests(unittest.TestCase):
             {"year": 1980, "anime": [{"id": 1, "popularity": 100}]},
             {"year": 1978, "status": "unavailable", "anime": [{"id": 4, "popularity": 999}]},
         ]}
-        html = '<section class="story-step" id="birth" data-start="1963" data-end="1979"></section><section class="story-step" id="modern" data-start="1980" data-end="present"></section>'
-        periods = exporter.select_periods(archive, html)
+        periods = exporter.select_periods(archive)
         self.assertEqual([a["id"] for a in periods[0]["anime"]], [2, 3])
         self.assertEqual([a["id"] for a in periods[1]["anime"]], [1])
-        self.assertEqual(periods[1]["end"], 2026)
+        self.assertEqual(periods[-1]["end"], 2026)
+        years = exporter.select_years(archive)
+        self.assertEqual([(row["year"], row["anime"][0]["id"]) for row in years], [(1979, 2), (1980, 1)])
 
     def test_original_movie_major_scores_are_reused_exactly_including_negatives(self):
         raw = struct.pack("<6f", 0.2, -0.1, 0.8, -0.5, 0.8, 0.3)
@@ -48,6 +49,10 @@ class StoryRecommendationsTests(unittest.TestCase):
             self.assertEqual(matches[0]["score"], read(7)[1])
             self.assertEqual(output["meta"]["reused_anime"], 1)
             self.assertEqual(output["meta"]["supplemental_anime"], 0)
+            annual = exporter.build_bundle({"meta": {}}, [{"year": 1979, "anime": period["anime"]}],
+                                           base, read, {}, {}, annual=True)
+            self.assertEqual(annual["years"], [{"year": 1979, "anime_id": 7,
+                                               "movie_id": "1", "score": read(7)[1]}])
             path.write_bytes(raw + b"x")
             with self.assertRaises(ValueError):
                 exporter.read_base_scores(base, path)

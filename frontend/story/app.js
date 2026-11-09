@@ -1,327 +1,228 @@
 "use strict";
 
 (() => {
-  const projectUrl = new URL("../../", document.currentScript.src);
-  const motion = matchMedia("(prefers-reduced-motion: reduce)");
-  const mobile = matchMedia("(max-width: 760px)");
+  const project = new URL("../../", document.currentScript.src);
   const $ = selector => document.querySelector(selector);
-  const steps = [...document.querySelectorAll(".story-step")];
-  const periods = steps.map(step => ({
-    id: step.id, start: Number(step.dataset.start),
-    end: step.dataset.end === "present" ? new Date().getFullYear() : Number(step.dataset.end),
-    present: step.dataset.end === "present",
-    theme: step.dataset.theme, color: step.dataset.color
-  }));
-  function sizeChapters() {
-    steps.forEach((step, i) => step.style.setProperty("--story-years", periods[i].end - periods[i].start + 1));
-  }
-  sizeChapters();
-  const store = { data: null, index: 0, year: 1963, summaries: [], frame: 0 };
-  const format = new Intl.NumberFormat("en-US");
-  const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
-  const color = d3.scaleOrdinal(d3.schemeTableau10);
-  const duration = () => motion.matches ? 0 : 420;
-  const escapeHTML = value => String(value ?? "").replace(/[&<>"']/g, c => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  }[c]));
-  const humanize = value => String(value || "Unknown").replaceAll("_", " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-  const imageUrl = work => safeURL(work.cover?.large || work.cover?.medium || work.cover?.extra_large);
+  const journey = $("#history-journey");
+  const panel = $(".history-panel");
+  const yearPicker = $("#year-picker");
+  const previous = $("#previous-year");
+  const next = $("#next-year");
+  const dialog = $("#history-dialog");
+  const retry = $("#retry-data");
+  const yearTravel = 76;
+  const number = new Intl.NumberFormat("en");
+  const svgNamespace = "http://www.w3.org/2000/svg";
+  const legacyYears = new Map([
+    ["#birth", 1963], ["#expansion", 1980], ["#global", 1990],
+    ["#digital", 2000], ["#streaming", 2010], ["#modern", 2020]
+  ]);
+  let pairs = [];
+  let chartStart;
+  let chartEnd;
+  let activeIndex = -1;
+  let frame = 0;
+
   function safeURL(value) {
-    try { const url = new URL(value); return url.protocol === "https:" ? url.href : ""; }
-    catch { return ""; }
-  }
-
-  function status(text, mode) {
-    $("#data-status").textContent = text;
-    $("#status-dot").className = `status-dot ${mode}`;
-  }
-
-  async function loadData() {
-    $("#retry-data").hidden = true;
-    $("#story-load").hidden = false;
-    $("#story-load span").textContent = "Loading annual archive…";
-    status("Loading annual AniList rankings…", "loading");
-    let payload;
-    let source;
     try {
-      try {
-        payload = StoryData.validate(await AnivizAPI.fetchJSON(new URL("api/story", projectUrl)));
-        source = "Backend cache";
-      } catch (error) {
-        payload = StoryData.validate(await AnivizAPI.fetchJSON(new URL("story.json", projectUrl), { timeout: 15000 }));
-        source = "Published snapshot";
+      const url = new URL(value);
+      return url.protocol === "https:" ? url.href : "";
+    } catch {
+      return "";
+    }
+  }
+
+  function makeCard(id, label, sourceName) {
+    const card = $(id);
+    card.append($("#history-card-template").content.cloneNode(true));
+    const kind = card.querySelector(".history-card-kind");
+    const year = card.querySelector(".history-card-year");
+    const title = card.querySelector("h2");
+    const meta = card.querySelector(".history-card-meta");
+    const summary = card.querySelector(".history-card-summary p");
+    const cover = card.querySelector(".history-cover");
+    const button = card.querySelector(".synopsis-button");
+    kind.textContent = label;
+    let entry;
+
+    button.addEventListener("click", () => {
+      $("#synopsis-kind").textContent = `${label} · ${entry.year}`;
+      $("#synopsis-title").textContent = entry.title;
+      $("#synopsis-text").textContent = entry.description;
+      const source = $("#synopsis-source");
+      const href = safeURL(entry.url);
+      source.hidden = !href;
+      source.href = href;
+      source.textContent = `View on ${sourceName} ↗`;
+      dialog.showModal();
+    });
+    cover.addEventListener("error", () => { cover.hidden = true; });
+
+    return (work, emptyMessage) => {
+      entry = work;
+      year.textContent = work?.year ?? "";
+      title.textContent = work?.title || emptyMessage;
+      meta.textContent = work?.meta || "";
+      meta.hidden = !work?.meta;
+      summary.textContent = work ? work.description || "No synopsis available." : "";
+      const image = safeURL(work?.cover);
+      cover.hidden = !image;
+      if (image) cover.src = image;
+      else cover.removeAttribute("src");
+      button.hidden = !work?.description;
+      button.setAttribute("aria-label", `Read synopsis for ${work?.title ?? label}`);
+    };
+  }
+
+  const updateAnime = makeCard("#history-anime", "Top anime", "AniList");
+  const updateMovie = makeCard("#history-movie", "Movie match", "TMDB");
+
+  function yFor(year) {
+    return 34 + 234 * (year - chartStart) / Math.max(1, chartEnd - chartStart);
+  }
+
+  function drawTicks() {
+    const ticks = $("#history-ticks");
+    const marks = [];
+    for (let year = Math.ceil(chartStart / 10) * 10; year <= chartEnd; year += 10) {
+      const y = yFor(year);
+      const mark = document.createElementNS(svgNamespace, "path");
+      mark.setAttribute("class", "history-tick");
+      mark.setAttribute("d", `M60 ${y} H66 M198 ${y} H204`);
+      marks.push(mark);
+      for (const [x, anchor] of [[55, "end"], [209, "start"]]) {
+        const label = document.createElementNS(svgNamespace, "text");
+        label.setAttribute("class", "history-tick-label");
+        label.setAttribute("x", x);
+        label.setAttribute("y", y);
+        label.setAttribute("dy", ".35em");
+        label.setAttribute("text-anchor", anchor);
+        label.textContent = year;
+        marks.push(label);
       }
-      store.data = payload;
-      periods.forEach(period => {
-        if (period.present) period.end = Math.max(period.start, payload.meta.end_year);
-      });
-      sizeChapters();
-      store.summaries = periods.map(period => StoryData.summarizePeriod(payload, period));
-      const picker = $("#year-picker");
-      picker.innerHTML = d3.range(1963, payload.meta.end_year + 1)
-        .map(year => `<option value="${year}">${year}</option>`).join("");
-      picker.disabled = false;
-      color.domain([...new Set(payload.years.flatMap(row => row.anime.flatMap(work => work.genres || [])))].sort());
-      document.querySelectorAll("[data-present-year]").forEach(element => {
-        element.textContent = payload.meta.end_year;
-      });
-      const date = payload.meta.generated_at ? new Date(payload.meta.generated_at).toLocaleDateString(undefined, {
-        year: "numeric", month: "short", day: "numeric"
-      }) : "Unknown date";
-      status(`${format.format(payload.meta.sample_size)} titles · ${payload.years.length} years`, payload.meta.complete ? "success" : "loading");
-      $("#footer-generated").textContent = `Retrieved ${date}`;
-      $("#footer-cache").textContent = source;
-      $("#snapshot-description").textContent = `${source}. Retrieved ${date}. First-release years ${payload.meta.start_year}–${payload.meta.end_year}. ${payload.meta.end_year} is provisional. ${payload.meta.warning || ""}`;
-      const archiveBehind = payload.meta.end_year < new Date().getFullYear();
-      const warning = payload.meta.warning || (archiveBehind ? `This snapshot ends in ${payload.meta.end_year}; newer years are not yet available.` : "");
-      $("#story-load span").textContent = warning;
-      $("#story-load").hidden = !warning;
-      buildTimeline();
-      syncScroll(true);
+    }
+    ticks.replaceChildren(...marks);
+  }
+
+  function updatePoint(track, year) {
+    const point = $(`#${track}-point`);
+    const label = $(`#${track}-point-year`);
+    point.toggleAttribute("hidden", year == null);
+    label.toggleAttribute("hidden", year == null);
+    if (year == null) return;
+    const y = yFor(year);
+    point.setAttribute("cy", y);
+    label.setAttribute("y", y < 50 ? y + 16 : y - 8);
+    label.textContent = year;
+  }
+
+  function render(index) {
+    if (activeIndex === index) return;
+    activeIndex = index;
+    const { year, anime, movie, score } = pairs[index];
+    yearPicker.value = year;
+    previous.disabled = index === 0;
+    next.disabled = index === pairs.length - 1;
+    updateAnime(anime && {
+      ...anime,
+      meta: [Number.isFinite(anime.popularity) ? `${number.format(anime.popularity)} AniList users` : "",
+        ...(anime.genres || []).slice(0, 2)].filter(Boolean).join(" · "),
+      url: anime.site_url,
+      cover: anime.cover?.large || anime.cover?.medium
+    }, "No anime data for this year");
+    updateMovie(movie && {
+      ...movie, description: movie.synopsis, meta: (movie.genres || []).slice(0, 3).join(" · ")
+    }, anime ? "No movie match available" : "No anime to match");
+
+    updatePoint("anime", anime?.year);
+    updatePoint("movie", movie?.year);
+    const line = $("#history-connection");
+    line.toggleAttribute("hidden", !movie);
+    const caption = $("#history-score");
+    if (movie) {
+      const from = yFor(year);
+      const to = yFor(movie.year);
+      line.setAttribute("d", `M66 ${from} C120 ${from} 144 ${to} 198 ${to}`);
+      const value = document.createElement("strong");
+      value.textContent = score.toFixed(3);
+      caption.replaceChildren("Cosine similarity ", value);
+      $("#timeline-title").textContent = `${anime.title} (${year}) connected to ${movie.title} (${movie.year})`;
+    } else {
+      caption.textContent = `No match for ${year}`;
+      $("#timeline-title").textContent = `Anime and movie release timelines for ${year}`;
+    }
+  }
+
+  function stickyTop() {
+    return parseFloat(getComputedStyle(panel).top);
+  }
+
+  function syncScroll() {
+    frame = 0;
+    if (!pairs.length) return;
+    const offset = stickyTop() - journey.getBoundingClientRect().top;
+    const index = Math.min(pairs.length - 1, Math.max(0, Math.round(offset / yearTravel)));
+    render(index);
+  }
+
+  function queueSync() {
+    if (!frame) frame = requestAnimationFrame(syncScroll);
+  }
+
+  function goTo(index) {
+    if (!pairs[index]) return;
+    const start = window.scrollY + journey.getBoundingClientRect().top - stickyTop();
+    window.scrollTo({ top: Math.max(0, start + index * yearTravel), behavior: "instant" });
+    syncScroll();
+  }
+
+  function followLegacyHash() {
+    const year = legacyYears.get(location.hash);
+    if (year && pairs.length) goTo(year - pairs[0].year);
+  }
+
+  async function load() {
+    const status = $("#history-load");
+    const message = status.querySelector("span");
+    status.hidden = false;
+    retry.hidden = true;
+    message.textContent = "Loading annual anime and movie matches…";
+    try {
+      // Use the published archive so its annual winners match the offline score export.
+      const [archive, bundle] = await Promise.all([
+        AnivizAPI.fetchJSON(new URL("story.json", project), { timeout: 15000 }),
+        AnivizAPI.fetchJSON(new URL("data/history_movie_matches.json", project), { timeout: 15000 })
+      ]);
+      pairs = StoryData.yearPairs(StoryData.validate(archive), bundle);
+      const first = pairs[0].year;
+      const last = pairs.at(-1).year;
+      const years = pairs.flatMap(pair => pair.movie ? [pair.movie.year] : []);
+      chartStart = Math.min(first, ...years);
+      chartEnd = Math.max(last, ...years);
+      drawTicks();
+
+      yearPicker.replaceChildren(...pairs.map(({ year }) => new Option(year, year)));
+      $("#history-range").textContent = `${first}–${last}`;
+      $("#movie-count").textContent = number.format(bundle.meta.movie_count);
+      $("#history-travel").style.height = `${(pairs.length - 1) * yearTravel}px`;
+      for (const id of ["history-controls", "history-pair", "history-note"]) $(`#${id}`).hidden = false;
+      status.hidden = true;
+      syncScroll();
+      followLegacyHash();
     } catch (error) {
-      status("Archive temporarily unavailable", "error");
-      $("#story-load span").textContent = "The annual archive could not be loaded. The historical story is still available. Try again to load its visualizations.";
-      $("#retry-data").hidden = false;
-      renderUnavailable("The annual archive is unavailable.");
+      message.textContent = "The annual archive could not be loaded. Try again to open the timelines.";
+      retry.hidden = false;
+      console.warn("History data unavailable", error);
     }
   }
 
-  function buildTimeline() {
-    const svg = d3.select("#story-timeline").selectAll("svg").data([null]).join("svg")
-      .attr("viewBox", "0 0 600 60").attr("role", "img")
-      .attr("aria-label", "Annual sample coverage from 1963 onward; each bar shows up to ten selected titles");
-    svg.selectAll("title").data([null]).join("title").text("Annual Top 10 sample coverage, not anime industry output");
-    const years = d3.range(1963, store.data.meta.end_year + 1);
-    const x = d3.scaleBand().domain(years).range([2, 598]).padding(.25);
-    const rows = new Map(store.data.years.map(row => [row.year, row]));
-    svg.selectAll("rect.year-bar").data(years, year => year).join("rect")
-      .attr("class", "year-bar").attr("x", year => x(year)).attr("width", x.bandwidth())
-      .attr("y", year => 37 - Math.max(2, (rows.get(year)?.anime.length || 0) * 2.6))
-      .attr("height", year => Math.max(2, (rows.get(year)?.anime.length || 0) * 2.6))
-      .attr("rx", 1).attr("fill", "#303a56")
-      .append("title").text(year => `${year}: ${rows.has(year) && rows.get(year).status !== "unavailable" ? `${rows.get(year).anime.length} selected titles` : "data unavailable"}`);
-    svg.selectAll("text.timeline-edge").data([1963, store.data.meta.end_year]).join("text")
-      .attr("class", "timeline-edge").attr("x", (year, i) => i ? 598 : 2).attr("y", 56)
-      .attr("text-anchor", (year, i) => i ? "end" : "start").attr("fill", "#79839f")
-      .attr("font-size", 10).text(year => year);
-    svg.selectAll("line.year-cursor").data([null]).join("line")
-      .attr("class", "year-cursor").attr("y1", 4).attr("y2", 43).attr("stroke-width", 2);
-    // Keep the timeline's scale so scroll updates only positions and colors.
-    store.timelineX = x;
-  }
-
-  function updateTimeline() {
-    if (!store.data) return;
-    const period = periods[store.index];
-    const svg = d3.select("#story-timeline svg");
-    svg.selectAll("rect.year-bar").interrupt().transition().duration(duration())
-      .attr("fill", year => year >= period.start && year <= period.end ? period.color : "#303a56")
-      .attr("opacity", year => year <= store.year ? 1 : .4);
-    svg.select("line.year-cursor").interrupt().transition().duration(motion.matches ? 0 : 180)
-      .attr("x1", store.timelineX(store.year) + store.timelineX.bandwidth() / 2)
-      .attr("x2", store.timelineX(store.year) + store.timelineX.bandwidth() / 2)
-      .attr("stroke", period.color);
-  }
-
-  function renderPosters() {
-    const row = store.data?.years.find(row => row.year === store.year);
-    const works = row?.status !== "unavailable" ? (row?.anime || []) : [];
-    $("#showcase-year").textContent = store.year;
-    $("#year-picker").value = store.year;
-    $("#year-count").textContent = `${works.length} titles${row?.provisional ? " · provisional" : ""}${row?.status === "stale" ? " · cached" : ""}`;
-    const shelf = d3.select("#poster-shelf");
-    shelf.selectAll(".archive-empty").remove();
-    const cards = shelf.selectAll("button.poster-card:not([data-exiting])").data(works, work => work.id);
-    // Fade outgoing posters in place without keeping them in the tab order or
-    // pushing the new year's posters to the end of the horizontal shelf.
-    cards.exit().each(function() {
-      const width = this.getBoundingClientRect().width;
-      const left = this.offsetLeft;
-      this.style.width = `${width}px`;
-      this.style.left = `${left}px`;
-    }).attr("data-exiting", "true").attr("aria-hidden", "true")
-      .attr("tabindex", -1).property("disabled", true)
-      .style("position", "absolute").style("pointer-events", "none")
-      .interrupt().transition().duration(duration() / 2).style("opacity", 0).remove();
-    const added = cards.enter().append("button").attr("type", "button").attr("class", "poster-card")
-      .style("opacity", 0).style("transform", "translateY(8px)");
-    added.html(work => `<span class="poster-art">${imageUrl(work) ? `<img src="${escapeHTML(imageUrl(work))}" alt="" loading="lazy">` : ""}<span class="art-missing">Cover unavailable</span><span class="poster-rank"></span></span><strong></strong><small></small>`);
-    added.selectAll("img").on("error", function() { this.hidden = true; });
-    const merged = added.merge(cards).order();
-    merged.attr("aria-label", (work, i) => `Rank ${i + 1}: ${work.title}, ${store.year}. Open details.`)
-      .on("mouseenter focus", (event, work) => showTooltip(event, work))
-      .on("mouseleave blur", hideTooltip)
-      .on("click", (event, work) => { hideTooltip(); openDetail(work); });
-    merged.select(".poster-rank").text((work, i) => `#${i + 1}`);
-    merged.select("strong").text(work => work.title);
-    merged.select("small").text(work => `${humanize(work.format)} · ${compact.format(work.popularity || 0)} users`);
-    added.interrupt().transition().duration(duration()).style("opacity", 1).style("transform", "translateY(0px)");
-    $("#poster-shelf").scrollLeft = 0;
-    if (!works.length) {
-      shelf.append("p").attr("class", "archive-empty").text(!row || row.status === "unavailable"
-        ? `Annual data for ${store.year} is unavailable.`
-        : `AniList returned no eligible titles for ${store.year}.`);
-    }
-  }
-
-  function renderRanking() {
-    const summary = store.summaries[store.index];
-    renderRankingChart("genres", summary);
-    renderRankingChart("studios", summary);
-    $("#ranking-caption").textContent = `Share of ${summary?.anime.length || 0} sampled titles · genres / studios can overlap · unknown studios excluded.`;
-    const info = `${summary?.anime.length || 0} titles · ${summary?.availableYears || 0} first-release years`;
-    const gaps = summary?.missing.length ? ` · ${summary.missing.length} years unavailable` : "";
-    const stale = summary?.stale.length ? ` · ${summary.stale.length} cached years not refreshed` : "";
-    $("#period-sample").textContent = info + gaps + stale;
-  }
-
-  function renderRankingChart(metric, summary) {
-    const isGenre = metric === "genres";
-    const data = summary?.[metric].slice(0, mobile.matches ? 4 : 6) || [];
-    const container = d3.select(`#${metric}-ranking`);
-    container.selectAll(".archive-empty").remove();
-    const height = mobile.matches ? 150 : 210;
-    const width = mobile.matches ? 180 : 300;
-    const svg = container.selectAll("svg").data([null]).join("svg")
-      .attr("viewBox", `0 0 ${width} ${height}`).attr("role", "img")
-      .attr("aria-label", `${isGenre ? "Genre" : "Studio"} shares of selected titles in ${periods[store.index].start} to ${periods[store.index].end}`);
-    svg.selectAll("title").data([null]).join("title").text(`${isGenre ? "Genres" : "Studios"} in this period: ${data.map(row => `${row.name} ${row.percent.toFixed(1)}%`).join(", ")}`);
-    const x = d3.scaleLinear().domain([0, 100]).range([0, width]);
-    const y = d3.scaleBand().domain(data.map(row => row.name)).range([8, height - 8]).padding(.3);
-    const groups = svg.selectAll("g.rank-row").data(data, row => row.name);
-    groups.exit().interrupt().transition().duration(duration() / 2).style("opacity", 0).remove();
-    const added = groups.enter().append("g").attr("class", "rank-row").style("opacity", 0)
-      .attr("transform", `translate(0,${height})`);
-    added.append("rect").attr("class", "rank-track").attr("y", 16).attr("width", width).attr("fill", "#1b243c").attr("rx", 3);
-    added.append("rect").attr("class", "rank-bar").attr("y", 16).attr("width", 0).attr("rx", 3);
-    added.append("text").attr("class", "rank-name").attr("x", 0).attr("fill", "#bbc3db").attr("font-size", 12);
-    added.append("text").attr("class", "rank-value").attr("text-anchor", "end").attr("fill", "#bbc3db").attr("font-size", 12);
-    const merged = added.merge(groups);
-    merged.interrupt().transition().duration(duration()).style("opacity", 1)
-      .attr("transform", row => `translate(0,${y(row.name)})`);
-    const labelLength = mobile.matches ? 20 : 32;
-    merged.select(".rank-name").attr("y", 10).attr("font-size", mobile.matches ? 11 : 12)
-      .text(row => row.name.length > labelLength ? row.name.slice(0, labelLength - 1) + "…" : row.name);
-    merged.select(".rank-value").attr("x", width).attr("y", 10).attr("font-size", mobile.matches ? 11 : 12)
-      .text(row => `${row.percent.toFixed(0)}%`);
-    merged.select(".rank-track").attr("width", width).attr("height", 8);
-    merged.select(".rank-bar").interrupt().transition().duration(duration())
-      .attr("height", 8).attr("width", row => x(row.percent))
-      .attr("fill", row => isGenre ? color(row.name) : periods[store.index].color);
-    merged.selectAll("title").data(row => [row]).join("title")
-      .text(row => `${row.name}: ${row.count} of ${summary.anime.length} selected titles (${row.percent.toFixed(1)}%)`);
-    if (!data.length) {
-      container.append("p").attr("class", "archive-empty").text(`No ${isGenre ? "genre" : "main-studio"} metadata is available for this period’s selected titles.`);
-      svg.style("display", "none");
-    } else { svg.style("display", null); }
-  }
-
-  function renderUnavailable(message) {
-    for (const selector of ["#poster-shelf", "#genres-ranking", "#studios-ranking"]) {
-      $(selector).innerHTML = `<p class="archive-empty">${escapeHTML(message)}</p>`;
-    }
-  }
-
-  function scrollProbe() {
-    const panel = $("#visual-stage");
-    return mobile.matches
-      ? Math.min(innerHeight - 40, Math.max(innerHeight * .5,
-        parseFloat(getComputedStyle(panel).top) + panel.offsetHeight + 30))
-      : 65;
-  }
-
-  function syncScroll(force = false) {
-    store.frame = 0;
-    const panel = $("#visual-stage");
-    const rail = $(".site-header");
-    document.body.style.setProperty("--story-sticky-top", `${rail.getBoundingClientRect().height + 10}px`);
-    document.body.style.setProperty("--story-scroll-offset", `${panel.offsetHeight + rail.getBoundingClientRect().height + 24}px`);
-    // Use the same line for chapter activation, year progress, and year jumps.
-    const probe = scrollProbe();
-    // Keep the archive pinned through the final chapter's last year as well.
-    document.body.style.setProperty("--story-end-space",
-      `${Math.max(0, parseFloat(getComputedStyle(panel).top) + panel.offsetHeight - probe) + 40}px`);
-    const located = StoryData.locatePeriod(steps.map((step, i) => ({
-      ...periods[i], top: step.getBoundingClientRect().top, height: step.getBoundingClientRect().height
-    })), probe);
-    const changed = located.index !== store.index;
-    const yearChanged = located.year !== store.year;
-    store.index = located.index;
-    store.year = located.year;
-    const period = periods[store.index];
-    document.body.style.setProperty("--era-color", period.color);
-    $("#active-theme").textContent = period.theme;
-    $("#active-period").textContent = `${period.start}–${period.end}`;
-    $("#active-year").textContent = store.year;
-    $("#chapter-progress").style.width = `${100 * located.progress}%`;
-    $("#act-indicator").textContent = `ERA ${String(store.index + 1).padStart(2, "0")} / ${String(periods.length).padStart(2, "0")}`;
-    steps.forEach((step, i) => {
-      step.classList.toggle("is-active", i === store.index);
-      step.style.setProperty("--era-color", periods[i].color);
-    });
-    document.querySelectorAll(".era-nav a").forEach(link => {
-      if (link.hash === `#${period.id}`) link.setAttribute("aria-current", "step");
-      else link.removeAttribute("aria-current");
-    });
-    if (force || changed || yearChanged) {
-      hideTooltip();
-      updateTimeline();
-      if (store.data) renderPosters();
-    }
-    if ((force || changed) && store.data) renderRanking();
-  }
-
-  function requestSync() {
-    if (!store.frame) store.frame = requestAnimationFrame(() => syncScroll());
-  }
-
-  function showTooltip(event, work) {
-    const tooltip = $("#story-tooltip");
-    tooltip.innerHTML = `<strong>${escapeHTML(work.title)}</strong><span>${work.year} · ${escapeHTML(humanize(work.format))}<br>${format.format(work.popularity || 0)} current AniList list users<br>Score: ${Number.isFinite(work.average_score) ? work.average_score + "/100" : "unavailable"}<br>${escapeHTML((work.studio_names || ["Unknown studio"]).join(", "))}</span>`;
-    tooltip.classList.add("visible");
-    tooltip.setAttribute("aria-hidden", "false");
-    const box = event.currentTarget.getBoundingClientRect();
-    const rect = tooltip.getBoundingClientRect();
-    tooltip.style.left = `${Math.max(8, Math.min(innerWidth - rect.width - 8, box.left))}px`;
-    tooltip.style.top = `${Math.max(8, box.top - rect.height - 10)}px`;
-  }
-
-  function hideTooltip() {
-    $("#story-tooltip").classList.remove("visible");
-    $("#story-tooltip").setAttribute("aria-hidden", "true");
-  }
-
-  function openDetail(work) {
-    const url = safeURL(work.site_url);
-    $("#dialog-content").innerHTML = `<div class="dialog-head">${imageUrl(work) ? `<img src="${escapeHTML(imageUrl(work))}" alt="Cover for ${escapeHTML(work.title)}">` : `<div class="archive-empty">Cover unavailable</div>`}<div><p class="chart-kicker">From the annual Top 10</p><h2 id="dialog-title">${escapeHTML(work.title)}</h2><p>${escapeHTML(work.titles?.romaji || "")}<br>${work.year} · ${escapeHTML(humanize(work.format))}</p><p>${escapeHTML((work.genres || []).join(" · ") || "Genres unavailable")}</p></div></div><div class="detail-stats"><div class="detail-stat"><span>Current list users</span><strong>${format.format(work.popularity || 0)}</strong></div><div class="detail-stat"><span>Average score</span><strong>${Number.isFinite(work.average_score) ? work.average_score + "/100" : "Unknown"}</strong></div></div><p class="dialog-description">${escapeHTML(work.description || "No synopsis is available for this title.")}</p><p class="dialog-description"><strong>Main studio:</strong> ${escapeHTML((work.studio_names || ["Unknown studio"]).join(", "))}</p><p class="dialog-caveat">These are current AniList metrics. They do not measure the audience or reception at the time of release.</p>${url ? `<a class="button button-primary" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">View on AniList ↗</a>` : ""}`;
-    $("#dialog-content img")?.addEventListener("error", event => { event.currentTarget.hidden = true; });
-    $("#anime-dialog").showModal();
-  }
-
-  $("#close-dialog").addEventListener("click", () => $("#anime-dialog").close());
-  $("#anime-dialog").addEventListener("click", event => {
-    if (event.target === event.currentTarget) {
-      const bounds = event.currentTarget.getBoundingClientRect();
-      if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) event.currentTarget.close();
-    }
-  });
-  $("#retry-data").addEventListener("click", loadData);
-  $("#year-picker").addEventListener("change", event => {
-    const year = Number(event.target.value);
-    const index = periods.findIndex(period => year >= period.start && year <= period.end);
-    if (index < 0) return;
-    const period = periods[index];
-    const section = steps[index];
-    const probe = scrollProbe();
-    const progress = StoryData.yearScrollProgress(period, year);
-    window.scrollTo({
-      top: scrollY + section.getBoundingClientRect().top - probe + progress * section.offsetHeight,
-      behavior: motion.matches ? "instant" : "smooth"
-    });
-  });
-  window.addEventListener("scroll", requestSync, { passive: true });
-  window.addEventListener("resize", () => { hideTooltip(); syncScroll(true); });
-  motion.addEventListener("change", () => syncScroll(true));
-  syncScroll();
-  loadData();
+  window.addEventListener("scroll", queueSync, { passive: true });
+  window.addEventListener("resize", queueSync);
+  window.addEventListener("pageshow", queueSync);
+  window.addEventListener("hashchange", followLegacyHash);
+  yearPicker.addEventListener("change", () => goTo(yearPicker.selectedIndex));
+  previous.addEventListener("click", () => goTo(activeIndex - 1));
+  next.addEventListener("click", () => goTo(activeIndex + 1));
+  retry.addEventListener("click", load);
+  load();
 })();

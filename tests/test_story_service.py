@@ -90,7 +90,7 @@ class StoryServiceTests(unittest.TestCase):
         with patch.object(story_service, "get_story", return_value={"meta": {"source": "test"}, "years": []}):
             self.assertEqual(client.get("/api/story").json["meta"]["source"], "test")
         for url, expected in [("/story", 302), ("/frontend/story/index.html", 200),
-                              ("/story.json", 200), ("/data.json", 200)]:
+                              ("/story.json", 200), ("/data/history_movie_matches.json", 200), ("/data.json", 200)]:
             response = client.get(url)
             self.assertEqual(response.status_code, expected)
             response.close()

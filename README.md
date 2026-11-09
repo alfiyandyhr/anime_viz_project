@@ -15,7 +15,7 @@ The compact dropdown contains exactly four destinations:
 | View | Data and interactions |
 | --- | --- |
 | Dust & Magnet | Choose either direction and a field of 30, 60, or 90 dots. Both directions include similarity connections, a field mirror, genres, release years, and a full ranking. Anime dust also shows reception and studio charts. |
-| History | Six eras, annual Top 10 posters, sticky timeline and period rankings from an independent historical dataset. Popularity is current AniList list popularity, not historical audience figures. |
+| History | Scroll a pair of release timelines to see each year’s most popular anime and its closest movie match. Both titles have synopses and the connection shows cosine similarity. |
 | Network | Actor/character/work collaboration graph, defaulting to Current dust when a saved anime-dust context exists, otherwise Catalogue. A local selector switches scopes without changing other views. The 35-work display cap and sampled Japanese cast credits are disclosed. |
 | Full Catalogue | The loaded 1,000-title metadata sample, with its own search, filters, sorting, pagination, details and automatic shortlist comparison. Saved movies never narrow its scope. |
 
@@ -139,86 +139,37 @@ git push
 
 GitHub Pages picks up the new data automatically after the push.
 
-## History — The Evolution of Anime
+## History
 
-Choose **History** from the view dropdown, or visit `http://localhost:5000/story` with Flask
-running. The page tells six connected eras from 1963 to the current year.
-Scrolling in either direction updates one sticky archive: an annual timeline,
-the year's Top 10 posters, and a period-level genre or main-studio ranking.
-The year selector jumps to a particular release year. Posters open accessible
-detail dialogs. Mobile layouts and reduced-motion preferences are supported.
+Choose **History** from the view dropdown or visit `/history` or `/story` with Flask.
+Scroll to advance one anime release year at a time, or use the year selector.
+The left timeline follows the most popular title from that year’s AniList sample.
+The right timeline marks the actual release year of its highest-scoring movie
+across the 1,000-title TMDB corpus. Open either synopsis for the full introduction.
+Popularity uses AniList user-list counts from the published snapshot. Both axes
+share the same release-year scale.
 
-`GET /api/story` serves its own cached dataset. `backend/story_service.py`
-reuses the existing AniList request/retry and normalization code, querying four
-independent annual Top 10 rankings per request. Results include Japanese,
-non-adult anime by `startDate.year`, excluding unreleased entries. The service
-uses `CACHE_TTL_HOURS`, writes `data/anilist_story_cache.json` locally, and falls
-back to cached years with explicit stale or unavailable states on failure.
-
-For static hosting, the page falls back to the published `story.json` snapshot.
-Refresh that snapshot separately from the global dashboard sample:
+History reads the published `story.json` and `data/history_movie_matches.json` on
+Flask and GitHub Pages. Regenerate them together so the annual winners and their
+scores stay in sync:
 
 ```bash
 python data/refresh_story.py
+python data/export_story_recommendations.py --annual --compute-missing
 ```
 
-Commit `story.json` to update GitHub Pages. An incomplete refresh preserves the
-previous static snapshot. The local backend cache is ignored by Git.
+The archive samples up to ten Japanese, non-adult titles per first-release year,
+excluding unreleased entries. The Flask `/api/story` endpoint also serves annual
+rankings using its own cache and reports stale or unavailable years.
 
-**Interpretation:** popularity is current AniList user-list popularity, not
-historical viewing figures. The current year is provisional. Genre/studio
-shares describe only the annual Top 10 sample and may overlap because a title
-can have multiple genres or credited main studios. Historical milestones link
-to primary sources in the narrative; the rankings are not evidence of those
-events' causes or effects.
-
-To add a historical era, add a `.story-step` section to
-`frontend/story/index.html` with its start/end years, theme, and accent color,
-then add its link to `.era-nav`. Scroll and chart logic derive periods from
-these attributes. `data.js` contains independently testable sample and scroll
-transformations; `app.js` owns the D3 joins, controls, and data loading.
-
-History no longer loads movie detours. The optional historical similarity export
-and its independent data checks remain available for research; they do not scope
-the historical archive or restart a numbered task workflow.
-
-Regenerate the separate published snapshot after updating `story.json`:
-
-```bash
-python data/export_story_recommendations.py --compute-missing
-```
-
-This requires the environment in `data/semantic_similarity/requirements-embeddings.txt`
-only when supplemental scores are needed. Existing anime rows are read directly
-from the verified published `movie_anime_scores.bin`, retaining their exact
-float32 values. Missing anime metadata uses the original collector's non-spoiler
-tag rules and the original embedding preprocessing. Inference uses
-**Qwen/Qwen3-Embedding-4B**, revision
-`5cf2132abc99cad020ac570b19d031efec650f2b`, float16 eager attention, an empty prompt,
-a 2,048-token budget with no silent truncation, and normalized 2,560-dimensional
-vectors. This is the model in the existing computation script and published
-scores; older 0.6B references in the embedding documentation describe an earlier
-configuration.
-
-The first supplemental run downloads the fixed model revision. If the original
-completed run is available, pass `--similarity-dir /path/to/similarity` to reuse its
-validated movie vectors. Otherwise the unchanged movie texts are encoded once;
-only missing anime-to-movie score rows are calculated. Metadata, movie vectors,
-model weights, and supplemental full score rows are cached under the ignored
-`data/semantic_similarity/output/` directory, with model/input hashes to prevent
-reuse across incompatible runs. Reruns reuse completed supplemental rows.
-`--offline` requires cached metadata and weights. Commit
-`data/story_movie_recommendations.json` for Flask and GitHub Pages; the site does
-not load a model or calculate embeddings in the browser. A failed computation
-preserves the previous published snapshot. Missing optional recommendations do
-not interrupt the historical narrative or annual archive.
-
-Run the relevant checks with:
-
-```bash
-python -m unittest discover -s tests -p 'test_*.py'
-node --test tests/*.test.cjs
-```
+The exporter reuses exact float32 scores from the published matrix. For anime
+missing from the matrix, it uses the same Qwen/Qwen3-Embedding-4B model revision,
+metadata preprocessing, and TMDB corpus. Supplemental inference requires
+`data/semantic_similarity/requirements-embeddings.txt`. Pass `--offline` when
+AniList metadata and the pinned model are cached. The ignored
+`data/semantic_similarity/output/story/` cache holds full supplemental score rows
+and movie vectors. The export without `--annual` still generates the six-period
+research snapshot.
 
 ## Dust & Magnet recommendations
 
