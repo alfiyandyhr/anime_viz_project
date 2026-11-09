@@ -329,10 +329,11 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
       const pointer = event.type === "focus" ? { clientX: rect.x + rect.width / 2, clientY: rect.y + rect.height / 2 } : event;
       showTooltip(pointer, `<strong>${escapeHTML(match.record.title)}</strong><span>${match.key.startsWith("anilist:") ? escapeHTML(humanize(match.record.format)) + " · " : ""}${match.record.year || "Year unknown"}</span>`
         + anchors.map(({ magnet, color }, index) => `<span class="dust-tooltip-score"><i style="background:${color}"></i>${mixed
-          ? escapeHTML(AnivizDust.mixedEvidence(match, magnet, index))
+          ? `<span>${escapeHTML(AnivizDust.magnetScoreLabel(magnet))}: ${AnivizDust.formatRawScore(match.rawScores[index], magnet)}<br>
+            Attraction percentile: ${AnivizDust.formatPercentile(match.scores[index])}</span>`
           : `${escapeHTML(magnet.kind === "genre" ? AnivizDust.magnetScoreLabel(magnet) : magnet.title)} <b>${match.scores[index].toFixed(3)}</b>`}</span>`).join("")
         + (mixed ? `<span>${AnivizDust.averageLabel(true)}: ${AnivizDust.formatPercentile(match.score)}</span>` : "")
-        + "<span>Click to toggle selection</span>");
+        + '<span class="dust-tooltip-hint">Click to toggle selection</span>');
     })
     .on("mousemove", moveTooltip)
     .on("mouseleave blur", hideTooltip)

@@ -11,7 +11,14 @@ const choice = page => page.locator('#genre-magnet-choice');
 const add = page => page.getByRole('button', { name: 'Add genre magnet' });
 const selectGenre = async (page, key) => {
   await page.getByRole('radio', { name: 'Genre cohort' }).check();
-  await choice(page).selectOption(key);
+  const select = choice(page);
+  const border = await select.evaluate(el => getComputedStyle(el).borderColor);
+  await select.focus();
+  await select.selectOption(key);
+  assert.deepEqual(await select.evaluate(el => {
+    const style = getComputedStyle(el);
+    return [style.borderColor, style.boxShadow];
+  }), [border, 'none'], 'selecting a genre keeps the dropdown border neutral');
   await add(page).press('Enter');
 };
 const snapshot = page => page.evaluate(() => {

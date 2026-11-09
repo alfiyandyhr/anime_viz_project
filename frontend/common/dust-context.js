@@ -25,8 +25,7 @@
   const formatRawScore = (value, magnet) => Number.isFinite(value) && magnet.kind === "popularity"
     ? String(value) : formatPercentile(value);
   function mixedEvidence(match, magnet, index) {
-    const value = match.rawScores[index];
-    const raw = Number.isFinite(value) ? String(value) : "Unavailable";
+    const raw = formatRawScore(match.rawScores[index], magnet);
     return `${magnetScoreLabel(magnet)}: ${raw} · Attraction percentile: ${formatPercentile(match.scores[index])}`;
   }
   const defaults = direction => ({ search: "", genre: "All", yearFrom: null, yearTo: null, ...(direction === REVERSE ? {} : { studio: "All", format: "All", minimumScore: 0 }) });

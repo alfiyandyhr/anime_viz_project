@@ -25,7 +25,7 @@ for (const menu of document.querySelectorAll('[data-view-menu], [data-field-opti
     links[next]?.focus();
   });
   window.addEventListener('pageshow', () => close());
-  // Field options is an inline disclosure and stays open during field interactions.
+  // The dust filters stay open during field interactions.
   if (!isViewMenu) continue;
   menu.addEventListener('focusout', event => {
     if (event.relatedTarget && !menu.contains(event.relatedTarget)) close();

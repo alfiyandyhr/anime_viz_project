@@ -92,12 +92,16 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
     assert.equal((await evidence()).magnetKeys.length, 3);
     assert.equal(await field.locator('.dust-magnet').count(), 3);
 
-    await fieldOptions.locator('summary').click();
-    for (const id of ['studio-filter', 'format-filter', 'score-filter']) assert.equal(await page.locator(`#${id}`).isVisible(), false);
+    assert.ok(await page.getByLabel('Movie dots').isVisible());
+    assert.ok(await page.getByRole('button', { name: 'Reset positions' }).isVisible());
+    assert.equal(await page.locator('#filterbar').isVisible(), false);
     for (const budget of [30, 90, 60]) {
       await page.selectOption('#dust-limit', String(budget));
       assert.equal(await field.locator('.dust-node').count(), budget);
     }
+    await fieldOptions.locator('summary').click();
+    assert.ok(await page.locator('#filterbar').isVisible());
+    for (const id of ['studio-filter', 'format-filter', 'score-filter']) assert.equal(await page.locator(`#${id}`).isVisible(), false);
     if ((await evidence()).selectedKeys.length) await page.locator('[data-dust-clear]').click();
     for (let i = 0; i < 4; i++) await dot(i).press('Enter');
     const selected = (await evidence()).selectedKeys;

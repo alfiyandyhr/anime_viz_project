@@ -12,6 +12,15 @@ const switchTo = (page, direction) => page.selectOption('#dust-direction', direc
 const choosePopularity = page => page.getByRole('radio', { name: 'High popularity' }).check();
 const ready = page => dot(page).first().waitFor();
 const mixed = page => page.waitForFunction(() => AnivizMain.snapshot().mixed && AnivizMain.snapshot().ranking.length === 1000);
+const assertTooltip = async (page, title) => {
+  await dot(page).first().locator('.dust-hit-area').hover({ force: true });
+  const tooltip = page.locator('#tooltip');
+  assert.ok(await tooltip.isVisible());
+  const scores = await tooltip.locator('.dust-tooltip-score').allInnerTexts();
+  for (const score of scores) assert.match(score, /^.+\nAttraction percentile: \d\.\d{3}$/);
+  assert.match(scores[0], new RegExp(`^Cosine to ${title}: -?\\d+\\.\\d{3}\\n`));
+  assert.match(await tooltip.innerText(), /Average attraction percentile: \d\.\d{3}\nClick to toggle selection$/);
+};
 const state = page => page.evaluate(() => {
   const { ranking, magnetKeys, activeMagnetKeys, selectedKeys, candidateKeys } = AnivizMain.snapshot();
   return { magnetKeys, activeMagnetKeys, selectedKeys, candidateKeys, ranking: ranking.map(row => [row.key, row.scores, row.rawScores, row.rank]) };
@@ -54,8 +63,8 @@ const state = page => page.evaluate(() => {
     assert.match(await page.locator('#recommendation-status').innerText(), /already a magnet/);
     assert.match(await page.locator('[data-dust-ranking-head]').textContent(), average);
     assert.match(await page.locator('#recommendation-score-note').innerText(), /attraction percentile/);
-    await dot(page).first().focus();
-    assert.match(await page.locator('#tooltip').innerText(), /AniList list users: \d+ · Attraction percentile:/);
+    await assertTooltip(page, 'Inception');
+    assert.match(await page.locator('#tooltip').innerText(), /AniList list users: \d+\nAttraction percentile:/);
     await dot(page).first().press('Enter');
     await dot(page).nth(1).press('Space');
     assert.match(await page.locator('#dust-focus').innerText(), average);
@@ -116,6 +125,7 @@ const state = page => page.evaluate(() => {
     await add(page).click();
     await mixed(page);
     assert.match(await page.locator('#movie-magnets').innerText(), /TMDB popularity · 2026-10-11 UTC · 1000 of 1000 eligible/);
+    await assertTooltip(page, 'Cowboy Bebop');
     await dot(page).first().press('Enter');
     const movieBlend = await state(page);
     assert.deepEqual(movieBlend.magnetKeys, ['anilist:1', movies]);

@@ -19,11 +19,11 @@ The compact dropdown contains exactly four destinations:
 | Network | Actor/character/work collaboration graph, defaulting to Current dust when a saved anime-dust context exists, otherwise Catalogue. A local selector switches scopes without changing other views. The 35-work display cap and sampled Japanese cast credits are disclosed. |
 | Full Catalogue | The loaded 1,000-title metadata sample, with its own search, filters, sorting, pagination, details and automatic shortlist comparison. Saved movies never narrow its scope. |
 
-Direction, the magnet picker, removable magnets, and **Field options** sit in the left panel.
+Direction, the magnet picker, removable magnets, dot count, and **Reset positions** sit in the left panel.
 The right panel follows the latest selected title. Anime details include AniList
 images, synopsis, tags, and sampled Japanese cast. Movie details use published
-TMDB text, genres, keywords, and a TMDB link. Field options contains dot count,
-position reset, and dust filters. Movie dust supports title and alias search,
+TMDB text, genres, keywords, and a TMDB link. Open **Filter** for dust filters.
+Movie dust supports title and alias search,
 genre, and release year.
 
 Filters narrow the sampled candidates without refilling them. The field and
@@ -240,8 +240,8 @@ sorts and score evidence still expose the raw values. Titles without popularity
 stay in the full ranking with an unavailable combined rank. Remove the
 popularity magnet to return to cosine scores.
 
-**Field options** contains the 30/60/90 dot choices, filters, and
-**Reset positions**. Drag magnets, or focus
+Choose 30, 60, or 90 dots and use **Reset positions** directly in the left panel.
+Open **Filter** to narrow the displayed titles. Drag magnets, or focus
 one and use arrow keys, to rearrange the field. Hover or keyboard-focus an anime
 for its title and cosine scores rounded to three decimals. Click or press Enter
 to show its details in the right panel. Enter/Space or another click toggles selection; two or three
