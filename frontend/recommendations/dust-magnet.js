@@ -1,6 +1,6 @@
 "use strict";
 
-const MAGNET_COLORS = ["#43d9e6", "#b49aff", "#ffcc70"];
+const MAGNET_COLORS = ["#43d9e6", "#ff6fae", "#ffcc70"];
 let dustChart = null;
 
 // Keep a fair share of each magnet's strongest matches, then fill by mean score.

@@ -25,15 +25,12 @@ test('each movie ranks its visible 60 dusts locally, independently of table sort
         .map(row => ({...row, closest:row.scores.indexOf(Math.max(...row.scores))}));
       const snapshot = {movieIds, displayedDust, ranking};
       const before = JSON.stringify(snapshot);
-      const groups = movieConnections(snapshot);
-      assert.equal(groups.length,count);
-      groups.forEach((group, movieIndex) => {
-        assert.equal(group.total,60);
-        assert.equal(group.omitted,50);
-        assert.deepEqual(group.matches.map(row => row.anime.id), expected[movieIndex].map(String));
-        assert.deepEqual(group.matches.map(row => row.rank), [1,2,3,4,5,56,57,58,59,60]);
-        assert.deepEqual(group.matches.map(row => row.group), [...Array(5).fill('top'), ...Array(5).fill('bottom')]);
-        group.matches.forEach(row => {
+      movieIds.forEach((_, movieIndex) => {
+        const matches = movieConnections(snapshot, movieIndex);
+        const extremes = [...matches.slice(0, 5), ...matches.slice(-5)];
+        assert.deepEqual(extremes.map(row => row.anime.id), expected[movieIndex].map(String));
+        assert.deepEqual(matches.map(row => row.rank), Array.from({length:60}, (_, i) => i+1));
+        matches.forEach(row => {
           assert.equal(row.similarity,scores[movieIndex * 80 + Number(row.anime.id)]);
           assert.equal(row.closest,displayedDust.find(dust => dust.anime.id === row.anime.id).closest);
         });
@@ -43,16 +40,12 @@ test('each movie ranks its visible 60 dusts locally, independently of table sort
   }
 });
 
-test('empty and filtered dust sets never duplicate titles between top and bottom groups', () => {
-  assert.deepEqual(movieConnections({movieIds:[],displayedDust:[]}),[]);
+test('empty and filtered dust sets rank each title once', () => {
   for (let count = 0; count <= 10; count++) {
     const displayedDust = Array.from({length:count}, (_, i) => ({anime:{id:String(i)},index:i,scores:[-i],closest:0}));
-    const [group] = movieConnections({movieIds:['a'],displayedDust});
-    assert.equal(group.total,count);
-    assert.equal(group.matches.length,count);
-    assert.equal(new Set(group.matches.map(row => row.anime.id)).size,count);
-    assert.equal(group.omitted,0);
-    assert.deepEqual(group.matches.map(row => row.rank),Array.from({length:count}, (_, i) => i+1));
+    const matches = movieConnections({displayedDust}, 0);
+    assert.equal(new Set(matches.map(row => row.anime.id)).size,count);
+    assert.deepEqual(matches.map(row => row.rank),Array.from({length:count}, (_, i) => i+1));
   }
 });
 
@@ -61,12 +54,12 @@ test('changing displayed membership reranks each movie without retaining global 
     scores:[i,90-i,45],closest:i>45?0:1,rank:1000-i}));
   for (const count of [30,60,90,13,1,0]) {
     const visible = displayedDust.slice(0,count);
-    const groups = movieConnections({movieIds:['a','b','c'],displayedDust:visible});
-    for (const group of groups) {
-      assert.equal(group.total,count);
-      assert.ok(group.matches.every(row => visible.some(dust => dust.anime.id === row.anime.id)));
-      assert.equal(group.matches[0]?.rank,count ? 1 : undefined);
-      assert.equal(group.matches.at(-1)?.rank,count || undefined);
+    for (let movieIndex = 0; movieIndex < 3; movieIndex++) {
+      const matches = movieConnections({displayedDust:visible}, movieIndex);
+      assert.equal(matches.length,count);
+      assert.ok(matches.every(row => visible.some(dust => dust.anime.id === row.anime.id)));
+      assert.equal(matches[0]?.rank,count ? 1 : undefined);
+      assert.equal(matches.at(-1)?.rank,count || undefined);
     }
   }
 });

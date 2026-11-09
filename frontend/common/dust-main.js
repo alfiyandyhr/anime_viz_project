@@ -3,7 +3,7 @@
 (function (root) {
   let context, composition, latest, metadataPayload = null, metadataError = false;
   let sources = [], sourceMovies = "", sourceLimit, rankingPage = 0, rankingSignature = "";
-  let restored = false, scrollRestored = false, pendingNotice = "";
+  let restored = false, scrollRestored = false, pendingNotice = "", focusedDustId = null;
   const $ = selector => document.querySelector(selector);
   const movieColors = new Map();
   function color(movieId) {
@@ -57,18 +57,27 @@
       description: anime.description || anime.synopsis,
       site_url: anime.site_url || anime.url || `https://anilist.co/anime/${anime.id}` });
   }
-  function select(id) {
+  function select(id, { showDrawer = false } = {}) {
     const key = String(id);
     if (!latest.displayedDustIds.includes(key)) { inspectAnime(key); return; }
+    const wasSelected = latest.selectedAnimeIds.includes(key);
+    focusedDustId = showDrawer && wasSelected ? null : key;
+    const before = latest;
     context.toggleSelection(key);
-    renderDetails(); highlightRecommendation();
+    // At capacity the comparison does not publish a new snapshot.
+    if (latest === before) renderDetails();
+    if (showDrawer && !wasSelected) inspectAnime(key);
+  }
+  function setSelection(ids) {
+    focusedDustId = null;
+    context.setSelection(ids);
   }
   function deselectLast() {
-    if (latest?.selectedAnimeIds.length) context.setSelection(latest.selectedAnimeIds.slice(0, -1));
+    if (latest && (latest.selectedAnimeIds.length || focusedDustId)) setSelection(latest.selectedAnimeIds.slice(0, -1));
   }
   function renderDetails() {
     if (!latest) return;
-    const result = AnivizDustDetails.render({ snapshot: latest, movies: movies(), color,
+    const result = AnivizDustDetails.render({ snapshot: latest, movies: movies(), color, focusedDustId,
       helpers: { escapeHTML, escapeAttribute, humanize, formatNumber } });
     const detail = $('#recommendation-detail'), cue = $('#dust-selection');
     const focus = $('#dust-focus');
@@ -80,6 +89,7 @@
   }
   function publish(snapshot) {
     latest = snapshot;
+    if (!snapshot.displayedDustIds.includes(focusedDustId)) focusedDustId = null;
     recommendationState.animeId = snapshot.selectedAnimeIds.at(-1) || null;
     recommendationState.dustMatches = snapshot.displayedDust;
     const anime = snapshot.displayedDustIds.map(id => snapshot.lookup.get(id).anime);
@@ -179,8 +189,9 @@
     composition = AnivizComposition.create({ onError: error => console.error(error) });
     document.querySelectorAll('[data-dust-chart]').forEach(container => {
       const kind = container.dataset.dustChart;
-      composition.mount(container, kind === 'connections' ? AnivizDustConnections.create({ container, d3, color, onInspect: inspectAnime,
-          onCoverage: text => { $('[data-coverage="connections"]').textContent = text; }, renderEmpty, helpers: { escapeHTML, escapeAttribute } })
+      composition.mount(container, kind === 'connections' ? AnivizDustConnections.create({ container, d3, color,
+          onSelect: id => select(id, { showDrawer: true }),
+          onCoverage: text => { $('[data-coverage="connections"]').textContent = text; }, renderEmpty })
         : AnivizCharts.create(kind, { container, d3, helpers: chartHelpers() }), { preserveHeight: kind === 'connections' });
     });
     context.subscribe(publish);
@@ -200,8 +211,8 @@
     });
     $('#recommendation-detail').addEventListener('click', event => {
       const remove = event.target.closest('[data-dust-remove]');
-      if (remove) context.toggleSelection(remove.dataset.dustRemove);
-      if (event.target.closest('[data-dust-clear]')) context.setSelection([]);
+      if (remove) setSelection(latest.selectedAnimeIds.filter(id => id !== remove.dataset.dustRemove));
+      if (event.target.closest('[data-dust-clear]')) setSelection([]);
     });
     bindRecommendationControls();
     populateFallbackControls();
@@ -256,7 +267,7 @@
       scrollY: window.scrollY });
   }
   root.AnivizMain = { bind, initialize, sync, select, color, saveLayout, renderDetails, deselectLast,
-    clearSelection() { context.setSelection([]); },
+    clearSelection() { setSelection([]); },
     resetPositions() { context.resetPositions(); recommendationState.magnetPositions = {}; dustChart = null; },
     refresh() { composition?.setActive(true); composition?.refresh(); },
     snapshot: () => context?.snapshot() };

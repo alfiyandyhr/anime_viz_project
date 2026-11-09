@@ -148,7 +148,7 @@ const url = route => new URL(route, base).href;
         counts:[...document.querySelectorAll('[data-dust-chart="genres"] [role="img"]')].map(el=>({genre:el.__data__.genre,count:el.__data__.count,expected:s.displayedDustIds.filter(id=>s.lookup.get(id).anime.genres.includes(el.__data__.genre)).length}))};
     });
     assert.deepEqual(scoped.dots.sort(),[...chosen.ids].sort());
-    assert.ok(scoped.map.every(id=>chosen.ids.includes(id)));assert.equal(scoped.map.length,chosen.movies.length * 10);
+    assert.deepEqual(scoped.map.sort(),[...chosen.ids].sort());
     assert.deepEqual(scoped.scatter.sort(),scoped.expectedScatter.sort());assert.ok(scoped.scatter.length>0);
     assert.equal(scoped.ranking,1000);assert.deepEqual(scoped.displayed.sort(),[...chosen.ids].sort());
     assert.ok(scoped.counts.length>0);for(const row of scoped.counts) assert.equal(row.count,row.expected);

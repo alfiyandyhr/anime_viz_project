@@ -1,7 +1,14 @@
 "use strict";
 // Inline comparison belongs only to the selected dust anime.
 (function (root) {
-  function render({ snapshot, movies, color, helpers }) {
+  // AniList covers for recommendation titles absent from the dashboard catalogue.
+  const coverFallbacks = new Map([
+    ['175872', 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/small/bx175872-d55nfiC4WWHO.jpg'],
+    ['195516', 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/small/bx195516-MJpUZlOberqH.jpg'],
+    ['195604', 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/small/bx195604-tSZcfKbVqSEG.jpg']
+  ]);
+
+  function render({ snapshot, movies, color, helpers, focusedDustId }) {
     const { escapeHTML: escape, escapeAttribute: attr, humanize, formatNumber } = helpers;
     const selected = snapshot.selectedAnimeIds.map(id => snapshot.ranking.find(row => String(row.anime.id) === id)).filter(Boolean);
     const animeFor = match => snapshot.lookup.get(String(match.anime.id))?.anime || match.anime;
@@ -22,12 +29,19 @@
       ];
       return `<div class="dust-comparison-scroll" role="region" tabindex="0" aria-label="Selected anime comparison, scroll horizontally">
         <table class="dust-comparison-table"><caption class="sr-only">Selected anime comparison</caption>
-        <thead><tr><th scope="col">Compare anime</th>${anime.map(item => `<th scope="col">${escape(item.title)}<button type="button" class="small-button ghost" data-dust-remove="${attr(item.id)}" aria-label="Remove ${attr(item.title)} from comparison">Remove</button></th>`).join('')}</tr></thead>
+        <thead><tr><th scope="col">Compare anime</th>${anime.map(item => {
+          const cover = item.cover?.medium || item.cover?.large || item.cover?.extra_large || coverFallbacks.get(String(item.id));
+          return `<th scope="col">
+            ${cover ? `<img class="dust-comparison-cover" src="${attr(cover)}" alt="" width="40" height="56">` : ''}
+            ${escape(item.title)}
+            <button type="button" class="small-button ghost" data-dust-remove="${attr(item.id)}" aria-label="Remove ${attr(item.title)} from comparison">Remove</button>
+          </th>`;
+        }).join('')}</tr></thead>
         <tbody>${rows.map(([label, cell], index) => `<tr${index >= 5 && index < 5 + movies.length ? ` style="--magnet-color:${color(movies[index - 5].id)}" class="dust-movie-metric"` : ''}><th scope="row">${escape(label)}</th>${values.map((value, i) => `<td>${cell(value, i)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
         <p class="table-note">Runtime = episodes × minutes per episode. Unknown values are omitted from bars. Cosine scale: 0 to 1; scores are not percentages.</p>`;
     }
-    // Keep the focus on the latest selected dust.
-    const focused = selected.at(-1), anime = focused && animeFor(focused);
+    const focused = snapshot.displayedDust.find(row => String(row.anime.id) === focusedDustId) || selected.at(-1);
+    const anime = focused && animeFor(focused);
     const cover = anime?.cover?.extra_large || anime?.cover?.large || '';
     const banner = anime?.banner_image || cover;
     const tags = anime?.tags || [];
