@@ -16,8 +16,19 @@
   };
   const keyFor = (catalogue, id) => `${catalogue}:${id}`;
   const catalogueFor = (data, catalogue) => (catalogue === "tmdb" ? data?.movies : data?.anime) || [];
-  const magnetScoreLabel = magnet => magnet.kind === "genre" ? `Mean cosine to ${magnet.title}` : `Cosine to ${magnet.title}`;
+  const magnetScoreLabel = magnet => magnet.kind === "popularity" ? magnet.metric
+    : magnet.kind === "genre" ? `Mean cosine to ${magnet.title}` : `Cosine to ${magnet.title}`;
   const cohortDescription = magnet => `${magnet.source} · ${magnet.memberIds.length} ${magnet.noun}`;
+  const popularityKey = direction => keyFor(DIRECTIONS[direction].dust, "popularity");
+  const averageLabel = mixed => mixed ? "Average attraction percentile" : "Average similarity";
+  const formatPercentile = value => Number.isFinite(value) ? value.toFixed(3) : "Unavailable";
+  const formatRawScore = (value, magnet) => Number.isFinite(value) && magnet.kind === "popularity"
+    ? String(value) : formatPercentile(value);
+  function mixedEvidence(match, magnet, index) {
+    const value = match.rawScores[index];
+    const raw = Number.isFinite(value) ? String(value) : "Unavailable";
+    return `${magnetScoreLabel(magnet)}: ${raw} · Attraction percentile: ${formatPercentile(match.scores[index])}`;
+  }
   const defaults = direction => ({ search: "", genre: "All", yearFrom: null, yearTo: null, ...(direction === REVERSE ? {} : { studio: "All", format: "All", minimumScore: 0 }) });
   const id = (value) => String(value);
   const ids = (values) => [...new Set((values || []).filter(v => typeof v === "string" || typeof v === "number").map(id))];
@@ -78,11 +89,25 @@
     }));
   }
 
-  function scoreDust(records, magnets, direction, pairScore, cohortVectors) {
-    if (!pairScore || !magnets.length) return [];
+  function midrankPercentiles(column, eligible) {
+    const sorted = [...eligible].sort((a, b) => column[a] - column[b]);
+    const percentiles = Array(column.length).fill(null);
+    for (let start = 0; start < sorted.length;) {
+      let end = start + 1;
+      while (end < sorted.length && column[sorted[end]] === column[sorted[start]]) end++;
+      const value = sorted.length === 1 ? 0.5 : (start + end - 1) / (2 * (sorted.length - 1));
+      for (let i = start; i < end; i++) percentiles[sorted[i]] = value;
+      start = end;
+    }
+    return percentiles;
+  }
+
+  function scoreDust(records, magnets, direction, pairScore, cohortVectors, popularityValues) {
+    if (!magnets.length || (!pairScore && magnets.some(magnet => magnet.kind !== "popularity"))) return [];
     const scorePair = direction === REVERSE
       ? (magnetId, dustId) => pairScore(dustId, magnetId) : pairScore;
-    const columns = magnets.map(magnet => {
+    const rawColumns = magnets.map(magnet => {
+      if (magnet.kind === "popularity") return records.map(record => finite(popularityValues.get(id(record.id))));
       if (magnet.kind !== "genre") return records.map(record => scorePair(magnet.id, record.id));
       if (!cohortVectors.has(magnet.key)) {
         const vector = records.map(record => magnet.memberIds.reduce((sum, memberId) =>
@@ -91,22 +116,29 @@
       }
       return cohortVectors.get(magnet.key);
     });
+    const popularityIndex = magnets.findIndex(magnet => magnet.kind === "popularity");
+    const eligible = popularityIndex < 0 ? null : records.flatMap((_, index) =>
+      Number.isFinite(rawColumns[popularityIndex][index]) ? [index] : []);
+    const columns = eligible ? rawColumns.map(column => midrankPercentiles(column, eligible)) : rawColumns;
     return records.map((record, index) => {
       const scores = columns.map(column => column[index]);
+      const available = scores[0] !== null;
       return { record, key: keyFor(DIRECTIONS[direction].dust, record.id), index, scores,
-        score: scores.reduce((sum, value) => sum + value, 0) / scores.length,
-        closest: scores.indexOf(Math.max(...scores)), group: "dust" };
+        rawScores: eligible ? rawColumns.map(column => column[index]) : scores,
+        score: available ? scores.reduce((sum, value) => sum + value, 0) / scores.length : null,
+        closest: available ? scores.indexOf(Math.max(...scores)) : null, group: "dust" };
     });
   }
 
   function rankDust(vectors, magnetIndex = -1) {
-    return vectors.map(match => ({ ...match, sortScore: magnetIndex < 0 ? match.score : match.scores[magnetIndex] }))
-      .sort((a, b) => b.sortScore - a.sortScore || a.index - b.index)
-      .map((match, index) => ({ ...match, rank: index + 1 }));
+    return vectors.map(match => ({ ...match, sortScore: magnetIndex < 0 ? match.score : match.rawScores[magnetIndex] }))
+      .sort((a, b) => (b.sortScore ?? -Infinity) - (a.sortScore ?? -Infinity) || a.index - b.index)
+      .map((match, index) => ({ ...match, rank: match.sortScore === null ? null : index + 1 }));
   }
 
-  // Take an equal share of each magnet's strongest matches, then fill by mean cosine.
+  // Take an equal share of each magnet's strongest matches, then fill by average attraction.
   function sampleDust(vectors, magnetCount, limit) {
+    vectors = vectors.filter(match => match.score !== null);
     if (!vectors.length) return [];
     const ranked = rankDust(vectors);
     const count = Math.min(vectors.length, limit);
@@ -146,7 +178,8 @@
     const { magnet, dust } = DIRECTIONS[direction];
     const typedIds = (values, catalogue) => ids(Array.isArray(values) ? values : []).filter(key => key.startsWith(`${catalogue}:`));
     return {
-      state: { ...state, magnetKeys: typedIds(value.magnetKeys, magnet).slice(0, 3),
+      state: { ...state, magnetKeys: ids(Array.isArray(value.magnetKeys) ? value.magnetKeys : [])
+        .filter(key => key.startsWith(`${magnet}:`) || key === popularityKey(direction)).slice(0, 3),
         selectedKeys: typedIds(value.selectedKeys, dust).slice(0, 3),
         dustLimit: dustLimit(value.dustLimit), rankingSortKey: typeof value.rankingSortKey === "string" ? value.rankingSortKey : "average",
         rankingOrder: value.rankingOrder === "descending" ? "descending" : "ascending",
@@ -181,8 +214,13 @@
     const sessions = new Map();
     // Catalogue-qualified keys separate directions. A new data or matrix object invalidates the bundle cache.
     const cohortVectors = new Map();
+    const popularitySources = {
+      [FORWARD]: { status: "loading", snapshotDate: null, values: new Map() },
+      [REVERSE]: { status: "idle", snapshotDate: null, values: new Map() }
+    };
     let cohorts = [];
     let catalogue = new Map(), lookup = new Map(), magnets = [], vectors = [], candidates = [], displayed = [], ranking = [];
+    let popularity;
     let persistent = true, warned = false, revision = 0;
     const listeners = new Set();
     function storageFailure() {
@@ -207,7 +245,8 @@
       const state = session.state;
       const visible = new Set(state.displayedKeys);
       return { ...state, version: VERSION, direction, revision, magnets, genreCohorts: cohorts, candidateDust: candidates, displayedDust: displayed,
-        ranking, lookup, metadataStatus, persistent,
+        ranking, lookup, metadataStatus, persistent, popularity, mixed: magnets.some(magnet => magnet.kind === "popularity"),
+        activeMagnetKeys: magnets.map(magnet => magnet.key),
         missingMetadataIds: direction === FORWARD ? state.candidateKeys.filter(key => !lookup.get(key)?.metadata) : [],
         filteredOutIds: state.candidateKeys.filter(key => !visible.has(key)) };
     }
@@ -236,14 +275,22 @@
       refreshLookup();
     }
     function validMagnets(values) {
-      return ids(values).filter(key => catalogue.has(key)).slice(0, 3);
+      return ids(values).filter(key => catalogue.has(key) || key === popularityKey(direction)).slice(0, 3);
     }
     function derive({ rescore = false, resample = false, rerank = false } = {}) {
       const state = session.state;
       if (rescore) {
         state.magnetKeys = validMagnets(state.magnetKeys);
-        magnets = state.magnetKeys.map(key => catalogue.get(key));
-        vectors = scoreDust(catalogueFor(data, DIRECTIONS[direction].dust), magnets, direction, pairScore, cohortVectors);
+        const records = catalogueFor(data, DIRECTIONS[direction].dust);
+        const source = popularitySources[direction], reverse = direction === REVERSE;
+        const eligible = records.filter(record => Number.isFinite(source.values.get(id(record.id)))).length;
+        popularity = { key: popularityKey(direction), kind: "popularity",
+          title: `High ${reverse ? "movie" : "anime"} popularity`,
+          metric: reverse ? "TMDB popularity" : "AniList list users",
+          snapshotDate: source.snapshotDate, status: source.status, eligible, total: records.length };
+        magnets = state.magnetKeys.map(key => key === popularity.key
+          ? (eligible ? popularity : null) : catalogue.get(key)).filter(Boolean);
+        vectors = scoreDust(records, magnets, direction, pairScore, cohortVectors, source.values);
       }
       if (rescore || resample) {
         candidates = sampleDust(vectors, magnets.length, state.dustLimit);
@@ -252,13 +299,14 @@
       displayed = candidates.filter(match => passesFilters(lookup.get(match.key).record, state.filters, direction));
       state.displayedKeys = displayed.map(match => match.key);
       const visible = new Set(state.displayedKeys);
-      if (pairScore && (direction === REVERSE || metadataStatus !== "loading")) {
+      const waitingForPopularity = state.magnetKeys.includes(popularity?.key) && ["idle", "loading"].includes(popularity.status);
+      if ((pairScore || vectors.length) && !waitingForPopularity && (direction === REVERSE || metadataStatus !== "loading")) {
         const retained = state.selectedKeys.filter(key => visible.has(key));
         if (retained.length < state.selectedKeys.length) onNotice("Selection updated. Titles no longer displayed were removed.");
         state.selectedKeys = retained;
       }
       if (!state.magnetKeys.includes(state.rankingSortKey)) state.rankingSortKey = "average";
-      if (rescore || rerank) ranking = rankDust(vectors, state.magnetKeys.indexOf(state.rankingSortKey));
+      if (rescore || rerank) ranking = rankDust(vectors, magnets.findIndex(magnet => magnet.key === state.rankingSortKey));
       ranking = ranking.map(match => ({ ...match, displayed: visible.has(match.key) }));
       return publish();
     }
@@ -318,11 +366,18 @@
         sessions.set(direction, session);
         return derive({ rescore: true });
       },
-      setMetadata(rows, status = "ready") {
+      setMetadata(rows, status = "ready", snapshotDate = null) {
         metadata = rows || []; metadataStatus = status;
-        if (direction === REVERSE) return snapshot();
+        popularitySources[FORWARD] = { status, snapshotDate: typeof snapshotDate === "string" ? snapshotDate : null,
+          values: new Map(metadata.map(row => [id(row.id), row.popularity])) };
+        if (!data || direction === REVERSE) return snapshot();
         refreshLookup();
-        return derive();
+        return derive({ rescore: true });
+      },
+      setMoviePopularity(payload, status) {
+        popularitySources[REVERSE] = { status, snapshotDate: payload?.snapshot_date,
+          values: new Map(Object.entries(payload?.popularity || {})) };
+        return direction === REVERSE ? derive({ rescore: true }) : snapshot();
       },
       setMagnets(values) {
         const keys = validMagnets(values);
@@ -367,6 +422,7 @@
     };
     return api;
   }
-  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, DIRECTIONS, keyFor, catalogueFor, magnetScoreLabel, cohortDescription, defaults, joinRecords,
+  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, DIRECTIONS, keyFor, catalogueFor, magnetScoreLabel, cohortDescription,
+    averageLabel, formatPercentile, formatRawScore, mixedEvidence, defaults, joinRecords,
     passesFilters, createScoreAccessor, forwardVectors, rankCorpus, sampleDust, createContext };
 });

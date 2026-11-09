@@ -2,7 +2,7 @@
 // Connect one directional dust snapshot to the field, details and analysis.
 (function (root) {
   let context, composition, latest, rankingPage = 0, rankingSignature = "";
-  let scrollRestored = false, pendingNotice = "";
+  let scrollRestored = false, pendingNotice = "", metadataLoading = false;
   const $ = selector => document.querySelector(selector);
   const magnetColors = new Map();
   const isReverse = () => latest.direction === AnivizDust.REVERSE;
@@ -80,7 +80,7 @@
       })}</div>`;
       openDrawer('Movie details');
     } else {
-      const similarityHtml = magnets.some(magnet => magnet.kind === 'genre')
+      const similarityHtml = magnets.some(magnet => magnet.kind !== undefined)
         ? AnivizDustDetails.magnetScores(match, magnets, color, detailHelpers()) : '';
       openAnimeDetail({ ...record, cover: record.cover || {}, description: record.description || record.synopsis,
         site_url: record.site_url || record.url || `https://anilist.co/anime/${record.id}` }, { similarityHtml });
@@ -109,7 +109,7 @@
     if (switched) loadLayout();
     const reverse = isReverse();
     const used = new Set();
-    snapshot.magnetKeys.forEach(key => {
+    snapshot.activeMagnetKeys.forEach(key => {
       let value = magnetColors.get(key);
       if (!MAGNET_COLORS.includes(value) || used.has(value)) value = MAGNET_COLORS.find(candidate => !used.has(candidate));
       magnetColors.set(key, value);
@@ -118,7 +118,7 @@
     if (switched) updateDirectionControls();
     const records = snapshot.displayedKeys.map(key => snapshot.lookup.get(key).record);
     const dustColors = new Map(snapshot.displayedDust.map(match => [
-      String(match.record.id), color(snapshot.magnetKeys[match.closest])
+      String(match.record.id), color(snapshot.activeMagnetKeys[match.closest])
     ]));
     const metric = reverse ? 'count' : $('[data-dust-genre-metric]').value;
     const selectedIds = snapshot.selectedKeys.map(key => snapshot.lookup.get(key)?.record.id).filter(id => id != null).map(String);
@@ -129,13 +129,17 @@
     const count = records.length, candidates = snapshot.candidateKeys.length;
     $('[data-dust-scope]').textContent = elements.filterSummary.textContent = `${count} / ${candidates} ${dustNoun()}`;
     $('#dust-limit').value = snapshot.dustLimit;
+    $('#recommendation-score-note').textContent = snapshot.mixed
+      ? 'Select up to 3 dots · Distance: order of attraction percentiles (0–1) · Color: highest percentile.'
+      : 'Select up to 3 dots · distance: preference order · cosine ≠ percentage.';
+    $('#dust-connection-method').textContent = `Select a magnet to rank the displayed titles by ${snapshot.mixed ? 'attraction percentile' : 'cosine similarity'}. Thicker curves show higher scores within that magnet’s range. Color shows each title’s closest magnet. Dust members lists the titles closest to the selected magnet. Scroll either list to see more titles.`;
     const notes = {
       genres: [metric === 'count' ? 'Genres' : 'Genre ' + metric,
         row => row.genres.length && (metric === 'score' ? Number.isFinite(row.average_score) : metric !== 'popularity' || Number.isFinite(row.popularity)), 'Counts overlap.'],
       years: ['Release years', row => Number.isFinite(row.year), reverse ? 'Bars show displayed movies by release year.' : 'Bars: titles · line: score.']
     };
     if (reverse) {
-      $('[data-coverage="reception"]').textContent = 'The published TMDB sample has no ratings or popularity values.';
+      $('[data-coverage="reception"]').textContent = 'The published TMDB sample has no ratings. The High popularity magnet uses the separate TMDB popularity snapshot.';
       $('[data-coverage="studios"]').textContent = 'The published TMDB sample has no production company or cast credits.';
       $('[data-coverage="heatmap"]').textContent = '';
     } else {
@@ -158,34 +162,41 @@
       button.addEventListener('click', () => setFilters({ [key]: AnivizDust.defaults(snapshot.direction)[key] }));
       $('[data-dust-chips]').append(button);
     });
-    const signature = JSON.stringify([snapshot.direction, snapshot.magnetKeys, snapshot.rankingSortKey, snapshot.rankingOrder]);
+    const signature = JSON.stringify([snapshot.direction, snapshot.activeMagnetKeys, snapshot.rankingSortKey, snapshot.rankingOrder]);
     if (signature !== rankingSignature) { rankingPage = 0; rankingSignature = signature; }
     const sort = $('[data-dust-ranking-sort]');
-    sort.innerHTML = '<option value="average">Average similarity</option>' + snapshot.magnets.map((magnet, i) => {
-      const label = magnet.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : `Closest to Magnet ${i + 1} — ${magnet.title}`;
+    sort.innerHTML = `<option value="average">${AnivizDust.averageLabel(snapshot.mixed)}</option>` + snapshot.magnets.map((magnet, i) => {
+      const label = snapshot.mixed || magnet.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : `Closest to Magnet ${i + 1} — ${magnet.title}`;
       return `<option value="${escapeAttribute(magnet.key)}">${escapeHTML(label)}</option>`;
     }).join('');
-    sort.value = snapshot.rankingSortKey;
+    sort.value = snapshot.activeMagnetKeys.includes(snapshot.rankingSortKey) ? snapshot.rankingSortKey : 'average';
     $('[data-dust-ranking-order]').value = snapshot.rankingOrder;
     renderRanking();
     renderDetails();
     highlightRecommendation();
   }
   function renderRanking() {
-    const { ranking, magnets, rankingOrder } = latest, size = 10;
+    const { ranking, magnets, rankingOrder, mixed, popularity } = latest, size = 10;
     const total = Math.max(1, Math.ceil(ranking.length / size));
     rankingPage = Math.min(rankingPage, total - 1);
-    const ordered = rankingOrder === 'descending' ? [...ranking].reverse() : ranking;
+    const ordered = rankingOrder !== 'descending' ? ranking
+      : [...ranking.filter(match => match.rank !== null).reverse(), ...ranking.filter(match => match.rank === null)];
     const start = rankingPage * size, rows = ordered.slice(start, start + size);
-    $('[data-dust-ranking-note]').textContent = `${ranking.length} corpus ${dustNoun()} · ${rows.length ? `ranks ${rows[0].rank}–${rows.at(-1).rank}` : 'Unavailable'}`;
+    const ranked = rows.filter(match => match.rank !== null);
+    $('[data-dust-ranking-note]').textContent = `${ranking.length} corpus ${dustNoun()} · ${ranked.length ? `ranks ${ranked[0].rank}–${ranked.at(-1).rank}` : 'Ranks unavailable'}`
+      + (mixed ? ` · ${popularityDescription(popularity)}. Individual magnet sorts use raw values. Titles without popularity have no combined rank.` : '');
     const title = isReverse() ? 'Movie' : 'Anime';
     const cohortLabels = magnets.map(magnet => magnet.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : '');
-    $('[data-dust-ranking-head]').innerHTML = `<tr><th scope="col" aria-sort="${rankingOrder}">Rank</th><th scope="col">${title}</th>${magnets.map((magnet, i) => `<th scope="col">M${i + 1} · ${escapeHTML(cohortLabels[i] || magnet.title)}</th>`).join('')}<th scope="col">Average similarity</th><th scope="col">${isReverse() ? 'Year' : 'Format / year'}</th><th scope="col">Displayed dust</th></tr>`;
+    const average = AnivizDust.averageLabel(mixed);
+    $('[data-dust-ranking-head]').innerHTML = `<tr><th scope="col" aria-sort="${rankingOrder}">Rank</th><th scope="col">${title}</th>${magnets.map((magnet, i) => `<th scope="col">M${i + 1} · ${escapeHTML(mixed ? AnivizDust.magnetScoreLabel(magnet) : cohortLabels[i] || magnet.title)}</th>`).join('')}<th scope="col">${average}</th><th scope="col">${isReverse() ? 'Year' : 'Format / year'}</th><th scope="col">Displayed dust</th></tr>`;
     $('[data-dust-ranking-body]').innerHTML = rows.map(match => {
       const { record } = match;
       const year = record.year || 'Unknown';
       const format = isReverse() ? '' : escapeHTML(humanize(record.format)) + ' / ';
-      return `<tr><td>${match.rank}</td><td><button type="button" class="recommendation-title-button" data-dust-rank-id="${escapeAttribute(match.key)}" aria-haspopup="dialog" aria-controls="detail-drawer">${escapeHTML(record.title)}</button></td>${match.scores.map((score, i) => `<td title="${escapeAttribute(cohortLabels[i] ? `${cohortLabels[i]}: ${score}` : `Cosine ${score}`)}">${score.toFixed(3)}</td>`).join('')}<td title="Average cosine ${match.score}">${match.score.toFixed(3)}</td><td>${format}${year}</td><td>${match.displayed ? 'Yes' : '—'}</td></tr>`;
+      const scores = match.scores.map((score, i) => mixed
+        ? `<td title="${escapeAttribute(AnivizDust.mixedEvidence(match, magnets[i], i))}">${AnivizDust.formatRawScore(match.rawScores[i], magnets[i])}<br><small>Percentile ${AnivizDust.formatPercentile(score)}</small></td>`
+        : `<td title="${escapeAttribute(cohortLabels[i] ? `${cohortLabels[i]}: ${score}` : `Cosine ${score}`)}">${score.toFixed(3)}</td>`);
+      return `<tr><td>${match.rank ?? 'Unavailable'}</td><td><button type="button" class="recommendation-title-button" data-dust-rank-id="${escapeAttribute(match.key)}" aria-haspopup="dialog" aria-controls="detail-drawer">${escapeHTML(record.title)}</button></td>${scores.join('')}<td title="${mixed ? average : 'Average cosine'} ${match.score ?? 'unavailable'}">${AnivizDust.formatPercentile(match.score)}</td><td>${format}${year}</td><td>${match.displayed ? 'Yes' : '—'}</td></tr>`;
     }).join('');
     const pages = [];
     for (let page = 0; page < total; page++) if (page === 0 || page === total - 1 || Math.abs(page - rankingPage) <= 1) pages.push(page);
@@ -195,10 +206,30 @@
       `<button type="button" class="page-btn" data-dust-page="${rankingPage + 1}" ${rankingPage === total - 1 ? 'disabled' : ''} aria-label="Next ranking page">›</button>`;
   }
   async function loadMetadata() {
+    if (metadataLoading) return;
+    metadataLoading = true;
+    if (latest.metadataStatus === 'unavailable') {
+      context.setMetadata([], 'loading');
+      renderRecommendations();
+    }
     const metadata = await AnivizData.dashboard().catch(() => null);
-    latest = context.setMetadata(metadata?.anime || [], metadata ? 'ready' : 'unavailable');
+    metadataLoading = false;
+    latest = context.setMetadata(metadata?.anime || [], metadata ? 'ready' : 'unavailable', metadata?.meta.generated_at);
     if (!isReverse()) { populateFilterChoices(); renderRecommendations(); }
     restoreScroll();
+  }
+  async function loadPopularity() {
+    if (!isReverse()) { void loadMetadata(); return; }
+    if (!['idle', 'unavailable'].includes(latest.popularity.status)) return;
+    context.setMoviePopularity(null, 'loading');
+    renderRecommendations();
+    const payload = await AnivizData.moviePopularity(recommendationState.data).catch(() => null);
+    context.setMoviePopularity(payload, payload ? 'ready' : 'unavailable');
+    if (isReverse()) renderRecommendations();
+    restoreScroll();
+  }
+  function loadSavedPopularity() {
+    if (latest.popularity.status === 'idle' && latest.magnetKeys.includes(latest.popularity.key)) void loadPopularity();
   }
   function bind() {
     let storage;
@@ -265,7 +296,9 @@
   }
   function restoreScroll() {
     if (scrollRestored || !recommendationState.data
-      || (latest.magnets.length && (!recommendationState.scores || (!isReverse() && latest.metadataStatus === 'loading')))) return;
+      || (latest.magnets.some(magnet => magnet.kind !== 'popularity') && !recommendationState.scores)
+      || (!isReverse() && latest.metadataStatus === 'loading')
+      || (latest.magnetKeys.includes(latest.popularity.key) && latest.popularity.status === 'loading')) return;
     scrollRestored = true;
     const direction = latest.direction;
     requestAnimationFrame(() => {
@@ -288,6 +321,7 @@
       loadLayout();
       context.setSources(data, null, { seedExample: true });
       updateDirectionControls();
+      loadSavedPopularity();
       restoreScroll();
     },
     setScores(scores) { context.setSources(recommendationState.data, scores); restoreScroll(); },
@@ -298,13 +332,14 @@
       closeDrawer();
       if (!pendingNotice.startsWith('Session storage')) notice('');
       context.setDirection(direction);
+      loadSavedPopularity();
       renderRecommendations();
       scrollRestored = true;
       window.scrollTo(0, context.getLayout().scrollY || 0);
     },
     setMagnets(keys) { context.setMagnets(keys); renderRecommendations(); },
     setDustLimit(value) { context.setDustLimit(value); renderRecommendations(); },
-    select, color, saveLayout,
+    select, color, saveLayout, loadPopularity,
     deselectLast() {
       if (latest.selectedKeys.length) context.setSelection(latest.selectedKeys.slice(0, -1));
     },

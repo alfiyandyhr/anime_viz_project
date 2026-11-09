@@ -10,7 +10,7 @@
 
   <meta
     name="description"
-    content="Explore similar stories in either direction with up to three title and genre cohort magnets."
+    content="Explore stories in either direction with up to three title, genre cohort, and popularity magnets."
   >
 
   <title>AnIViz — Dust &amp; Magnet</title>
@@ -85,6 +85,7 @@
             <legend>Magnet type</legend>
             <label><input type="radio" name="magnet-type" value="title" checked> Title</label>
             <label><input type="radio" name="magnet-type" value="genre"> Genre cohort</label>
+            <label><input type="radio" name="magnet-type" value="popularity"> High popularity</label>
           </fieldset>
           <div class="recommendation-controls" id="title-magnet-search">
             <label class="movie-search-label" for="movie-search">
@@ -101,6 +102,11 @@
             </label>
             <p id="genre-magnet-source"></p>
             <button id="add-genre-magnet" class="small-button" type="button" disabled>Add genre magnet</button>
+          </div>
+          <div id="popularity-magnet-picker" hidden>
+            <p id="popularity-magnet-source" role="status"></p>
+            <button id="add-popularity-magnet" class="small-button" type="button" disabled>Add popularity magnet</button>
+            <button id="retry-popularity" class="small-button ghost" type="button" hidden>Retry popularity data</button>
           </div>
           <div id="movie-magnets" class="movie-magnets" aria-label="Your magnets" hidden></div>
           <details class="field-options" data-field-options>
@@ -226,7 +232,7 @@
 
           <article class="chart-card dust-analysis-wide"><p class="chart-kicker">Compare similarities &amp; differences</p>
             <h3>Which stories are similar—and which differ?</h3>
-            <p>Select a magnet to rank the displayed titles by cosine similarity. Thicker curves show higher similarity within that magnet’s score range. Color shows each title’s closest magnet. Dust members lists the titles closest to the selected magnet. Scroll either list to see more titles.</p>
+            <p id="dust-connection-method">Select a magnet to rank the displayed titles by cosine similarity. Thicker curves show higher scores within that magnet’s range. Color shows each title’s closest magnet. Dust members lists the titles closest to the selected magnet. Scroll either list to see more titles.</p>
             <p>Outlined titles are selected for comparison in the playground and here. Click an outlined title to remove it. Click any other title to open its details and add it to the comparison if there’s room for it. Compare up to three titles.</p>
             <p data-coverage="connections"></p><div class="dust-linked-chart" role="region" aria-label="Similarity connections" data-dust-chart="connections"></div></article>
           <div class="dust-analysis-wide dust-reception">
@@ -266,8 +272,9 @@
             <article><h3>One million comparisons</h3><p id="recommendation-method-data">1,000 popular AniList anime × 1,000 popular TMDB movies. Both directions use the same pair scores from the complete score matrix.</p></article>
             <article><h3>Story similarity</h3><p id="recommendation-method-model">Qwen3-Embedding-4B embeds titles, genres, tags, and synopses. Cosine similarity compares the normalized vectors; ratings and popularity do not affect the score.</p></article>
             <article><h3>Genre cohorts</h3><p>A cohort uses every sampled title with that genre in the magnet catalogue. Its score is the mean of the signed cosines to those titles. A title can belong to multiple cohorts and contribute to each of their scores. Each magnet contributes one score to the combined average. Field options filter the dust while the cohorts stay fixed.</p></article>
+            <article><h3>High popularity</h3><p>One popularity magnet can use AniList list users for anime or the TMDB popularity metric for movies. The picker shows the snapshot date and sample coverage. With popularity active, each magnet’s raw scores become attraction percentiles from 0 to 1 over the same titles with known popularity. Ties share the average rank and a sample of one gets 0.5. Magnets contribute equally to the average attraction percentile. Dot count and filters leave the reference sample fixed. The full ranking retains titles with unavailable popularity and supports sorting by raw evidence.</p></article>
 
-            <article><h3>Reading the magnets</h3><p>The field samples each magnet’s strongest matches, then fills remaining slots by average cosine. Distances express each dot’s preference order across magnets. Color identifies its highest-scoring magnet. If three magnets approach a straight line, some distances become approximate. Spread the magnets or reset positions to recover the full ordering. Hover or focus a dot to see its scores rounded to three decimals. Select up to three dots with a click, tap, Enter, or Space. Select again to remove a title, or click empty space to remove the latest selection.</p></article>
+            <article><h3>Reading the magnets</h3><p>The field samples each magnet’s strongest matches, then fills remaining slots by average cosine or average attraction percentile. Distances express each dot’s preference order across magnets. Color identifies its highest-scoring magnet. If three magnets approach a straight line, some distances become approximate. Spread the magnets or reset positions to recover the full ordering. Hover or focus a dot to see its scores. Select up to three dots with a click, tap, Enter, or Space. Select again to remove a title, or click empty space to remove the latest selection.</p></article>
             <article><h3>Reading the charts</h3><p>Charts use the displayed titles. The full ranking uses the entire dust catalogue. Genres can overlap. With anime dust, AniList popularity counts list users and reception marker size shows favourites. With movie dust, the TMDB sample supplies genres and release years for analysis.</p></article>
             <article><h3>A starting point</h3><p>These are text-based recommendations, not predictions of your enjoyment. Seasons, sequels, and the same animated film in both databases can appear separately. Genre labels are context, not an explanation of the model’s score.</p></article>
           </div>

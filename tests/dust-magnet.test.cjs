@@ -158,6 +158,16 @@ test("moving magnets preserves score order immediately and throughout the animat
   }
 });
 
+test("changing attraction scores refreshes geometry with fixed magnet positions", () => {
+  const anchors = [{ x: 100, y: 250 }, { x: 540, y: 250 }];
+  const node = grain([.8, .2], 250, 250);
+  stepDust([node], anchors, 640, 500, 0);
+  assertScoreOrder(node, anchors);
+  node.scores = [.2, .8];
+  stepDust([node], anchors, 640, 500, 0);
+  assertScoreOrder(node, anchors);
+});
+
 test("impossible collinear orders keep the best movie nearest and flag the limitation", () => {
   const anchors = [{ x: 100, y: 250 }, { x: 320, y: 250 }, { x: 540, y: 250 }];
   const [node] = layoutDust([grain([.8, .2, .6])], anchors, 640, 500);

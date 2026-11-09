@@ -527,3 +527,83 @@ test('an explicitly empty v1 session takes priority over the legacy seed and exa
   context.setDirection(FORWARD);
   assert.deepEqual(context.setDirection(REVERSE).magnetKeys, []);
 });
+
+test('popularity uses midranks on one shared sample and preserves raw sorts for missing titles', () => {
+  const fixture = {
+    movies: [{ id: 1, title: 'One', genres: ['Action'] }, { id: 2, title: 'Two', genres: ['Action'] }],
+    anime: [1, 2, 3, 4].map(id => ({ id, title: String(id) }))
+  };
+  const matrix = Float32Array.of(-0.5, -0.5, 0.5, 1, 0, 0.5, -1, 1);
+  const context = createContext();
+  context.setSources(fixture, matrix);
+  context.setMetadata([{ id: 1, popularity: 10 }, { id: 2, popularity: 20 }, { id: 3, popularity: 20 }]);
+  const keys = ['tmdb:1', 'tmdb:genre:Action', 'anilist:popularity'];
+  const mixed = context.setMagnets(keys);
+  assert.equal(mixed.popularity.eligible, 3);
+  assert.deepEqual(mixed.ranking.map(row => [row.key, row.scores, row.rawScores, row.rank]), [
+    ['anilist:2', [0.25, 1, 0.75], [-0.5, 0, 20], 1],
+    ['anilist:3', [1, 0.25, 0.75], [0.5, -0.25, 20], 2],
+    ['anilist:1', [0.25, 0.25, 0], [-0.5, -0.25, 10], 3],
+    ['anilist:4', [null, null, null], [1, 1, null], null]
+  ]);
+  assert.equal(mixed.ranking[0].score, 2 / 3);
+  assert.equal(mixed.ranking[0].closest, 1);
+  assert.equal(mixed.ranking[3].score, null);
+  assert.equal(mixed.candidateDust.length, 3);
+  context.setFilters({ search: '2' });
+  context.setDustLimit(30);
+  assert.deepEqual(context.snapshot().displayedKeys, ['anilist:2']);
+  assert.deepEqual(context.snapshot().displayedDust[0].scores, [0.25, 1, 0.75]);
+  const raw = context.setRankingSort('tmdb:1');
+  assert.deepEqual(raw.ranking.map(row => [row.key, row.rank]), [
+    ['anilist:4', 1], ['anilist:3', 2], ['anilist:1', 3], ['anilist:2', 4]
+  ]);
+  context.setMetadata([{ id: 3, popularity: 0 }]);
+  assert.deepEqual(context.snapshot().candidateDust[0].scores, [0.5, 0.5, 0.5]);
+  assert.equal(context.snapshot().candidateDust[0].closest, 0);
+  const cosine = context.setMagnets(keys.slice(0, 2));
+  assert.equal(cosine.mixed, false);
+  assert.equal(cosine.ranking[0].score, 1);
+  assert.equal(cosine.candidateDust.length, 4);
+});
+
+test('popularity sources, saved choices, and missing values remain independent by direction', () => {
+  const { context, storage } = setup();
+  const scienceFiction = 'tmdb:genre:Science Fiction';
+  const forwardKeys = ['tmdb:27205', scienceFiction, 'anilist:popularity'];
+  const forward = context.setMagnets(forwardKeys);
+  assert.equal(forward.popularity.eligible, 997);
+  assert.equal(forward.ranking.filter(row => row.rank === null).length, 3);
+  const inceptionRow = data.movies.findIndex(movie => movie.id === movies[0]) * data.anime.length;
+  assert.ok(forward.candidateDust.every(row => row.rawScores[0] === scores[inceptionRow + row.index]));
+  context.setDirection(REVERSE);
+  const reverseKeys = ['anilist:1', 'tmdb:popularity'];
+  context.setMagnets(reverseKeys);
+  context.setRankingSort('tmdb:popularity');
+  assert.equal(context.snapshot().ranking[0].key, 'tmdb:9016');
+
+  const restored = createContext({ storage });
+  assert.ok(restored.restore());
+  restored.setSources(data, scores);
+  assert.deepEqual(restored.snapshot().magnetKeys, reverseKeys);
+  assert.deepEqual(restored.snapshot().activeMagnetKeys, ['anilist:1']);
+  const { popularity } = require('../data/movie_popularity.json');
+  const ids = data.movies.slice(0, 3).map(movie => String(movie.id));
+  const unavailable = restored.setMoviePopularity(null, 'unavailable');
+  assert.deepEqual(unavailable.magnetKeys, reverseKeys);
+  assert.equal(unavailable.mixed, false);
+  const tied = restored.setMoviePopularity({ popularity: { [ids[0]]: 8, [ids[1]]: 8, [ids[2]]: null } }, 'ready');
+  assert.deepEqual(tied.ranking.slice(0, 3).map(row => [row.key, row.scores[1], row.rank]), [
+    [tmdb(ids[0]), 0.5, 1], [tmdb(ids[1]), 0.5, 2], [tmdb(ids[2]), null, null]
+  ]);
+  const reverse = restored.setMoviePopularity({ popularity }, 'ready');
+  assert.equal(reverse.popularity.eligible, 1000);
+  const selected = reverse.displayedKeys[0];
+  restored.setSelection([selected]);
+  const missing = restored.setDirection(FORWARD);
+  assert.deepEqual(missing.magnetKeys, forwardKeys);
+  assert.equal(missing.mixed, false);
+  restored.setMetadata(dashboard.anime);
+  assert.deepEqual(restored.snapshot().ranking, forward.ranking);
+  assert.deepEqual(restored.setDirection(REVERSE).selectedKeys, [selected]);
+});

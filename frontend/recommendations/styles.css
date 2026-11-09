@@ -523,6 +523,7 @@ body[data-chapter="recommendations"] .filterbar { display: none; }
 .dust-connection-rank, .dust-connection-score { font-variant-numeric: tabular-nums; }
 .dust-connection-rank { color: var(--text-muted); text-align: right; }
 .dust-connection-score { color: var(--dust-color); }
+.dust-connection-score small, .dust-member-score small { display: block; color: var(--text-muted); }
 .dust-member-panel { min-width: 0; }
 .dust-member-panel h4 { margin: 0 0 8px; font-size: .95rem; }
 .dust-member-magnets {
@@ -587,7 +588,7 @@ body[data-chapter="dust-magnet"] .recommendation-picker {
 }
 .magnet-type-picker input[type="radio"]:focus { box-shadow: none; }
 .magnet-type-picker input[type="radio"]:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
-#genre-magnet-source { margin: 6px 0; color: var(--text-soft); font-size: .72rem; }
+#genre-magnet-source, #popularity-magnet-source { margin: 6px 0; color: var(--text-soft); font-size: .72rem; }
 .dust-movie-drawer { padding: 48px 24px 24px; overflow-wrap: anywhere; }
 .dust-movie-drawer > * { margin-bottom: 16px; }
 body[data-chapter="dust-magnet"] .recommendation-controls { display: block; min-width: 0; }

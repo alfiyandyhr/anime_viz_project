@@ -84,6 +84,10 @@ function bindRecommendationControls() {
     document.querySelector("#recommendation-status").textContent = "";
   });
   document.querySelector("#add-genre-magnet").addEventListener("click", () => addMagnet(genreChoice.value, "genre"));
+  document.querySelector("#add-popularity-magnet").addEventListener("click", () => {
+    addMagnet(AnivizMain.snapshot().popularity.key, "popularity");
+  });
+  document.querySelector("#retry-popularity").addEventListener("click", () => AnivizMain.loadPopularity());
   document.querySelector("#dust-direction").addEventListener("change", event => AnivizMain.switchDirection(event.target.value));
   document.querySelector("#recommendation-retry").addEventListener("click", () => {
     recommendationState.error = null;
@@ -123,18 +127,42 @@ function resetMagnetPicker() {
 }
 
 function updateMagnetPickerMode() {
-  const genre = document.querySelector('#magnet-type [value="genre"]').checked;
-  document.querySelector("#genre-magnet-picker").hidden = !genre;
-  document.querySelector("#title-magnet-search").hidden = genre;
-  document.querySelector("#movie-suggestions").hidden = genre;
+  const type = document.querySelector('#magnet-type input:checked').value;
+  document.querySelector("#genre-magnet-picker").hidden = type !== "genre";
+  document.querySelector("#title-magnet-search").hidden = type !== "title";
+  document.querySelector("#movie-suggestions").hidden = type !== "title";
   document.querySelector("#movie-search-results").hidden = true;
   document.querySelector("#recommendation-status").textContent = "";
-  if (!genre) renderMovieSearchResults();
+  if (type === "title") renderMovieSearchResults();
+  if (type === "popularity" && AnivizMain.snapshot().popularity?.status === "idle") AnivizMain.loadPopularity();
+  renderPopularityPicker();
+}
+
+function popularityDescription({ metric, snapshotDate, eligible, total }) {
+  return `${metric}${snapshotDate ? ` · ${snapshotDate.slice(0, 10)} UTC` : ""} · ${eligible} of ${total} eligible`;
+}
+
+function renderPopularityPicker() {
+  const { popularity, magnetKeys } = AnivizMain.snapshot();
+  if (!popularity) return;
+  const picking = document.querySelector('#magnet-type [value="popularity"]').checked;
+  const saved = magnetKeys.includes(popularity.key);
+  const button = document.querySelector("#add-popularity-magnet");
+  document.querySelector("#popularity-magnet-picker").hidden = !picking && !(saved && !popularity.eligible);
+  button.hidden = !picking;
+  button.disabled = !popularity.eligible;
+  button.textContent = `Add ${popularity.title.toLowerCase()} magnet`;
+  document.querySelector("#retry-popularity").hidden = popularity.status !== "unavailable";
+  const status = popularity.eligible ? popularityDescription(popularity)
+    : ["loading", "idle"].includes(popularity.status) ? `Loading ${popularity.metric}…`
+    : popularity.status === "unavailable" ? `${popularity.metric} could not be loaded or validated. Retry to use this magnet.`
+    : `${popularityDescription(popularity)}. No values are available for this sample.`;
+  document.querySelector("#popularity-magnet-source").textContent = status;
 }
 
 function focusMagnetPicker() {
-  const genre = !document.querySelector("#genre-magnet-picker").hidden;
-  const input = document.querySelector(genre ? "#genre-magnet-choice" : "#movie-search");
+  const type = document.querySelector('#magnet-type input:checked').value;
+  const input = document.querySelector({ title: "#movie-search", genre: "#genre-magnet-choice", popularity: "#add-popularity-magnet" }[type]);
   (input.disabled ? document.querySelector('#magnet-type input:checked') : input).focus({ preventScroll: true });
 }
 
@@ -163,9 +191,9 @@ async function loadRecommendations() {
     document.querySelector("#dust-direction").disabled = false;
     document.querySelector("#magnet-type").disabled = false;
     document.querySelector("#recommendation-method-data").textContent =
-      `${numberFormatter.format(data.meta.anime_count)} AniList anime × ${numberFormatter.format(data.meta.movie_count)} TMDB movies: ${numberFormatter.format(data.meta.pair_count)} pairs. Both directions read the same cosine for each movie–anime pair. Use up to three magnets in any mix of titles and genre cohorts from the chosen magnet catalogue. Computed ${formatDate(data.meta.generated_at)}.`;
+      `${numberFormatter.format(data.meta.anime_count)} AniList anime × ${numberFormatter.format(data.meta.movie_count)} TMDB movies: ${numberFormatter.format(data.meta.pair_count)} pairs. Both directions read the same cosine for each movie–anime pair. Use up to three magnets across titles, genre cohorts, and one popularity magnet. Computed ${formatDate(data.meta.generated_at)}.`;
     document.querySelector("#recommendation-method-model").textContent =
-      `${data.meta.model} embeds titles, genres, tags, and synopses. Cosine similarity compares normalized vectors; ratings and popularity do not affect the score.`;
+      `${data.meta.model} embeds titles, genres, tags, and synopses. Cosine similarity compares the normalized story vectors. The popularity magnet uses a separate source metric.`;
   } catch (error) {
     recommendationState.error = error.message;
     setStatus("Recommendation data could not be loaded.", "error");
@@ -222,15 +250,16 @@ function renderMovieSearchResults() {
 }
 
 function addMagnet(key, type = "title") {
-  const { magnetKeys, genreCohorts } = AnivizMain.snapshot();
+  const { magnetKeys, genreCohorts, popularity } = AnivizMain.snapshot();
   const status = document.querySelector("#recommendation-status");
   const genre = type === "genre";
   if (genre && !genreCohorts.some(cohort => cohort.key === key)) {
     status.textContent = "That genre cohort is unavailable in this sample.";
     return;
   }
+  if (type === "popularity" && !popularity.eligible) return;
   if (magnetKeys.includes(key)) {
-    status.textContent = `That ${genre ? "genre cohort" : "title"} is already a magnet.`;
+    status.textContent = `That ${genre ? "genre cohort" : type === "popularity" ? "popularity choice" : "title"} is already a magnet.`;
     return;
   }
   if (magnetKeys.length >= 3) {
@@ -252,6 +281,7 @@ function renderRecommendations() {
   }
   document.querySelector("#movie-magnets").hidden = false;
   document.querySelector("#dust-toolbar").hidden = false;
+  renderPopularityPicker();
   hideTooltip();
   renderDustRecommendations();
 }

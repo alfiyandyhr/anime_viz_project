@@ -10,8 +10,8 @@
     }));
     return requests.get(key);
   }
-  async function json(path) {
-    const response = await fetch(new URL(path, base), { headers: { Accept: "application/json" } });
+  async function json(path, cache = "default") {
+    const response = await fetch(new URL(path, base), { headers: { Accept: "application/json" }, cache });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   }
@@ -22,6 +22,26 @@
       return payload;
     }),
     recommendations: () => once("recommendations", () => json("data/movie_recommendations.json")),
+    moviePopularity: data => {
+      const movieIds = data.movies.map(movie => String(movie.id)).sort();
+      return once(`movie-popularity:${movieIds.join(",")}`, async () => {
+        const ids = new Set(movieIds);
+        const payload = await json("data/movie_popularity.json", "no-cache");
+        const { popularity, snapshot_date: date } = payload || {};
+        const entries = Object.entries(popularity || {});
+        const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(date) : null;
+        if (payload?.schema_version !== 1 || payload.source !== "TMDB" || payload.metric !== "popularity"
+          || !parsedDate || !Number.isFinite(+parsedDate) || parsedDate.toISOString().slice(0, 10) !== date
+          || !/^[a-f0-9]{64}$/.test(payload.input_sha256)
+          || !popularity || typeof popularity !== "object" || Array.isArray(popularity)
+          || ids.size !== movieIds.length || entries.length !== ids.size || payload.record_count !== ids.size
+          || entries.some(([id, value]) => !ids.has(id) || (value !== null && !Number.isFinite(value)))
+          || payload.eligible_count !== entries.filter(([, value]) => Number.isFinite(value)).length) {
+          throw new Error("Invalid TMDB popularity data for this movie sample");
+        }
+        return payload;
+      });
+    },
     history: () => once("history", () => json("story.json")),
     matrix: data => once(`matrix:${data.meta.score_matrix?.sha256}`, async () => {
       const meta = data.meta.score_matrix;

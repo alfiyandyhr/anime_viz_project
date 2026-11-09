@@ -47,6 +47,7 @@ class FrontendRoutesTests(unittest.TestCase):
                 ("/frontend/common/navigation.js", "frontend/common/navigation.js"),
                 ("/data/movie_recommendations.json", "data/movie_recommendations.json"),
                 ("/data/movie_anime_scores.bin", "data/movie_anime_scores.bin"),
+                ("/data/movie_popularity.json", "data/movie_popularity.json"),
                 ("/data/story_movie_recommendations.json", "data/story_movie_recommendations.json"),
                 ("/assets/tmdb-logo.svg", "assets/tmdb-logo.svg"),
                 ("/frontend/recommendations/app.js", "frontend/recommendations/app.js"),

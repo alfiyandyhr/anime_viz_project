@@ -178,7 +178,7 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
         return top >= 48 && top < 180;
       }, anchor);
     }
-    assert.match(await page.locator('#reception').innerText(), /no ratings or popularity/);
+    assert.match(await page.locator('#reception').innerText(), /no ratings.*separate TMDB popularity snapshot/);
     assert.match(await page.locator('#creators').innerText(), /no production company or cast credits/);
     await page.evaluate(() => {
       sessionStorage.setItem('aniviz-dust-session-v1', JSON.stringify({ version: 1, state: {

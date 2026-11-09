@@ -228,6 +228,18 @@ Try **Inception** with **Science Fiction movies** (214 TMDB movies), or **Sci-Fi
 (165 AniList anime) in the reverse direction. Each cohort score averages the signed
 cosines to its sampled titles. A cohort occupies one slot and contributes one score
 to the combined average. Its membership stays fixed when you filter the dust.
+
+Choose **High popularity** to add one popularity magnet within the same three
+slots. With anime dust it uses AniList list users (997 of 1,000 anime in the
+2026-09-29 snapshot). With movie dust it uses TMDB popularity (1,000 of 1,000
+movies in the 2026-10-11 snapshot). Try **Inception**, **Science Fiction movies**,
+and **High anime popularity** together. Each magnet's raw values become
+midrank percentiles from 0 to 1 over the same titles with known popularity.
+The field and combined ranking use those percentiles. Individual ranking
+sorts and score evidence still expose the raw values. Titles without popularity
+stay in the full ranking with an unavailable combined rank. Remove the
+popularity magnet to return to cosine scores.
+
 **Field options** contains the 30/60/90 dot choices, filters, and
 **Reset positions**. Drag magnets, or focus
 one and use arrow keys, to rearrange the field. Hover or keyboard-focus an anime
@@ -241,14 +253,14 @@ available by scrolling.
 
 The dust field defaults to **60 dots**, with 30 and 90 options. It reserves half
 the candidate budget equally for each magnet's strongest matches, then fills
-remaining slots with the highest mean cosine scores, deduplicating overlap.
-All candidates use the complete matrix. Color identifies the highest-scoring
+remaining slots with the highest average attraction scores, deduplicating overlap.
+The reference sample stays fixed when dot count or filters change. Color identifies the highest-scoring
 magnet; white outlines mark selected anime. Selected dots show connections;
 hover and keyboard focus show score tooltips without selecting an anime.
 
 With two or three magnets, each dot is closer to its higher-scoring magnets.
-Targets fit squared-distance differences to cosine-score differences, including
-zero and negative scores. Each dot is constrained to the intersection of the
+Targets fit squared-distance differences to score differences, using signed
+cosines or attraction percentiles. Each dot is constrained to the intersection of the
 appropriate sides of the magnets' perpendicular bisectors. Collision separation
 also respects these constraints, so crowding cannot reverse the score order.
 Tied scores impose no ordering. A single magnet gathers a compact cloud at its
@@ -300,6 +312,14 @@ lazily loads and validates it for the magnet view and the full ranking. Commit b
 `data/movie_recommendations.json` and `data/movie_anime_scores.bin` along with
 frontend changes to deploy. The analysis outputs and model weights are not
 needed by the site.
+
+To rebuild the movie popularity sidecar from the archived TMDB CSV, run
+`python3 data/export_movie_popularity.py`. The exporter checks the input
+SHA-256 against the completed similarity run and requires exact coverage of the
+published TMDB IDs. It records the collection date, source, input hash, and
+eligible count in `data/movie_popularity.json`. Flask and static hosting serve
+the same file. The browser loads and validates it separately when movie popularity
+is requested, with a Retry control if the fetch or validation fails.
 
 Run recommendation, story, network, and collector checks:
 

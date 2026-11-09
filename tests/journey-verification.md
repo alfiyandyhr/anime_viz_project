@@ -1,3 +1,32 @@
+# High-popularity magnets
+
+1. Keep **Inception** in **Movie → Anime**. Add **Science Fiction movies** and
+   **High anime popularity**. The popularity chip reports 997 of 1,000 titles
+   with AniList list-user counts from 2026-09-29 UTC.
+2. Focus a dot and compare two dots. Check the raw cosine, raw popularity, and
+   the attraction percentiles in the tooltip, mirror, focus card, comparison,
+   and connections. Change dot count, filter, and move a magnet. The full
+   ranking and the reference percentiles stay fixed.
+3. On the last page of the combined ranking, check the three titles with
+   unavailable popularity and combined ranks. Sort by Inception and confirm
+   all 1,000 titles have a raw similarity rank. Remove popularity to restore
+   cosine scores.
+4. Switch to **Anime → Movies** and add **High movie popularity** alongside
+   Cowboy Bebop. The separate TMDB snapshot covers 1,000 movies and is dated
+   2026-10-11 UTC. Switch directions and reload to check saved magnets, sorts,
+   and selections.
+5. Block the dashboard or movie popularity request and reload a saved
+   popularity magnet. The chip is inactive and the remaining magnets still
+   work. Restore the request and use **Retry popularity data** to reactivate it.
+   Repeat with a movie sidecar whose ID set differs from the movie bundle.
+
+Run `node tests/browser/dust-popularity.cjs` with the Playwright setup below.
+Use the Flask root URL and a static URL under the project prefix. The Node
+suites also cover signed raw scores, missing values, ties, a sample of one, and
+geometry refresh after a score change.
+
+---
+
 # Genre cohort magnets
 
 1. In **Movie → Anime**, keep Inception and add **Genre cohort → Science Fiction movies**.

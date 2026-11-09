@@ -23,19 +23,25 @@
   function magnetScores(match, magnets, color, { escapeHTML: escape, escapeAttribute: attr },
     { exactEvidence = true } = {}) {
     if (!match) return '';
+    const mixed = magnets.some(magnet => magnet.kind === 'popularity');
     return `<div class="dust-detail-scores">${magnets.map((magnet, index) => {
       const score = match.scores[index];
+      if (mixed) {
+        const label = attr(root.AnivizDust.mixedEvidence(match, magnet, index));
+        const name = root.AnivizDust.magnetScoreLabel(magnet);
+        return `<div style="--magnet-color:${color(magnet.key)}"><span><i></i>${escape(name)} <b>${root.AnivizDust.formatRawScore(match.rawScores[index], magnet)}</b></span><strong tabindex="0" title="${label}" aria-label="${label}">${root.AnivizDust.formatPercentile(score)}</strong></div>`;
+      }
       const rounded = score.toFixed(3);
       const cohort = magnet.kind === 'genre';
       const name = cohort ? root.AnivizDust.magnetScoreLabel(magnet) : magnet.title;
       const label = attr(cohort ? `${name}: ${score}` : `Cosine ${exactEvidence ? score : rounded}`);
       return `<div style="--magnet-color:${color(magnet.key)}"><span><i></i>${escape(name)}</span><strong tabindex="0" title="${label}" aria-label="${label}">${rounded}</strong></div>`;
-    }).join('')}<small>Cosine similarity · higher means closer</small></div>`;
+    }).join('')}<small>${mixed ? `Right column: attraction percentile (0–1)<br>${root.AnivizDust.averageLabel(true)}: ${root.AnivizDust.formatPercentile(match.score)}` : 'Cosine similarity · higher means closer'}</small></div>`;
   }
 
   function render({ snapshot, color, helpers }) {
     const { escapeHTML: escape, escapeAttribute: attr, humanize, formatNumber } = helpers;
-    const { magnets } = snapshot;
+    const { magnets, mixed } = snapshot;
     const reverse = snapshot.direction === 'anime-to-movies';
     const noun = reverse ? 'movies' : 'anime';
     const selected = snapshot.selectedKeys.map(key => snapshot.displayedDust.find(row => row.key === key)).filter(Boolean);
@@ -61,13 +67,17 @@
         ...metadataRows,
         ...magnets.map((magnet, index) => {
           const cohort = magnet.kind === 'genre';
-          const label = cohort ? root.AnivizDust.magnetScoreLabel(magnet) : magnet.title;
+          const label = mixed || cohort ? root.AnivizDust.magnetScoreLabel(magnet) : magnet.title;
           return [`M${index + 1} · ${label}`, (_, i) => {
-            const value = matches[i].scores[index];
+            const match = matches[i], value = match.scores[index];
+            if (mixed) return `<small>Raw ${root.AnivizDust.formatRawScore(match.rawScores[index], magnet)}</small><br>${
+              score(value, 0, 1, root.AnivizDust.formatPercentile(value), root.AnivizDust.mixedEvidence(match, magnet, index))}`;
             return score(value, -1, 1, value.toFixed(3), cohort ? `${label}: ${value}` : `Cosine ${value}`);
           }];
         }),
-        ['Average cosine similarity', (_, i) => score(matches[i].score, -1, 1, matches[i].score.toFixed(3), `Average cosine ${matches[i].score}`)]
+        [mixed ? root.AnivizDust.averageLabel(true) : 'Average cosine similarity', (_, i) =>
+          score(matches[i].score, mixed ? 0 : -1, 1, matches[i].score.toFixed(3),
+            `${mixed ? root.AnivizDust.averageLabel(true) : 'Average cosine'} ${matches[i].score}`)]
       ];
       return `<div class="dust-comparison-scroll" role="region" tabindex="0" aria-label="Selected ${noun} comparison, scroll horizontally">
         <table class="dust-comparison-table"><caption class="sr-only">Selected ${noun} comparison</caption>
@@ -80,7 +90,7 @@
           </th>`;
         }).join('')}</tr></thead>
         <tbody>${rows.map(([label, cell], index) => `<tr${index >= metadataRows.length && index < metadataRows.length + magnets.length ? ` style="--magnet-color:${color(magnets[index - metadataRows.length].key)}" class="dust-movie-metric"` : ''}><th scope="row">${escape(label)}</th>${values.map((value, i) => `<td>${cell(value, i)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
-        <p class="table-note">${reverse ? '' : 'Estimated runtime multiplies episodes by minutes per episode. '}Cosine scores range from −1 to 1.</p>`;
+        <p class="table-note">${reverse ? '' : 'Estimated runtime multiplies episodes by minutes per episode. '}${mixed ? 'Meters show attraction percentiles from 0 to 1.' : 'Cosine scores range from −1 to 1.'}</p>`;
     }
     const focused = selected.at(-1);
     const record = focused && recordFor(focused);

@@ -20,7 +20,7 @@
 
     function update(value, resetMemberScroll = false) {
       const { snapshot } = value;
-      const { magnets, magnetKeys, displayedDust, selectedKeys } = snapshot;
+      const { magnets, activeMagnetKeys: magnetKeys, displayedDust, selectedKeys, mixed } = snapshot;
       const noun = snapshot.direction === 'anime-to-movies' ? 'movies' : 'anime';
       const focused = document.activeElement;
       const focusKey = ['data-dust-connection-movie', 'data-dust-connection-id', 'data-dust-connection-panel',
@@ -38,7 +38,8 @@
       drawLines = null;
       const magnet = magnets[magnetIndex];
       const cohortLabel = magnet?.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : '';
-      onCoverage(`${displayedDust.length} displayed ${noun} · ${cohortLabel || 'Signed cosine similarity'}.`);
+      const scoreLabel = mixed ? `Attraction percentile · ${AnivizDust.magnetScoreLabel(magnet)}` : cohortLabel || 'Signed cosine similarity';
+      onCoverage(`${displayedDust.length} displayed ${noun} · ${scoreLabel}.`);
       if (!magnetKeys.length || !displayedDust.length) {
         offsets = [0, 0];
         renderEmpty(container, magnetKeys.length ? `No ${noun} match the current dust filters. Broaden or reset filters to see connections.`
@@ -52,6 +53,12 @@
       const midpoint = Math.ceil(ranking.length / 2);
       const max = ranking[0].similarity, min = ranking.at(-1).similarity;
       const title = titleFor(magnetIndex);
+      const evidence = match => mixed ? AnivizDust.mixedEvidence(match, magnet, magnetIndex)
+        : cohortLabel ? `${cohortLabel}: ${match.similarity}` : `Cosine ${match.similarity}`;
+      const showScores = cells => {
+        cells.attr('title', evidence).text(match => match.similarity.toFixed(3));
+        if (mixed) cells.append('small').text(match => `Raw ${AnivizDust.formatRawScore(match.rawScores[magnetIndex], magnet)}`);
+      };
       const comparison = d3.select(container).append('div').attr('class', 'dust-connection-comparison');
       const card = comparison.append('section').attr('class', 'dust-connection-map')
         .attr('aria-label', `Similarity connections for ${title}`);
@@ -79,7 +86,7 @@
       const panels = card.append('div').attr('class', 'dust-connection-panels');
       const lists = [ranking.slice(0, midpoint), ranking.slice(midpoint)].map((matches, index) => {
         if (!matches.length) return null;
-        const label = index === 0 ? 'Most similar' : 'Least similar';
+        const label = mixed ? (index === 0 ? 'Highest attraction' : 'Lowest attraction') : (index === 0 ? 'Most similar' : 'Least similar');
         const ranks = matches.length === 1 ? `Rank ${matches[0].rank}` : `Ranks ${matches[0].rank}–${matches.at(-1).rank}`;
         const section = panels.append('div').attr('class', 'dust-connection-panel');
         const heading = section.append('h4');
@@ -95,13 +102,13 @@
           .attr('aria-pressed', isSelected)
           .attr('aria-haspopup', match => isSelected(match) ? null : 'dialog')
           .attr('aria-controls', 'recommendation-detail detail-drawer')
-          .attr('aria-label', match => `Dust rank ${match.rank} of ${ranking.length}: ${match.record.title}. ${AnivizDust.magnetScoreLabel(magnet)}: ${match.similarity}.`)
+          .attr('aria-label', match => `Dust rank ${match.rank} of ${ranking.length}: ${match.record.title}. ${mixed ? evidence(match) : `${AnivizDust.magnetScoreLabel(magnet)}: ${match.similarity}`}.`)
           .attr('title', match => match.record.title)
           .on('click', (event, match) => onSelect(match.key));
         rows.append('span').attr('class', 'dust-connection-dot').attr('aria-hidden', 'true');
         rows.append('span').attr('class', 'dust-connection-rank').text(match => match.rank);
         rows.append('span').attr('class', 'dust-connection-title').text(match => match.record.title);
-        rows.append('span').attr('class', 'dust-connection-score').attr('title', match => cohortLabel ? `${cohortLabel}: ${match.similarity}` : `Cosine ${match.similarity}`).text(match => match.similarity.toFixed(3));
+        showScores(rows.append('span').attr('class', 'dust-connection-score'));
         const panel = list.node(), end = panel.scrollHeight - panel.clientHeight;
         panel.scrollTop = index === 0 ? offsets[index] : end - offsets[index];
         list.on('scroll', () => {
@@ -123,7 +130,7 @@
           .attr('tabindex', 0).attr('aria-label', `Dust member ranking for ${title}`).attr('data-dust-member-scroll', '');
         const table = scroll.append('table').attr('aria-label', `Dust members for ${title}`)
           .style('--magnet-color', color(selectedMagnetKey));
-        table.append('thead').append('tr').selectAll('th').data(['Rank', noun === 'movies' ? 'Movie' : 'Anime', cohortLabel || 'Similarity']).join('th')
+        table.append('thead').append('tr').selectAll('th').data(['Rank', noun === 'movies' ? 'Movie' : 'Anime', mixed ? scoreLabel : cohortLabel || 'Similarity']).join('th')
           .attr('scope', 'col').text(label => label);
         const rows = table.append('tbody').selectAll('tr').data(members).join('tr')
           .classed('dust-member-selected', isSelected)
@@ -136,7 +143,7 @@
           .attr('data-dust-member-id', match => `${selectedMagnetKey}:${match.key}`)
           .attr('aria-pressed', isSelected).attr('aria-haspopup', match => isSelected(match) ? null : 'dialog')
           .attr('aria-controls', 'recommendation-detail detail-drawer').text(match => match.record.title);
-        rows.append('td').attr('class', 'dust-member-score').attr('title', match => cohortLabel ? `${cohortLabel}: ${match.similarity}` : `Cosine ${match.similarity}`).text(match => match.similarity.toFixed(3));
+        showScores(rows.append('td').attr('class', 'dust-member-score'));
         scroll.node().scrollTop = memberScrollTop;
       } else {
         memberPanel.append('p').attr('class', 'dust-member-empty').text(`None of the displayed ${noun} are closest to ${title}.`);
