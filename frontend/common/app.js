@@ -156,6 +156,13 @@ function bindControls() {
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeDrawer();
+    if (event.key !== "Tab" || !elements.drawer.matches('[aria-modal="true"].open')) return;
+    const links = elements.drawer.querySelectorAll('button, a[href], [tabindex="0"]');
+    const edge = event.shiftKey ? links[0] : links[links.length - 1];
+    if (document.activeElement === edge) {
+      event.preventDefault();
+      (event.shiftKey ? links[links.length - 1] : links[0]).focus();
+    }
   });
 
   window.addEventListener("resize", debounce(renderPage, 250));
@@ -535,22 +542,34 @@ function openAnimeDetail(anime) {
     </div>
   `;
 
-  openDrawer();
+  openDrawer("Anime details");
 }
 
-function openDrawer() {
+let drawerTrigger;
+function openDrawer(label) {
+  const modal = elements.drawer.matches('[aria-modal="true"]');
+  if (modal) drawerTrigger = document.activeElement;
+  if (label) elements.drawer.setAttribute("aria-label", label);
   elements.drawer.scrollTop = 0;
   elements.drawer.classList.add("open");
   elements.drawerOverlay.classList.add("open");
   elements.drawer.setAttribute("aria-hidden", "false");
   document.body.style.overflow = "hidden";
+  if (modal) {
+    elements.drawer.inert = false;
+    elements.closeDrawer.focus({ preventScroll: true });
+  }
 }
 
 function closeDrawer() {
+  if (!elements.drawer.classList.contains("open")) return;
   elements.drawer.classList.remove("open");
   elements.drawerOverlay.classList.remove("open");
   elements.drawer.setAttribute("aria-hidden", "true");
+  if (elements.drawer.matches('[aria-modal="true"]')) elements.drawer.inert = true;
   document.body.style.overflow = "";
+  drawerTrigger?.focus({ preventScroll: true });
+  drawerTrigger = null;
 }
 function computeGenreStats(anime) {
   return d3.rollups(

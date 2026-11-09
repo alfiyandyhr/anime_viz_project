@@ -1,12 +1,8 @@
 "use strict";
 
 const recommendationState = {
-  data: null, loading: false, error: null, movieId: null,
-  animeId: null, limit: 5,
-  viz: typeof document !== "undefined" && document.body?.dataset.chapter === "dust-magnet" ? "magnets" : "connections",
-  movieIds: [], dustLimit: 60,
-  scores: null, scoresLoading: false, scoresError: null, magnetPositions: {},
-  ranking: [], tablePage: 0, cohortSelected: false
+  data: null, loading: false, error: null,
+  scores: null, scoresLoading: false, scoresError: null, magnetPositions: {}
 };
 
 function normalizeMovieSearch(value) {
@@ -54,26 +50,61 @@ function getRecommendationRanking(data, scores, movie) {
 function bindRecommendationControls() {
   bindDustControls();
   const search = document.querySelector("#movie-search");
+  const results = document.querySelector("#movie-search-results");
   search.addEventListener("input", renderMovieSearchResults);
-  search.addEventListener("keydown", (event) => {
-    const first = document.querySelector("#movie-search-results button");
+  search.addEventListener("keydown", event => {
+    const first = !results.hidden && results.querySelector("button");
     if (first && ["ArrowDown", "Enter"].includes(event.key)) {
       event.preventDefault();
       if (event.key === "Enter") first.click();
       else first.focus();
     }
-    if (event.key === "Escape") document.querySelector("#movie-search-results").hidden = true;
+    if (event.key === "Escape") results.hidden = true;
   });
-  for (const id of ["#movie-search-results", "#movie-suggestions"]) {
-    document.querySelector(id).addEventListener("click", (event) => {
-      const button = event.target.closest("[data-movie-id]");
-      if (button) selectRecommendationMovie(button.dataset.movieId);
+  results.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+      results.hidden = true;
+      search.focus();
+    }
+    if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === "ArrowDown" ? event.target.nextElementSibling : event.target.previousElementSibling;
+    (next || search).focus();
+  });
+  for (const selector of ["#movie-search-results", "#movie-suggestions"]) {
+    document.querySelector(selector).addEventListener("click", event => {
+      const button = event.target.closest("[data-magnet-key]");
+      if (button) addMagnet(button.dataset.magnetKey);
     });
   }
+  document.querySelector("#dust-direction").addEventListener("change", event => AnivizMain.switchDirection(event.target.value));
   document.querySelector("#recommendation-retry").addEventListener("click", () => {
     recommendationState.error = null;
     renderRecommendations();
   });
+}
+
+function pickerCatalogue() {
+  const { direction } = AnivizMain.snapshot();
+  const { magnet } = AnivizDust.DIRECTIONS[direction];
+  return { direction, magnet, records: AnivizDust.catalogueFor(recommendationState.data, magnet),
+    label: magnet === "tmdb" ? "movie" : "anime" };
+}
+
+function resetMagnetPicker() {
+  const { direction, magnet, records, label } = pickerCatalogue();
+  const search = document.querySelector("#movie-search");
+  search.value = "";
+  search.placeholder = `Search ${label} titles or aliases`;
+  document.querySelector("#movie-search-label").textContent = `Add ${label === "anime" ? "an" : "a"} ${label} magnet · up to 3`;
+  document.querySelector("#movie-search-results").hidden = true;
+  document.querySelector("#recommendation-status").textContent = "";
+  const titles = direction === AnivizDust.REVERSE
+    ? ["Attack on Titan", "ONE PIECE", "Naruto", "Your Name.", "Death Note"]
+    : ["Inception", "Interstellar", "The Matrix", "The Dark Knight", "Titanic"];
+  document.querySelector("#movie-suggestions").innerHTML = `<span>Try a favorite</span>` + titles
+    .map(title => records.find(record => record.title === title)).filter(Boolean)
+    .map(record => `<button type="button" data-magnet-key="${escapeAttribute(AnivizDust.keyFor(magnet, record.id))}">${escapeHTML(record.title)}</button>`).join("");
 }
 
 async function loadRecommendations() {
@@ -97,22 +128,16 @@ async function loadRecommendations() {
     document.querySelector("#footer-generated").textContent = `Generated ${formatDate(data.meta.generated_at)}`;
     document.querySelector("#footer-cache").textContent = "Data mode: published similarity snapshot";
     document.querySelector("#movie-search").disabled = false;
-    const initial = data.movies.find(movie => movie.title === "Inception") || data.movies[0];
-    recommendationState.movieId = initial.id;
-    recommendationState.movieIds = [initial.id];
-    if (recommendationState.viz === "magnets") globalThis.AnivizMain?.initialize(data);
-    document.querySelector("#movie-suggestions").innerHTML = `<span>Try a favorite</span>` +
-      ["Inception", "Interstellar", "The Matrix", "The Dark Knight", "Titanic"]
-        .map((title) => data.movies.find((movie) => movie.title === title)).filter(Boolean)
-        .map((movie) => `<button type="button" data-movie-id="${escapeAttribute(movie.id)}">${escapeHTML(movie.title)}</button>`).join("");
+    AnivizMain.initialize(data);
+    document.querySelector("#dust-direction").disabled = false;
     document.querySelector("#recommendation-method-data").textContent =
-      `${numberFormatter.format(data.meta.anime_count)} AniList anime × ${numberFormatter.format(data.meta.movie_count)} TMDB movies: ${numberFormatter.format(data.meta.pair_count)} pairs. Combine up to three movies using the complete score matrix. Dots combine strong matches to each movie and shared favorites. Computed ${formatDate(data.meta.generated_at)}.`;
+      `${numberFormatter.format(data.meta.anime_count)} AniList anime × ${numberFormatter.format(data.meta.movie_count)} TMDB movies: ${numberFormatter.format(data.meta.pair_count)} pairs. Both directions read the same cosine for each movie–anime pair. Use up to three titles from the chosen magnet catalogue. Computed ${formatDate(data.meta.generated_at)}.`;
     document.querySelector("#recommendation-method-model").textContent =
       `${data.meta.model} embeds titles, genres, tags, and synopses. Cosine similarity compares normalized vectors; ratings and popularity do not affect the score.`;
   } catch (error) {
     recommendationState.error = error.message;
     setStatus("Recommendation data could not be loaded.", "error");
-    status.textContent = `Could not load recommendations (${error.message}). Retry to load the movie sample.`;
+    status.textContent = `Could not load recommendations (${error.message}). Retry to load the title samples.`;
     document.querySelector("#recommendation-retry").hidden = false;
   } finally {
     recommendationState.loading = false;
@@ -127,6 +152,7 @@ async function loadRecommendationScores() {
   try {
     const scores = await AnivizData.matrix(recommendationState.data);
     recommendationState.scores = scores;
+    AnivizMain.setScores(scores);
   } catch (error) {
     recommendationState.scoresError = error.message;
   } finally {
@@ -136,48 +162,50 @@ async function loadRecommendationScores() {
 }
 
 function renderMovieSearchResults() {
-  const data = recommendationState.data;
-  if (!data) return;
+  if (!recommendationState.data) return;
+  const { magnet, records, label } = pickerCatalogue();
   const query = document.querySelector("#movie-search").value;
   const container = document.querySelector("#movie-search-results");
+  const status = document.querySelector("#recommendation-status");
   if (!normalizeMovieSearch(query)) {
     container.hidden = true;
-    document.querySelector("#recommendation-status").textContent = recommendationState.viz === "magnets" ? "" : `Search ${numberFormatter.format(data.movies.length)} movies, or choose a favorite below.`;
+    status.textContent = "";
     return;
   }
-  const matches = searchRecommendationMovies(data.movies, query);
+  const matches = searchRecommendationMovies(records, query);
   container.hidden = false;
-  container.innerHTML = matches.length ? matches.slice(0, 30).map((movie) => `
-    <button type="button" data-movie-id="${escapeAttribute(movie.id)}">
-      <strong>${escapeHTML(movie.title)}</strong><span>${movie.year || "Year unknown"} · ${escapeHTML(movie.genres.join(" / ") || "Genres unavailable")}</span>
-    </button>`).join("") : `<p>No movies match “${escapeHTML(query)}” in this 1,000-movie sample. Try another title.</p>`;
-  document.querySelector("#recommendation-status").textContent = matches.length
-    ? `${matches.length} movies found.${matches.length > 30 ? " Showing the first 30; refine your search." : " Choose one to update your matches."}`
-    : "No search results. Your current movie and recommendations remain below.";
+  container.innerHTML = matches.slice(0, 30).map(record => {
+    const format = record.format;
+    const hint = magnet === "tmdb" ? record.genres.join(" / ")
+      : ["TV", "OVA", "ONA"].includes(format) ? format : humanize(format);
+    return `<button type="button" data-magnet-key="${escapeAttribute(AnivizDust.keyFor(magnet, record.id))}">
+      <strong>${escapeHTML(record.title)}</strong><span>${record.year || "Year unknown"}${hint ? ` · ${escapeHTML(hint)}` : ""}</span>
+    </button>`;
+  }).join("");
+  if (!matches.length) container.hidden = true;
+  const noun = label === "anime" || matches.length === 1 ? label : "movies";
+  status.textContent = matches.length
+    ? `${matches.length} ${noun} found.${matches.length > 30 ? " Showing the first 30." : ""}`
+    : `No ${noun} match “${query}” in this sample.`;
 }
 
-function selectRecommendationMovie(id) {
-  if (!recommendationState.data.movies.some((movie) => movie.id === id)) return;
-  if (recommendationState.viz === "magnets") {
-    if (recommendationState.movieIds.includes(id)) {
-      document.querySelector("#recommendation-status").textContent = "That movie is already a magnet. Add a different favorite.";
-      return;
-    }
-    if (recommendationState.movieIds.length >= 3) {
-      document.querySelector("#recommendation-status").textContent = "Three magnets are in place. Remove one to try another movie.";
-      return;
-    }
-    recommendationState.movieIds.push(id);
-  } else {
-    recommendationState.movieIds = [id];
+function addMagnet(key) {
+  const { magnetKeys } = AnivizMain.snapshot();
+  const status = document.querySelector("#recommendation-status");
+  if (magnetKeys.includes(key)) {
+    status.textContent = "That title is already a magnet.";
+    return;
   }
-  recommendationState.movieId = id;
-  recommendationState.cohortSelected = true;
-  recommendationState.tablePage = 0;
-  if (recommendationState.viz !== "magnets") recommendationState.animeId = null;
-  document.querySelector("#movie-search").value = "";
+  if (magnetKeys.length >= 3) {
+    status.textContent = "Three magnets are in place. Remove one to add another title.";
+    return;
+  }
+  AnivizMain.setMagnets([...magnetKeys, key]);
+  const search = document.querySelector("#movie-search");
+  search.value = "";
+  search.focus({ preventScroll: true });
   document.querySelector("#movie-search-results").hidden = true;
-  renderRecommendations(true);
+  status.textContent = "";
 }
 
 function renderRecommendations() {
@@ -192,36 +220,16 @@ function renderRecommendations() {
   renderDustRecommendations();
 }
 
-function selectRecommendationAnime(id) {
-  AnivizMain.select(id);
-  renderDustDetail();
-  highlightRecommendation();
-}
-
-function highlightRecommendation(previewId) {
-  const selectedId = recommendationState.animeId;
-  const selected = recommendationState.viz === "magnets" && globalThis.AnivizMain
-    ? AnivizMain.snapshot()?.selectedAnimeIds || [] : [selectedId];
-  if (recommendationState.viz === "magnets") previewId = null;
-  document.querySelectorAll("[data-match-id]").forEach((row) => {
-    const isSelected = selected.includes(row.dataset.matchId);
-    row.classList.toggle("is-selected", isSelected);
-    row.classList.toggle("is-preview", row.dataset.matchId === previewId);
-    if (row.getAttribute("role") === "button") row.setAttribute("aria-pressed", isSelected);
-    row.querySelector("button")?.setAttribute("aria-pressed", isSelected);
+function highlightRecommendation() {
+  const selected = AnivizMain.snapshot().selectedKeys;
+  document.querySelectorAll(".dust-node").forEach(dot => {
+    const isSelected = selected.includes(dot.dataset.matchId);
+    dot.classList.toggle("is-selected", isSelected);
+    dot.setAttribute("aria-pressed", isSelected);
   });
-  if (recommendationState.viz === "magnets") highlightDustConnections(selectedId);
+  highlightDustConnections();
 }
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = { normalizeMovieSearch, searchRecommendationMovies, getRecommendationMatches, getRecommendationRanking };
-}
-
-// Recommendations use their own published dataset, independently of dashboard filters.
-if (typeof document !== "undefined") {
-  registerPage({
-    usesDashboard: false,
-    bindControls: bindRecommendationControls,
-    render: renderRecommendations
-  });
 }

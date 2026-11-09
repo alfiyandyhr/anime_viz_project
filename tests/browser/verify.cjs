@@ -19,7 +19,7 @@ const url = route => new URL(route, base).href;
     };
     const snapshot = () => page.evaluate(() => {
       const s=AnivizMain.snapshot();
-      return {movies:s.movieIds, ids:s.displayedDustIds, candidates:s.candidateDustIds, scores:s.perMovieScores, selection:s.selectedAnimeIds, sort:s.rankingSortKey};
+      return {movies:s.magnetKeys, ids:s.displayedKeys, candidates:s.candidateKeys, scores:s.candidateDust.map(row=>row.scores), selection:s.selectedKeys, sort:s.rankingSortKey};
     });
     const sameEvidence = (a,b) => {
       for(const field of ['ids','candidates','scores','selection']) assert.deepEqual(b[field],a[field],field);
@@ -46,14 +46,14 @@ const url = route => new URL(route, base).href;
         await page.locator(`[data-dust-chart="${kind}"]`).scrollIntoViewIfNeeded();
         await page.waitForFunction(kind=>document.querySelector(`[data-dust-chart="${kind}"] svg`),kind);
         const failures=await page.evaluate(kind=>{
-          const s=AnivizMain.snapshot(),rows=s.displayedDustIds.map(id=>s.lookup.get(id).anime);
+          const s=AnivizMain.snapshot(),rows=s.displayedKeys.map(id=>s.lookup.get(id).record);
           const role = kind === 'reception' ? 'button' : 'img';
           return [...document.querySelectorAll(`[data-dust-chart="${kind}"] [role="${role}"]`)].flatMap(el=>{
             const d=el.__data__;
             const matching=rows.filter(a=>kind==='genres'?a.genres.includes(d.genre):kind==='years'?a.year===d.year:
               kind==='studios'?a.studio_names.includes(d.studio):kind==='heatmap'?a.studio_names.includes(d.studio)&&a.genres.includes(d.genre):a.id===String(d.id));
             const ok=kind==='reception'?matching.length===1&&Boolean(el.getAttribute('aria-label')):
-              d.count===matching.length&&d.selectedCount===matching.filter(a=>s.selectedAnimeIds.includes(a.id)).length;
+              d.count===matching.length&&d.selectedCount===matching.filter(a=>s.selectedKeys.includes(`anilist:${a.id}`)).length;
             return ok?[]:[{kind,genre:d.genre,studio:d.studio,year:d.year,count:d.count,expected:matching.length}];
           });
         },kind);
@@ -92,9 +92,10 @@ const url = route => new URL(route, base).href;
     for(let i=0;i<3;i++) {
       const dust=page.locator('.dust-node').nth(i);
       await dust.focus();
-      assert.ok((await page.locator('#tooltip .dust-tooltip-score b').allTextContents()).every(value=>/^-?\d+\.\d{3}$/.test(value)));
+      assert.deepEqual(await page.locator('#tooltip .dust-tooltip-score b').allTextContents(),
+        await dust.evaluate(el => el.__data__.scores.map(score => score.toFixed(3))));
       await page.keyboard.press('Enter');
-      const expected=await page.evaluate(()=>{const s=AnivizMain.snapshot();return s.lookup.get(s.selectedAnimeIds.at(-1)).anime.title});
+      const expected=await page.evaluate(()=>{const s=AnivizMain.snapshot();return s.lookup.get(s.selectedKeys.at(-1)).record.title});
       assert.equal(await focusTitle(),expected);
     }
     assert.equal(await page.locator('#dust-focus .detail-cover').count(),1);
@@ -118,7 +119,7 @@ const url = route => new URL(route, base).href;
       assert.deepEqual((await snapshot()).selection,triple.selection.slice(0,left));
       assert.ok(await fieldOptions.evaluate(el => el.open), 'deselecting dust keeps Field options open');
       if(left) {
-        const expected=await page.evaluate(()=>{const s=AnivizMain.snapshot();return s.lookup.get(s.selectedAnimeIds.at(-1)).anime.title});
+        const expected=await page.evaluate(()=>{const s=AnivizMain.snapshot();return s.lookup.get(s.selectedKeys.at(-1)).record.title});
         assert.equal(await focusTitle(),expected);
       } else assert.equal(await focusTitle(),'Every dot has a story.');
     }
@@ -139,13 +140,13 @@ const url = route => new URL(route, base).href;
     }
     const scoped=await page.evaluate(()=>{
       const s=AnivizMain.snapshot();
-      return {dots:[...document.querySelectorAll('#recommendation-chart .dust-node')].map(el=>String(el.__data__.anime.id)),
-        map:[...document.querySelectorAll('[data-dust-connection-id]')].map(el=>String(el.__data__.anime.id)),
-        scatter:[...document.querySelectorAll('[data-dust-chart="reception"] circle[role="button"]')].map(el=>String(el.__data__.id)),
-        expectedScatter:s.displayedDustIds.filter(id=>{const a=s.lookup.get(id).anime;return a.popularity>0&&Number.isFinite(a.average_score)}),
+      return {dots:[...document.querySelectorAll('#recommendation-chart .dust-node')].map(el=>el.__data__.key),
+        map:[...document.querySelectorAll('[data-dust-connection-id]')].map(el=>el.__data__.key),
+        scatter:[...document.querySelectorAll('[data-dust-chart="reception"] circle[role="button"]')].map(el=>`anilist:${el.__data__.id}`),
+        expectedScatter:s.displayedKeys.filter(id=>{const a=s.lookup.get(id).record;return a.popularity>0&&Number.isFinite(a.average_score)}),
         ranking:s.ranking.length,
-        displayed:s.ranking.filter(row=>row.displayed).map(row=>String(row.anime.id)),
-        counts:[...document.querySelectorAll('[data-dust-chart="genres"] [role="img"]')].map(el=>({genre:el.__data__.genre,count:el.__data__.count,expected:s.displayedDustIds.filter(id=>s.lookup.get(id).anime.genres.includes(el.__data__.genre)).length}))};
+        displayed:s.ranking.filter(row=>row.displayed).map(row=>row.key),
+        counts:[...document.querySelectorAll('[data-dust-chart="genres"] [role="img"]')].map(el=>({genre:el.__data__.genre,count:el.__data__.count,expected:s.displayedKeys.filter(id=>s.lookup.get(id).record.genres.includes(el.__data__.genre)).length}))};
     });
     assert.deepEqual(scoped.dots.sort(),[...chosen.ids].sort());
     assert.deepEqual(scoped.map.sort(),[...chosen.ids].sort());
@@ -210,7 +211,7 @@ const url = route => new URL(route, base).href;
     assert.equal((await snapshot()).sort,'average');
     const afterRemoval=await snapshot();assert.deepEqual(afterRemoval.selection,persisted.selection.filter(id=>afterRemoval.ids.includes(id)));
     for(const id of afterRemoval.movies) await page.locator(`[data-remove-magnet="${id}"]`).click();
-    assert.equal((await snapshot()).ids.length,0);assert.match(await page.locator('#recommendation-chart').innerText(),/Add a movie/);
+    assert.equal((await snapshot()).ids.length,0);assert.match(await page.locator('#recommendation-chart').innerText(),/Add a title magnet/);
     await page.reload();await page.waitForFunction(()=>AnivizMain.snapshot()?.metadataStatus==='ready'&&recommendationState.data);
     assert.equal((await snapshot()).movies.length,0);
     await addMovie('Inception');await dustReady();
@@ -240,7 +241,7 @@ const url = route => new URL(route, base).href;
       try {const p=await c.newPage();p.on('pageerror',e=>errors.push(e.stack));await setup(c,p);await check(p);} finally {await c.close();}
     };
     await checkIsolated(async(c,p)=>{await c.addInitScript(()=>sessionStorage.setItem('aniviz_seed_movie',JSON.stringify({tmdbId:'157336',title:'Interstellar'})));await p.goto(url(''));},async p=>{
-      await p.waitForSelector('.dust-node');assert.deepEqual(await p.evaluate(()=>AnivizMain.snapshot().movieIds),['157336']);
+      await p.waitForSelector('.dust-node');assert.deepEqual(await p.evaluate(()=>AnivizMain.snapshot().magnetKeys),['tmdb:157336']);
       assert.equal(await p.locator('#recommendation-chart .dust-node').count(),60);assert.doesNotMatch(await p.locator('#movie-magnets').innerText(),/Example/);
     });
     await checkIsolated(async(c,p)=>{await p.goto(url('frontend/network/index.html'));},async p=>{
@@ -248,7 +249,7 @@ const url = route => new URL(route, base).href;
     });
     await checkIsolated(async(c,p)=>{await c.addInitScript(()=>{Object.defineProperty(window,'sessionStorage',{get(){throw new Error('disabled')}})});await p.goto(url(''));},async p=>{
       await p.waitForSelector('.dust-node');assert.match(await p.locator('[data-dust-notice]').innerText(),/unavailable/);
-      await p.locator('.dust-node').first().focus();await p.keyboard.press('Enter');assert.equal(await p.evaluate(()=>AnivizMain.snapshot().selectedAnimeIds.length),1);
+      await p.locator('.dust-node').first().focus();await p.keyboard.press('Enter');assert.equal(await p.evaluate(()=>AnivizMain.snapshot().selectedKeys.length),1);
     });
     for(const kind of ['metadata','matrix']) {
       await checkIsolated(async(c,p)=>{
@@ -288,14 +289,14 @@ const url = route => new URL(route, base).href;
     const touch=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,reducedMotion:'reduce'});
     const phone=await touch.newPage();await phone.goto(url(''));await phone.waitForSelector('.dust-node');
     await phone.locator('.dust-node').first().tap();await phone.locator('.dust-node').nth(1).tap();
-    assert.equal(await phone.evaluate(()=>AnivizMain.snapshot().selectedAnimeIds.length),2);
+    assert.equal(await phone.evaluate(()=>AnivizMain.snapshot().selectedKeys.length),2);
     const box=await phone.locator('#recommendation-chart').boundingBox();
     await phone.evaluate(({x,y})=>{window.testTouchStart={x,y,scroll:scrollY}},box);
     const client=await touch.newCDPSession(phone);
     await client.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:box.x+box.width-10,y:box.y+box.height-50}]});
     await client.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:box.x+box.width-10,y:box.y+box.height-250}]});
     await client.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-    await phone.waitForFunction(()=>scrollY>0);assert.equal(await phone.evaluate(()=>AnivizMain.snapshot().selectedAnimeIds.length),2);
+    await phone.waitForFunction(()=>scrollY>0);assert.equal(await phone.evaluate(()=>AnivizMain.snapshot().selectedKeys.length),2);
     await touch.close();
     assert.deepEqual(errors,[]);
     console.log('Passed real-browser checks: four views, scopes, filters, ranking, selection, history/scroll restoration, legacy routes, migration, loading/storage failures, desktop/mobile layouts and touch scrolling.');

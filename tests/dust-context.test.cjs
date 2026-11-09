@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { createContext, joinRecords, rankCorpus, STORAGE_KEY } = require('../frontend/common/dust-context.js');
+const { createContext, joinRecords, rankCorpus, createScoreAccessor, FORWARD, REVERSE, STORAGE_KEY } = require('../frontend/common/dust-context.js');
 const ChartData = require('../frontend/common/chart-data.js');
 const { getDustMatches } = require('../frontend/recommendations/dust-magnet.js');
 const root = path.resolve(__dirname, '..');
@@ -12,13 +12,16 @@ const dashboard = JSON.parse(readFileSync(path.join(root, 'data.json')));
 const bytes = readFileSync(path.join(root, 'data/movie_anime_scores.bin'));
 const scores = Float32Array.from({ length: bytes.length / 4 }, (_, i) => bytes.readFloatLE(i * 4));
 const movies = ['Inception', 'Interstellar', 'The Matrix'].map(title => data.movies.find(movie => movie.title === title).id);
+const tmdb = id => `tmdb:${id}`;
+const anilist = id => `anilist:${id}`;
+const movieKeys = movies.map(tmdb);
 function setup() {
   const memory = new Map([['aniviz-catalogue-filters', 'catalogue state'], ['history-year', '1999']]);
   const storage = { getItem: key => memory.get(key) || null, setItem: (key, value) => memory.set(key, value) };
-  const notices = []; let samples = 0;
-  const context = createContext({ storage, onNotice: message => notices.push(message), getDustMatches(...args) { samples++; return getDustMatches(...args); } });
-  context.setSources(data, scores); context.setMetadata(dashboard.anime); context.setMovies(movies);
-  return { context, memory, storage, notices, samples: () => samples };
+  const notices = [];
+  const context = createContext({ storage, onNotice: message => notices.push(message) });
+  context.setSources(data, scores); context.setMetadata(dashboard.anime); context.setMagnets(movieKeys);
+  return { context, memory, storage, notices };
 }
 test('string ID joins preserve the real 997/1000 overlap and unknown metrics', () => {
   const lookup = joinRecords(data.anime, dashboard.anime);
@@ -35,89 +38,88 @@ test('string ID joins preserve the real 997/1000 overlap and unknown metrics', (
   assert.equal(fixture.get('2').anime.average_score, null);
 });
 test('three-movie 60-dot scope is shared, filters never refill, selection never scopes charts', () => {
-  const { context, samples } = setup();
+  const { context } = setup();
   const original = context.snapshot();
-  assert.deepEqual(original.candidateDustIds, getDustMatches(data, scores, movies, 60).map(row => row.anime.id));
+  assert.deepEqual(original.candidateKeys, getDustMatches(data, scores, movies, 60).map(row => anilist(row.anime.id)));
   assert.equal(original.ranking.length, 1000);
-  const selected = original.displayedDustIds[0];
+  const selected = original.displayedKeys[0];
   context.setSelection([selected]);
-  assert.deepEqual(context.snapshot().displayedDustIds, original.displayedDustIds);
-  const genre = original.lookup.get(selected).anime.genres[0];
+  assert.deepEqual(context.snapshot().displayedKeys, original.displayedKeys);
+  const genre = original.lookup.get(selected).record.genres[0];
   context.setFilters({genre});
   const filtered = context.snapshot();
-  assert.ok(filtered.displayedDustIds.length > 0 && filtered.displayedDustIds.length < 60);
-  assert.deepEqual(filtered.candidateDustIds, original.candidateDustIds);
-  assert.ok(filtered.displayedDustIds.every(id => filtered.lookup.get(id).anime.genres.includes(genre)));
+  assert.ok(filtered.displayedKeys.length > 0 && filtered.displayedKeys.length < 60);
+  assert.deepEqual(filtered.candidateKeys, original.candidateKeys);
+  assert.ok(filtered.displayedKeys.every(id => filtered.lookup.get(id).record.genres.includes(genre)));
   assert.equal(filtered.ranking.length, 1000);
-  assert.deepEqual(filtered.ranking.filter(row => row.displayed).map(row => row.anime.id).sort(), [...filtered.displayedDustIds].sort());
-  assert.equal(samples(), 2, 'initial empty sources and active movie set only');
-  context.resetFilters(); assert.deepEqual(context.snapshot().displayedDustIds, original.displayedDustIds);
+  assert.deepEqual(filtered.ranking.filter(row => row.displayed).map(row => row.key).sort(), [...filtered.displayedKeys].sort());
+  assert.equal(filtered.candidateDust, original.candidateDust);
+  context.resetFilters(); assert.deepEqual(context.snapshot().displayedKeys, original.displayedKeys);
 });
 test('layout, hover-free snapshots, ranking sort and selection do not resample candidates', () => {
-  const {context, samples} = setup(); const before = context.snapshot(), count = samples();
-  context.setSelection(before.displayedDustIds.slice(0, 2));
+  const {context} = setup(); const before = context.snapshot();
+  context.setSelection(before.displayedKeys.slice(0, 2));
   const revision = context.snapshot().revision;
   context.saveLayout({magnetPositions:{'3:movie':{x:.3,y:.7}},scrollY:1444});
   context.resetPositions();
   assert.equal(context.snapshot().revision, revision);
-  for (const sort of [...movies, 'average']) {
+  for (const sort of [...movieKeys, 'average']) {
     context.setRankingSort(sort);
-    assert.deepEqual(context.snapshot().candidateDustIds, before.candidateDustIds);
-    assert.deepEqual(context.snapshot().perMovieScores, before.perMovieScores);
-    assert.deepEqual(context.snapshot().selectedAnimeIds, before.displayedDustIds.slice(0, 2));
+    assert.deepEqual(context.snapshot().candidateKeys, before.candidateKeys);
+    assert.equal(context.snapshot().candidateDust, before.candidateDust);
+    assert.deepEqual(context.snapshot().selectedKeys, before.displayedKeys.slice(0, 2));
   }
-  assert.equal(samples(),count);
   assert.equal(context.getLayout().scrollY,1444);
 });
 test('selection retention follows displayed membership, count/movie changes resample once', () => {
-  const {context,notices,samples} = setup();
-  context.setSelection(context.snapshot().displayedDustIds.slice(0,3));
+  const {context,notices} = setup();
+  context.setSelection(context.snapshot().displayedKeys.slice(0,3));
   context.setFilters({search:'no such title in this corpus'});
-  assert.deepEqual(context.snapshot().selectedAnimeIds,[]);
-  assert.equal(context.snapshot().displayedDustIds.length,0);
-  assert.equal(context.snapshot().candidateDustIds.length,60);
+  assert.deepEqual(context.snapshot().selectedKeys,[]);
+  assert.equal(context.snapshot().displayedKeys.length,0);
+  assert.equal(context.snapshot().candidateKeys.length,60);
   assert.match(notices.at(-1),/no longer displayed/);
-  context.resetFilters(); const count=samples();
-  context.setDustLimit(90);assert.equal(context.snapshot().candidateDustIds.length,90); assert.equal(samples(),count+1);
-  const retained=context.snapshot().displayedDustIds.slice(0,2);context.setSelection(retained);
+  context.resetFilters();
+  context.setDustLimit(90);assert.equal(context.snapshot().candidateKeys.length,90);
+  const retained=context.snapshot().displayedKeys.slice(0,2);context.setSelection(retained);
   context.setDustLimit(30);
-  assert.deepEqual(context.snapshot().selectedAnimeIds,retained.filter(id=>context.snapshot().displayedDustIds.includes(id)));
-  context.setRankingSort(movies[1]);context.setMovies([movies[0]]);
+  assert.deepEqual(context.snapshot().selectedKeys,retained.filter(id=>context.snapshot().displayedKeys.includes(id)));
+  context.setRankingSort(movieKeys[1]);context.setMagnets([movieKeys[0]]);
   assert.equal(context.snapshot().rankingSortKey,'average');assert.equal(context.snapshot().ranking.length,1000);
-  context.setMovies([]);assert.equal(context.snapshot().candidateDustIds.length,0);
+  context.setMagnets([]);assert.equal(context.snapshot().candidateKeys.length,0);
 });
 test('missing metadata is distinct from filtered-out records and does not block similarity', () => {
   const {context} = setup();const before=context.snapshot();
   context.setMetadata([], 'unavailable'); const unavailable=context.snapshot();
-  assert.deepEqual(unavailable.displayedDustIds,before.displayedDustIds);
+  assert.deepEqual(unavailable.displayedKeys,before.displayedKeys);
   assert.equal(unavailable.missingMetadataIds.length,60);assert.equal(unavailable.filteredOutIds.length,0);
   assert.equal(unavailable.ranking.length,1000);
-  const rows=unavailable.displayedDustIds.map(id=>unavailable.lookup.get(id).anime);
+  const rows=unavailable.displayedKeys.map(id=>unavailable.lookup.get(id).record);
   assert.ok(ChartData.genres(rows).every(row=>row.averageScore===null && row.totalPopularity===null));
   context.setFilters({minimumScore:1});
-  assert.equal(context.snapshot().displayedDustIds.length,0);
+  assert.equal(context.snapshot().displayedKeys.length,0);
   assert.equal(context.snapshot().missingMetadataIds.length,60);
   assert.equal(context.snapshot().filteredOutIds.length,60);
 });
 test('versioned session round trip restores movies, filters, selections and independent layout', () => {
-  const {context,memory,storage} = setup(); const chosen=context.snapshot().displayedDustIds[0];
-  context.setSelection([chosen]);context.setRankingSort(movies[2]);
-  context.setFilters({genre:context.snapshot().lookup.get(chosen).anime.genres[0]});
+  const {context,memory,storage} = setup(); const chosen=context.snapshot().displayedKeys[0];
+  context.setSelection([chosen]);context.setRankingSort(movieKeys[2]);
+  context.setFilters({genre:context.snapshot().lookup.get(chosen).record.genres[0]});
   context.saveLayout({magnetPositions:{a:{x:.4,y:.2}},scrollY:876,particles:{width:800,height:500,positions:[]}});
-  const restored=createContext({storage,getDustMatches}); assert.equal(restored.restore(),true);
+  const restored=createContext({storage}); assert.equal(restored.restore(),true);
   restored.setMetadata(dashboard.anime);restored.setSources(data,scores);
-  assert.deepEqual(restored.snapshot().movieIds,movies);assert.deepEqual(restored.snapshot().selectedAnimeIds,[chosen]);
-  assert.equal(restored.snapshot().rankingSortKey,movies[2]);assert.equal(restored.getLayout().scrollY,876);
+  assert.deepEqual(restored.snapshot().magnetKeys,movieKeys);assert.deepEqual(restored.snapshot().selectedKeys,[chosen]);
+  assert.equal(restored.snapshot().rankingSortKey,movieKeys[2]);assert.equal(restored.getLayout().scrollY,876);
   assert.deepEqual(restored.snapshot().filters,context.snapshot().filters);
-  assert.deepEqual(restored.snapshot().displayedDustIds,context.snapshot().displayedDustIds);
+  assert.deepEqual(restored.snapshot().displayedKeys,context.snapshot().displayedKeys);
   assert.equal(memory.get('aniviz-catalogue-filters'),'catalogue state');assert.equal(memory.get('history-year'),'1999');
   memory.set(STORAGE_KEY,JSON.stringify({version:999,state:{movieIds:movies}}));
-  assert.equal(createContext({storage,getDustMatches}).restore(),false);
+  assert.equal(createContext({storage}).restore(),false);
 });
 test('storage denial preserves in-memory context and emits one relevant notice', () => {
-  const notices=[]; const context=createContext({getDustMatches,onNotice:m=>notices.push(m),storage:{getItem(){throw Error('disabled')},setItem(){throw Error('disabled')}}});
-  context.restore();context.setSources(data,scores);context.setMovies(movies);context.setFilters({genre:'Action'});
-  assert.ok(context.snapshot().displayedDustIds.length>0);assert.equal(context.snapshot().persistent,false);
+  const notices=[]; const context=createContext({onNotice:m=>notices.push(m),storage:{getItem(){throw Error('disabled')},setItem(){throw Error('disabled')}}});
+  context.restore();context.setSources(data,scores);context.setMagnets(movieKeys);context.setFilters({genre:'Action'});
+  assert.ok(context.snapshot().displayedKeys.length>0);assert.equal(context.snapshot().persistent,false);
   assert.equal(notices.length,1);
 });
 test('full-corpus sorts use exact signed scores, arithmetic averages and stable record-order ties', () => {
@@ -176,27 +178,27 @@ test('resource caches share in-flight requests and isolate metadata failure from
 });
 test('restoring a score-filtered selection waits for metadata rather than dropping it during loading', () => {
   const {context,storage}=setup();
-  context.setFilters({minimumScore:70});const chosen=context.snapshot().displayedDustIds[0];context.setSelection([chosen]);
-  const restored=createContext({storage,getDustMatches});restored.restore();restored.setSources(data,scores);
-  assert.equal(restored.snapshot().displayedDustIds.length,0, 'unknown ratings cannot pass a score filter');
-  assert.deepEqual(restored.snapshot().selectedAnimeIds,[chosen], 'pending metadata is not a completed membership change');
+  context.setFilters({minimumScore:70});const chosen=context.snapshot().displayedKeys[0];context.setSelection([chosen]);
+  const restored=createContext({storage});restored.restore();restored.setSources(data,scores);
+  assert.equal(restored.snapshot().displayedKeys.length,0, 'unknown ratings cannot pass a score filter');
+  assert.deepEqual(restored.snapshot().selectedKeys,[chosen], 'pending metadata is not a completed membership change');
   restored.setMetadata(dashboard.anime);
-  assert.ok(restored.snapshot().displayedDustIds.includes(chosen));assert.deepEqual(restored.snapshot().selectedAnimeIds,[chosen]);
+  assert.ok(restored.snapshot().displayedKeys.includes(chosen));assert.deepEqual(restored.snapshot().selectedKeys,[chosen]);
 });
 test('numeric movie IDs normalize before candidate lookup and silent storage rejection reports persistence loss', () => {
   const fixture={movies:[{id:1}],anime:[{id:1},{id:2}]};
-  const notices=[];const context=createContext({getDustMatches,onNotice:m=>notices.push(m),storage:{getItem:()=>null,setItem(){}}});
-  context.setSources(fixture,Float32Array.from([-.1,.5]));context.setMovies([1]);
-  assert.equal(context.snapshot().candidateDustIds.length,2);assert.deepEqual(context.snapshot().movieIds,['1']);
+  const notices=[];const context=createContext({onNotice:m=>notices.push(m),storage:{getItem:()=>null,setItem(){}}});
+  context.setSources(fixture,Float32Array.from([-.1,.5]));context.setMagnets([tmdb(1)]);
+  assert.equal(context.snapshot().candidateKeys.length,2);assert.deepEqual(context.snapshot().magnetKeys,['tmdb:1']);
   assert.equal(context.snapshot().persistent,false);assert.equal(notices.length,1);
 });
 
 test('withdrawing a score source clears stale dust membership and full ranking', () => {
-  const {context}=setup();assert.equal(context.snapshot().displayedDustIds.length,60);
+  const {context}=setup();assert.equal(context.snapshot().displayedKeys.length,60);
   context.setSources(data,null);
-  assert.deepEqual(context.snapshot().candidateDustIds,[]);assert.deepEqual(context.snapshot().displayedDustIds,[]);
+  assert.deepEqual(context.snapshot().candidateKeys,[]);assert.deepEqual(context.snapshot().displayedKeys,[]);
   assert.deepEqual(context.snapshot().ranking,[]);
-  context.setSources(data,scores);assert.equal(context.snapshot().candidateDustIds.length,60);
+  context.setSources(data,scores);assert.equal(context.snapshot().candidateKeys.length,60);
 });
 
 test('legacy Top-20 migration reuses only a resolvable seed and publishes newly computed 60-dot membership', () => {
@@ -208,32 +210,32 @@ test('legacy Top-20 migration reuses only a resolvable seed and publishes newly 
     ['aniviz-catalogue-filters','independent catalogue']
   ]);
   const storage={getItem:key=>memory.get(key)||null,setItem:(key,value)=>memory.set(key,value)};
-  const context=createContext({getDustMatches,storage});
+  const context=createContext({storage});
   assert.equal(context.restore(),false);
   context.setMetadata(dashboard.anime); // Metadata may arrive before similarity JSON.
   assert.equal(context.migrateLegacy(data),true);
   context.setMetadata(dashboard.anime);context.setSources(data,scores);
   const s=context.snapshot();
-  assert.deepEqual(s.movieIds,[movies[1]]);
-  assert.deepEqual(s.displayedDustIds,getDustMatches(data,scores,[movies[1]],60).map(row=>String(row.anime.id)));
-  assert.equal(s.displayedDustIds.length,60);assert.equal(s.displayedDustIds.includes('invented-old-id'),false);
-  assert.deepEqual(s.selectedAnimeIds,[]);assert.equal(s.filters.search,'');
+  assert.deepEqual(s.magnetKeys,[movieKeys[1]]);
+  assert.deepEqual(s.displayedKeys,getDustMatches(data,scores,[movies[1]],60).map(row=>anilist(row.anime.id)));
+  assert.equal(s.displayedKeys.length,60);assert.equal(s.displayedKeys.includes('invented-old-id'),false);
+  assert.deepEqual(s.selectedKeys,[]);assert.equal(s.filters.search,'');
   assert.equal(memory.get('aniviz-catalogue-filters'),'independent catalogue');
-  const restored=createContext({getDustMatches,storage});assert.equal(restored.restore(),true);
+  const restored=createContext({storage});assert.equal(restored.restore(),true);
   assert.equal(restored.migrateLegacy(data),false,'versioned session wins over obsolete seed');
-  restored.setMetadata(dashboard.anime);restored.setSources(data,scores);restored.setMovies([]);
-  const empty=createContext({getDustMatches,storage});assert.equal(empty.restore(),true);
-  assert.equal(empty.migrateLegacy(data),false);assert.deepEqual(empty.snapshot().movieIds,[],'explicit empty state survives');
+  restored.setMetadata(dashboard.anime);restored.setSources(data,scores);restored.setMagnets([]);
+  const empty=createContext({storage});assert.equal(empty.restore(),true);
+  assert.equal(empty.migrateLegacy(data),false);assert.deepEqual(empty.snapshot().magnetKeys,[],'explicit empty state survives');
 });
 
 test('unresolvable legacy seeds cannot import old IDs; missing Top-20 IDs do not prevent seed recovery', () => {
   for(const raw of ['null','{bad',JSON.stringify({tmdbId:'unknown'}),JSON.stringify({tmdbId:movies[0]})]) {
     const memory=new Map([['aniviz_seed_movie',raw]]);
     const notices=[];
-    const context=createContext({getDustMatches,onNotice:notice=>notices.push(notice),storage:{getItem:key=>memory.get(key)||null,setItem:(k,v)=>memory.set(k,v)}});
+    const context=createContext({onNotice:notice=>notices.push(notice),storage:{getItem:key=>memory.get(key)||null,setItem:(k,v)=>memory.set(k,v)}});
     const valid=raw.includes(movies[0]);assert.equal(context.migrateLegacy(data),valid);
     assert.deepEqual(notices,[],'malformed seed data is distinct from denied storage');
-    context.setSources(data,scores);assert.equal(context.snapshot().candidateDustIds.length,valid?60:0);
+    context.setSources(data,scores);assert.equal(context.snapshot().candidateKeys.length,valid?60:0);
   }
 });
 
@@ -251,21 +253,21 @@ test('reduced dataset-mismatch fixture preserves all recommendation records with
 });
 
 test('every filter narrows the same multi-movie candidate set used by aggregates; count changes respect filters', () => {
-  const {context,samples}=setup();const initial=context.snapshot(), sampleCount=samples();
-  const title=initial.lookup.get(initial.displayedDustIds[0]).anime;
+  const {context}=setup();const initial=context.snapshot();
+  const title=initial.lookup.get(initial.displayedKeys[0]).record;
   for(const patch of [{search:title.title},{genre:title.genres[0]},{studio:title.studio_names[0]},
     {format:title.format},{yearFrom:title.year,yearTo:title.year},{minimumScore:title.average_score}]) {
     context.resetFilters();context.setFilters(patch);const s=context.snapshot();
-    const expected=initial.candidateDustIds.filter(key=>require('../frontend/common/dust-context.js').passesFilters(s.lookup.get(key).anime,s.filters));
-    assert.deepEqual(s.displayedDustIds,expected);
-    const rows=s.displayedDustIds.map(key=>s.lookup.get(key).anime), allowed=new Set(expected);
+    const expected=initial.candidateKeys.filter(key=>require('../frontend/common/dust-context.js').passesFilters(s.lookup.get(key).record,s.filters));
+    assert.deepEqual(s.displayedKeys,expected);
+    const rows=s.displayedKeys.map(key=>s.lookup.get(key).record), allowed=new Set(rows.map(row=>row.id));
     for(const aggregate of [...ChartData.genres(rows),...ChartData.studios(rows)]) assert.ok(aggregate.ids.every(key=>allowed.has(key)));
     assert.equal(ChartData.timeline(rows).reduce((n,row)=>n+row.count,0),rows.filter(row=>Number.isFinite(row.year)).length);
     assert.equal(s.ranking.length,1000);
   }
-  assert.equal(samples(),sampleCount);
+  assert.equal(context.snapshot().candidateDust,initial.candidateDust);
   context.setFilters({search:'no possible title'});
-  for(const count of [30,60,90]) {context.setDustLimit(count);assert.equal(context.snapshot().candidateDustIds.length,count);assert.equal(context.snapshot().displayedDustIds.length,0);}
+  for(const count of [30,60,90]) {context.setDustLimit(count);assert.equal(context.snapshot().candidateKeys.length,count);assert.equal(context.snapshot().displayedKeys.length,0);}
 });
 
 test('ranking order has an independent oracle for all 1/2/3-movie bases, including tied and negative scores', () => {
@@ -280,4 +282,140 @@ test('ranking order has an independent oracle for all 1/2/3-movie bases, includi
       for(const row of rows) assert.equal(row.score,row.scores.reduce((n,v)=>n+v,0)/count);
     }
   }
+});
+
+test('forward sampling, cosine vectors, ranks and filters match the alfi 3342eb3 fixture', () => {
+  for (const fixture of require('./fixtures/dust-forward-3342eb3.json')) {
+    const { context } = setup();
+    context.setMagnets(fixture.movieIds.map(tmdb));
+    context.setDustLimit(fixture.limit);
+    const original = context.snapshot();
+    assert.deepEqual(original.candidateDust.map(row => [row.record.id, row.rank, ...row.scores]), fixture.candidates);
+    assert.deepEqual(original.displayedKeys, fixture.displayed.map(anilist));
+    for (const [basis, expected] of Object.entries(fixture.ranking)) {
+      const { ranking } = context.setRankingSort(basis === 'average' ? basis : tmdb(basis));
+      assert.deepEqual(ranking.map(row => row.record.id), expected);
+      assert.deepEqual(ranking.filter(row => row.displayed).map(row => row.record.id).sort(), fixture.displayed.slice().sort());
+    }
+    const filtered = context.setFilters(fixture.filters);
+    assert.deepEqual(filtered.displayedKeys, fixture.filtered.map(anilist));
+    assert.equal(filtered.candidateDust, original.candidateDust);
+    for (const [basis, expected] of Object.entries(fixture.ranking)) {
+      const { ranking } = context.setRankingSort(basis === 'average' ? basis : tmdb(basis));
+      assert.deepEqual(ranking.map(row => row.record.id), expected);
+      assert.deepEqual(ranking.filter(row => row.displayed).map(row => row.record.id).sort(), fixture.filtered.slice().sort());
+    }
+  }
+});
+
+test('a 2 × 3 movie-major fixture reads the correct row and column, including signed and tied scores', () => {
+  const fixture = {
+    movies: [{ id: 1, title: 'Movie One', aliases: ['Alternate One'], genres: ['Action'], year: 1999 }, { id: 2, title: 'Movie Two' }],
+    anime: [{ id: 1, title: 'Cowboy Bebop' }, { id: 2, title: 'Anime Two' }, { id: 3, title: 'Anime Three' }]
+  };
+  const matrix = Float32Array.from([-.5, .25, -.5, -.5, .75, .125]);
+  const pair = createScoreAccessor(fixture, matrix);
+  assert.equal(pair('2', '3'), .125);
+  assert.equal(pair(2, 2), .75);
+  assert.equal(pair(3, 2), undefined);
+  const context = createContext();
+  context.setMetadata([]);
+  context.setSources(fixture, matrix);
+  const forward = context.setMagnets(['tmdb:1']);
+  assert.deepEqual(forward.ranking.map(row => [row.key, row.score]), [['anilist:2', .25], ['anilist:1', -.5], ['anilist:3', -.5]]);
+  context.toggleSelection('anilist:1');
+  const reverse = context.setDirection(REVERSE);
+  assert.deepEqual(reverse.magnetKeys, ['anilist:1']);
+  assert.deepEqual(reverse.selectedKeys, []);
+  assert.deepEqual(reverse.ranking.map(row => [row.key, row.score]), [['tmdb:1', -.5], ['tmdb:2', -.5]]);
+  assert.equal(reverse.lookup.get('tmdb:1').record.title, 'Movie One');
+  assert.equal(reverse.lookup.has('anilist:1'), false);
+  assert.equal(reverse.candidateDust[0].scores, reverse.ranking[0].scores);
+  assert.deepEqual(context.setFilters({ search: 'alternate', genre: 'Action', yearFrom: 1999,
+    yearTo: 1999, minimumScore: 100 }).displayedKeys, ['tmdb:1']);
+  assert.deepEqual(context.snapshot().candidateKeys, reverse.candidateKeys);
+  assert.equal(context.setFilters({ search: 'Action' }).displayedKeys.length, 0, 'movie search uses title and alias only');
+  context.resetFilters();
+  context.toggleSelection('tmdb:1');
+  assert.deepEqual(context.setDirection(FORWARD).selectedKeys, ['anilist:1']);
+  assert.equal(context.snapshot().lookup.get('anilist:1').record.title, 'Cowboy Bebop');
+});
+
+test('published Cowboy Bebop column and Inception row agree, and Treasure Planet leads the reverse ranking', () => {
+  const { context } = setup();
+  const forward = context.setMagnets(['tmdb:27205']);
+  assert.equal(forward.ranking.find(row => row.key === 'anilist:1').score, 0.5034430027008057);
+  const reverse = context.setDirection(REVERSE);
+  assert.equal(reverse.example, true);
+  assert.deepEqual(reverse.magnetKeys, ['anilist:1']);
+  assert.equal(reverse.ranking.find(row => row.key === 'tmdb:27205').score, 0.5034430027008057);
+  assert.equal(reverse.ranking[0].record.title, 'Treasure Planet');
+  assert.equal(reverse.ranking[0].score, 0.6052206158638);
+});
+
+test('v1 imports typed selections, sorts and layouts and keeps both directions independent during loading', () => {
+  const { context: initial } = setup();
+  const selected = initial.snapshot().displayedKeys[0].slice('anilist:'.length);
+  const v1 = {
+    version: 1,
+    state: { version: 1, movieIds: movies, selectedAnimeIds: [selected], rankingSortKey: movies[0],
+      filters: { minimumScore: 70 }, displayedDustIds: ['stale'] },
+    layout: { magnetPositions: { [`3:${movies[0]}`]: { x: .2, y: .4 } },
+      movieColors: { [movies[0]]: '#43d9e6' }, scrollY: 450,
+      particles: { width: 600, height: 450, positions: [{ anime: { id: selected }, x: 200, y: 100 }] } }
+  };
+  const memory = new Map([['aniviz-dust-session-v1', JSON.stringify(v1)]]);
+  const storage = { getItem: key => memory.get(key), setItem: (key, value) => memory.set(key, value) };
+  const context = createContext({ storage });
+  assert.equal(context.restore(), true);
+  context.setSources(data, null);
+  assert.deepEqual(context.snapshot().magnetKeys, movieKeys);
+  assert.deepEqual(context.snapshot().displayedKeys, []);
+  assert.deepEqual(context.snapshot().selectedKeys, [anilist(selected)]);
+  assert.deepEqual(context.getLayout().magnetPositions, { [`3:${movieKeys[0]}`]: { x: .2, y: .4 } });
+  assert.deepEqual(context.getLayout().magnetColors, { [movieKeys[0]]: '#43d9e6' });
+  assert.equal(context.getLayout().particles.positions[0].key, anilist(selected));
+  assert.equal(context.getLayout().scrollY, 450);
+  context.setDirection(REVERSE);
+  context.setSources(data, scores);
+  context.toggleSelection('tmdb:9016');
+  context.setRankingSort('anilist:1');
+  context.setRankingOrder('descending');
+  context.saveLayout({ scrollY: 125 });
+  const reverse = context.snapshot();
+  context.setMetadata(dashboard.anime);
+  assert.deepEqual(context.snapshot().displayedKeys, reverse.displayedKeys);
+  assert.deepEqual(context.snapshot().selectedKeys, ['tmdb:9016']);
+  const forward = context.setDirection(FORWARD);
+  assert.deepEqual(forward.selectedKeys, [anilist(selected)]);
+  assert.equal(forward.rankingSortKey, movieKeys[0]);
+  assert.equal(forward.rankingOrder, 'ascending');
+  assert.equal(context.getLayout().scrollY, 450);
+  context.setMagnets([]);
+  context.setDirection(REVERSE);
+  const restored = createContext({ storage });
+  assert.equal(restored.restore(), true);
+  const saved = restored.setSources(data, scores);
+  assert.equal(saved.direction, REVERSE);
+  assert.deepEqual(saved.selectedKeys, ['tmdb:9016']);
+  assert.equal(saved.rankingOrder, 'descending');
+  assert.equal(restored.getLayout().scrollY, 125);
+  assert.deepEqual(restored.setDirection(FORWARD).magnetKeys, []);
+  assert.equal(memory.get('aniviz-dust-session-v1'), JSON.stringify(v1));
+});
+
+test('an explicitly empty v1 session takes priority over the legacy seed and example', () => {
+  const values = {
+    'aniviz-dust-session-v1': JSON.stringify({ version: 1, state: { version: 1, movieIds: [] } }),
+    aniviz_seed_movie: JSON.stringify({ tmdbId: movies[0] })
+  };
+  const context = createContext({ storage: { getItem: key => values[key], setItem: (key, value) => { values[key] = value; } } });
+  assert.equal(context.restore(), true);
+  const snapshot = context.setSources(data, scores, { seedExample: true });
+  assert.deepEqual(snapshot.magnetKeys, []);
+  assert.equal(snapshot.example, false);
+  assert.deepEqual(context.setDirection(REVERSE).magnetKeys, ['anilist:1']);
+  assert.deepEqual(context.setMagnets([]).magnetKeys, []);
+  context.setDirection(FORWARD);
+  assert.deepEqual(context.setDirection(REVERSE).magnetKeys, []);
 });

@@ -6,9 +6,17 @@
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.AnivizDust = api;
 })(globalThis, function () {
-  const VERSION = 1;
-  const STORAGE_KEY = "aniviz-dust-session-v1";
-  const defaults = () => ({ search: "", genre: "All", studio: "All", format: "All", yearFrom: null, yearTo: null, minimumScore: 0 });
+  const VERSION = 2;
+  const STORAGE_KEY = "aniviz-dust-session-v2";
+  const LEGACY_KEY = "aniviz-dust-session-v1";
+  const FORWARD = "movie-to-anime", REVERSE = "anime-to-movies";
+  const DIRECTIONS = {
+    [FORWARD]: { magnet: "tmdb", dust: "anilist", example: "Inception" },
+    [REVERSE]: { magnet: "anilist", dust: "tmdb", example: "Cowboy Bebop" }
+  };
+  const keyFor = (catalogue, id) => `${catalogue}:${id}`;
+  const catalogueFor = (data, catalogue) => (catalogue === "tmdb" ? data?.movies : data?.anime) || [];
+  const defaults = direction => ({ search: "", genre: "All", yearFrom: null, yearTo: null, ...(direction === REVERSE ? {} : { studio: "All", format: "All", minimumScore: 0 }) });
   const id = (value) => String(value);
   const ids = (values) => [...new Set((values || []).filter(v => typeof v === "string" || typeof v === "number").map(id))];
   const finite = (v) => Number.isFinite(v) ? v : null;
@@ -28,169 +36,298 @@
     }));
   }
 
-  function passesFilters(anime, filters) {
-    const text = [anime.title, ...Object.values(anime.titles || {}), ...(anime.aliases || []),
-      ...anime.genres, ...anime.studio_names, ...anime.voice_actors.map(actor => actor.name)].filter(Boolean).join(" ").toLowerCase();
+  function passesFilters(record, filters, direction = FORWARD) {
+    const { genres = [], studio_names = [], voice_actors = [] } = record;
+    const text = [record.title, ...Object.values(record.titles || {}), ...(record.aliases || []),
+      ...(direction === FORWARD ? [...genres, ...studio_names, ...voice_actors.map(actor => actor.name)] : [])]
+      .filter(Boolean).join(" ").toLowerCase();
     return (!filters.search || text.includes(filters.search.toLowerCase()))
-      && (filters.genre === "All" || anime.genres.includes(filters.genre))
-      && (filters.studio === "All" || anime.studio_names.includes(filters.studio))
-      && (filters.format === "All" || anime.format === filters.format)
-      && (filters.yearFrom === null || Number.isFinite(anime.year) && anime.year >= filters.yearFrom)
-      && (filters.yearTo === null || Number.isFinite(anime.year) && anime.year <= filters.yearTo)
-      && (!filters.minimumScore || Number.isFinite(anime.average_score) && anime.average_score >= filters.minimumScore);
+      && (filters.genre === "All" || genres.includes(filters.genre))
+      && (filters.yearFrom === null || Number.isFinite(record.year) && record.year >= filters.yearFrom)
+      && (filters.yearTo === null || Number.isFinite(record.year) && record.year <= filters.yearTo)
+      && (direction === REVERSE || ((filters.studio === "All" || studio_names.includes(filters.studio))
+        && (filters.format === "All" || record.format === filters.format)
+        && (!filters.minimumScore || Number.isFinite(record.average_score) && record.average_score >= filters.minimumScore)));
   }
 
-  function rankCorpus(data, scores, movieIds, sortKey = "average") {
-    if (!data || !scores || !movieIds.length) return [];
-    const indices = movieIds.map(movieId => data.movies.findIndex(movie => id(movie.id) === id(movieId)));
-    if (indices.some(index => index < 0)) return [];
-    const selected = movieIds.indexOf(sortKey);
-    return data.anime.map((anime, index) => {
-      const values = indices.map(movieIndex => scores[movieIndex * data.anime.length + index]);
-      const score = values.reduce((sum, value) => sum + value, 0) / values.length;
-      return { anime, index, scores: values, score, sortScore: selected < 0 ? score : values[selected] };
-    }).sort((a, b) => b.sortScore - a.sortScore || a.index - b.index)
+  // The validated bundle is movie-major. Both directions use the same pair lookup.
+  function createScoreAccessor(data, matrix) {
+    const rows = new Map(data.movies.map((record, index) => [id(record.id), index]));
+    const columns = new Map(data.anime.map((record, index) => [id(record.id), index]));
+    const stride = data.anime.length;
+    return (movieId, animeId) => {
+      const row = rows.get(id(movieId)), column = columns.get(id(animeId));
+      return row === undefined || column === undefined ? undefined : matrix[row * stride + column];
+    };
+  }
+
+  function scoreDust(records, magnets, direction, pairScore) {
+    if (!pairScore || !magnets.length) return [];
+    const reverse = direction === REVERSE;
+    return records.map((record, index) => {
+      const scores = magnets.map(magnet => reverse ? pairScore(record.id, magnet.id) : pairScore(magnet.id, record.id));
+      return { record, key: keyFor(DIRECTIONS[direction].dust, record.id), index, scores,
+        score: scores.reduce((sum, value) => sum + value, 0) / scores.length,
+        closest: scores.indexOf(Math.max(...scores)), group: "dust" };
+    });
+  }
+
+  function rankDust(vectors, magnetIndex = -1) {
+    return vectors.map(match => ({ ...match, sortScore: magnetIndex < 0 ? match.score : match.scores[magnetIndex] }))
+      .sort((a, b) => b.sortScore - a.sortScore || a.index - b.index)
       .map((match, index) => ({ ...match, rank: index + 1 }));
   }
 
-  function createContext({ getDustMatches, storage, onNotice = () => {} } = {}) {
-    let data = null, scores = null, metadata = [], lookup = new Map();
-    let state = { version: VERSION, revision: 0, movieIds: [], dustLimit: 60,
-      candidateDustIds: [], displayedDustIds: [], perMovieScores: {}, rankingSortKey: "average",
-      filters: defaults(), selectedAnimeIds: [] };
-    let candidates = [], ranking = [], displayed = [], signature = null;
-    let layout = { magnetPositions: {}, particles: null, scrollY: 0 };
-    let metadataStatus = "loading", persistent = true, warned = false, sessionRestored = false;
+  // Take an equal share of each magnet's strongest matches, then fill by mean cosine.
+  function sampleDust(vectors, magnetCount, limit) {
+    if (!vectors.length) return [];
+    const ranked = rankDust(vectors);
+    const count = Math.min(vectors.length, limit);
+    const chosen = new Set();
+    const perMagnet = Math.floor(count / (magnetCount * 2));
+    for (let i = 0; i < magnetCount; i++) {
+      vectors.slice().sort((a, b) => b.scores[i] - a.scores[i] || a.index - b.index)
+        .slice(0, perMagnet).forEach(match => chosen.add(match.index));
+    }
+    for (const match of ranked) {
+      if (chosen.size >= count) break;
+      chosen.add(match.index);
+    }
+    return ranked.filter(match => chosen.has(match.index));
+  }
+
+  function forwardVectors(data, matrix, movieIds) {
+    if (!data || !matrix || !movieIds.length) return [];
+    const movies = movieIds.map(movieId => data.movies.find(movie => id(movie.id) === id(movieId)));
+    if (movies.some(movie => !movie)) return [];
+    return scoreDust(data.anime, movies, FORWARD, createScoreAccessor(data, matrix));
+  }
+
+  // Compatibility for the original single-direction helpers.
+  function rankCorpus(data, scores, movieIds, sortKey = "average") {
+    return rankDust(forwardVectors(data, scores, movieIds), movieIds.indexOf(sortKey))
+      .map(({ record, index, scores, score, sortScore, rank }) => ({ anime: record, index, scores, score, sortScore, rank }));
+  }
+
+  const dustLimit = value => [30, 60, 90].includes(Number(value)) ? Number(value) : 60;
+  const blankState = direction => ({ magnetKeys: [], dustLimit: 60, candidateKeys: [], displayedKeys: [],
+    rankingSortKey: "average", rankingOrder: "ascending", filters: defaults(direction), selectedKeys: [], example: false });
+  const blankLayout = () => ({ magnetPositions: {}, magnetColors: {}, particles: null, scrollY: 0 });
+
+  function readSession(direction, saved) {
+    const state = blankState(direction), value = saved.state;
+    const { magnet, dust } = DIRECTIONS[direction];
+    const typedIds = (values, catalogue) => ids(Array.isArray(values) ? values : []).filter(key => key.startsWith(`${catalogue}:`));
+    return {
+      state: { ...state, magnetKeys: typedIds(value.magnetKeys, magnet).slice(0, 3),
+        selectedKeys: typedIds(value.selectedKeys, dust).slice(0, 3),
+        dustLimit: dustLimit(value.dustLimit), rankingSortKey: typeof value.rankingSortKey === "string" ? value.rankingSortKey : "average",
+        rankingOrder: value.rankingOrder === "descending" ? "descending" : "ascending",
+        filters: Object.fromEntries(Object.entries(state.filters).map(([key, fallback]) =>
+          [key, typeof value.filters?.[key] === (fallback === null ? "number" : typeof fallback) ? value.filters[key] : fallback])),
+        example: value.example === true },
+      layout: { ...blankLayout(), ...saved.layout }
+    };
+  }
+
+  function importV1(saved) {
+    const { state, layout } = saved;
+    const typed = values => ids(Array.isArray(values) ? values : []);
+    return readSession(FORWARD, {
+      state: { ...state, magnetKeys: typed(state.movieIds).map(value => keyFor("tmdb", value)),
+        selectedKeys: typed(state.selectedAnimeIds).map(value => keyFor("anilist", value)),
+        rankingSortKey: state.rankingSortKey && state.rankingSortKey !== "average" ? keyFor("tmdb", state.rankingSortKey) : "average" },
+      layout: { scrollY: layout?.scrollY || 0,
+        magnetPositions: Object.fromEntries(Object.entries(layout?.magnetPositions || {}).map(([key, value]) =>
+          [key.replace(/^(\d+):/, "$1:tmdb:"), value])),
+        magnetColors: Object.fromEntries(Object.entries(layout?.movieColors || {}).map(([key, value]) =>
+          [keyFor("tmdb", key), value])),
+        particles: Array.isArray(layout?.particles?.positions) && { ...layout.particles, positions: layout.particles.positions
+          .filter(node => node?.anime?.id != null).map(({ anime, ...node }) => ({ ...node, key: keyFor("anilist", anime.id) })) }
+      }
+    });
+  }
+
+  function createContext({ storage, onNotice = () => {} } = {}) {
+    let direction = FORWARD, data, matrix, pairScore, metadata = [], metadataStatus = "loading";
+    let session = { state: blankState(direction), layout: blankLayout() };
+    const sessions = new Map();
+    let catalogue = new Map(), lookup = new Map(), magnets = [], vectors = [], candidates = [], displayed = [], ranking = [];
+    let persistent = true, warned = false, revision = 0;
     const listeners = new Set();
     function storageFailure() {
       persistent = false;
       if (!warned) { warned = true; onNotice("Session storage is unavailable. Changes work here, but may not survive navigation or reload."); }
     }
+    function read(key) {
+      let raw;
+      try { raw = storage?.getItem(key); } catch (_) { storageFailure(); }
+      try { return JSON.parse(raw || "null"); } catch (_) { return null; }
+    }
     function persist() {
+      if (!data) return;
       try {
         if (!storage) { storageFailure(); return; }
-        const serialized = JSON.stringify({ version: VERSION, state, layout });
+        const serialized = JSON.stringify({ version: VERSION, direction, sessions: Object.fromEntries(sessions) });
         storage.setItem(STORAGE_KEY, serialized);
         if (storage.getItem(STORAGE_KEY) !== serialized) storageFailure();
-      }
-      catch (_) { storageFailure(); }
+      } catch (_) { storageFailure(); }
     }
     function snapshot() {
-      return { ...state, candidateDust: candidates, displayedDust: displayed, ranking,
-        lookup, metadataStatus, persistent,
-        missingMetadataIds: state.candidateDustIds.filter(key => !lookup.get(key)?.metadata),
-        filteredOutIds: state.candidateDustIds.filter(key => !state.displayedDustIds.includes(key)) };
+      const state = session.state;
+      const visible = new Set(state.displayedKeys);
+      return { ...state, version: VERSION, direction, revision, magnets, candidateDust: candidates, displayedDust: displayed,
+        ranking, lookup, metadataStatus, persistent,
+        missingMetadataIds: direction === FORWARD ? state.candidateKeys.filter(key => !lookup.get(key)?.metadata) : [],
+        filteredOutIds: state.candidateKeys.filter(key => !visible.has(key)) };
     }
     function publish() {
-      state = { ...state, revision: state.revision + 1 };
+      revision++;
       persist();
       const value = snapshot();
       listeners.forEach(listener => listener(value));
       return value;
     }
-    function derive({ resample = false, rerank = false } = {}) {
-      if (resample) {
-        const next = data && scores ? JSON.stringify([state.movieIds, state.dustLimit]) : null;
-        if (signature !== next || !data || !scores) {
-          signature = next;
-          candidates = next ? getDustMatches(data, scores, state.movieIds, state.dustLimit) : [];
-        }
+    function refreshLookup() {
+      if (direction === FORWARD) {
+        lookup = new Map([...joinRecords(data?.anime || [], metadata)].map(([id, row]) =>
+          [keyFor("anilist", id), { record: row.anime, metadata: row.metadata }]));
+      } else {
+        lookup = new Map(catalogueFor(data, "tmdb").map(record => [keyFor("tmdb", record.id), { record }]));
       }
-      state.candidateDustIds = candidates.map(match => id(match.anime.id));
-      state.perMovieScores = Object.fromEntries(candidates.map(match => [id(match.anime.id),
-        Object.fromEntries(state.movieIds.map((movieId, i) => [movieId, match.scores[i]]))]));
-      displayed = candidates.filter(match => passesFilters(lookup.get(id(match.anime.id)).anime, state.filters));
-      state.displayedDustIds = displayed.map(match => id(match.anime.id));
-      const retained = state.selectedAnimeIds.filter(key => state.displayedDustIds.includes(key));
-      if (data && scores && metadataStatus !== "loading" && retained.length < state.selectedAnimeIds.length) onNotice("Selection updated: titles no longer displayed were removed.");
-      if (data && scores && metadataStatus !== "loading") state.selectedAnimeIds = retained;
-      if (!state.movieIds.includes(state.rankingSortKey)) state.rankingSortKey = "average";
-      if (rerank) ranking = rankCorpus(data, scores, state.movieIds, state.rankingSortKey);
-      const visible = new Set(state.displayedDustIds);
-      ranking = ranking.map(match => ({ ...match, displayed: visible.has(id(match.anime.id)) }));
+    }
+    function activate() {
+      const { magnet } = DIRECTIONS[direction];
+      catalogue = new Map(catalogueFor(data, magnet).map(record =>
+        [keyFor(magnet, record.id), { ...record, id: id(record.id), key: keyFor(magnet, record.id) }]));
+      refreshLookup();
+    }
+    function derive({ rescore = false, resample = false, rerank = false } = {}) {
+      const state = session.state;
+      if (rescore) {
+        state.magnetKeys = state.magnetKeys.filter(key => catalogue.has(key));
+        magnets = state.magnetKeys.map(key => catalogue.get(key));
+        vectors = scoreDust(catalogueFor(data, DIRECTIONS[direction].dust), magnets, direction, pairScore);
+      }
+      if (rescore || resample) {
+        candidates = sampleDust(vectors, magnets.length, state.dustLimit);
+        state.candidateKeys = candidates.map(match => match.key);
+      }
+      displayed = candidates.filter(match => passesFilters(lookup.get(match.key).record, state.filters, direction));
+      state.displayedKeys = displayed.map(match => match.key);
+      const visible = new Set(state.displayedKeys);
+      if (pairScore && (direction === REVERSE || metadataStatus !== "loading")) {
+        const retained = state.selectedKeys.filter(key => visible.has(key));
+        if (retained.length < state.selectedKeys.length) onNotice("Selection updated. Titles no longer displayed were removed.");
+        state.selectedKeys = retained;
+      }
+      if (!state.magnetKeys.includes(state.rankingSortKey)) state.rankingSortKey = "average";
+      if (rescore || rerank) ranking = rankDust(vectors, state.magnetKeys.indexOf(state.rankingSortKey));
+      ranking = ranking.map(match => ({ ...match, displayed: visible.has(match.key) }));
       return publish();
+    }
+    function seed() {
+      const example = [...catalogue.values()].find(record => record.title === DIRECTIONS[direction].example) || catalogue.values().next().value;
+      if (example) { session.state.magnetKeys = [example.key]; session.state.example = true; }
     }
     const api = {
       snapshot,
       subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
       restore() {
-        let raw;
-        try { raw = storage?.getItem(STORAGE_KEY); }
-        catch (_) { storageFailure(); return false; }
-        try {
-          const saved = JSON.parse(raw || "null");
-          if (saved?.version === VERSION && saved.state?.version === VERSION) {
-            sessionRestored = true;
-            const s = saved.state;
-            state = { ...state, movieIds: ids(s.movieIds).slice(0, 3), dustLimit: [30, 60, 90].includes(s.dustLimit) ? s.dustLimit : 60,
-              rankingSortKey: typeof s.rankingSortKey === "string" ? s.rankingSortKey : "average",
-              filters: { ...defaults(), ...s.filters }, selectedAnimeIds: ids(s.selectedAnimeIds).slice(0, 3) };
-            if (saved.layout && typeof saved.layout === "object") layout = { ...layout, ...saved.layout };
-            return true;
+        const saved = read(STORAGE_KEY);
+        if (saved?.version === VERSION && Object.hasOwn(DIRECTIONS, saved.direction)
+          && Array.isArray(saved.sessions?.[saved.direction]?.state?.magnetKeys)) {
+          for (const name of Object.keys(DIRECTIONS)) {
+            const entry = saved.sessions[name];
+            if (Array.isArray(entry?.state?.magnetKeys)) sessions.set(name, readSession(name, entry));
           }
-        } catch (_) { /* Malformed saved data does not imply storage is disabled. */ }
-        return false;
+          direction = saved.direction;
+        } else {
+          const legacy = read(LEGACY_KEY);
+          if (legacy?.version !== 1 || legacy.state?.version !== 1 || !Array.isArray(legacy.state.movieIds)) return false;
+          sessions.set(FORWARD, importV1(legacy));
+        }
+        session = sessions.get(direction);
+        return true;
       },
-      // Import only a resolvable seed. Old Top-20 IDs, filters, ranking and layout
-      // are deliberately excluded; the next source derivation uses today's algorithm.
+      // Only the resolvable title is imported from the older Top-20 experience.
       migrateLegacy(recommendations) {
-        if (sessionRestored) return false;
-        let raw;
-        try { raw = storage?.getItem("aniviz_seed_movie"); }
-        catch (_) { storageFailure(); return false; }
-        try {
-          const seed = JSON.parse(raw || "null");
-          const movie = recommendations?.movies.find(row => id(row.id) === String(seed?.tmdbId));
-          if (!movie) return false;
-          state.movieIds = [id(movie.id)];
-          return true;
-        } catch (_) { return false; }
+        if (sessions.has(FORWARD)) return false;
+        const seed = read("aniviz_seed_movie");
+        const movie = recommendations?.movies.find(row => id(row.id) === id(seed?.tmdbId));
+        if (!movie) return false;
+        session.state.magnetKeys = [keyFor("tmdb", movie.id)];
+        sessions.set(FORWARD, session);
+        return true;
       },
-      setSources(recommendations, matrix) {
-        if (data !== recommendations || scores !== matrix) signature = null;
-        data = recommendations; scores = matrix;
-        lookup = joinRecords(data?.anime || [], metadata);
-        state.movieIds = state.movieIds.filter(key => data?.movies.some(movie => id(movie.id) === key));
-        return derive({ resample: true, rerank: true });
+      setSources(recommendations, scores, { seedExample = false } = {}) {
+        const changed = data !== recommendations || matrix !== scores;
+        data = recommendations; matrix = scores;
+        if (changed) pairScore = data && matrix ? createScoreAccessor(data, matrix) : null;
+        activate();
+        if (seedExample && !sessions.has(direction) && !api.migrateLegacy(data)) seed();
+        sessions.set(direction, session);
+        return derive({ rescore: changed || seedExample });
+      },
+      setDirection(next) {
+        if (!data || next === direction || !Object.hasOwn(DIRECTIONS, next)) return snapshot();
+        direction = next;
+        const previous = sessions.get(direction);
+        session = previous || { state: blankState(direction), layout: blankLayout() };
+        activate();
+        if (!previous) seed();
+        sessions.set(direction, session);
+        return derive({ rescore: true });
       },
       setMetadata(rows, status = "ready") {
         metadata = rows || []; metadataStatus = status;
-        lookup = joinRecords(data?.anime || [], metadata);
+        if (direction === REVERSE) return snapshot();
+        refreshLookup();
         return derive();
       },
-      setMovies(values) {
-        state.movieIds = ids(values).filter(key => data?.movies.some(movie => id(movie.id) === key)).slice(0, 3);
-        return derive({ resample: true, rerank: true });
+      setMagnets(values) {
+        const keys = ids(values).filter(key => catalogue.has(key)).slice(0, 3);
+        if (keys.join() === session.state.magnetKeys.join()) return snapshot();
+        session.state.magnetKeys = keys;
+        session.state.example = false;
+        return derive({ rescore: true });
       },
       setDustLimit(value) {
-        state.dustLimit = [30, 60, 90].includes(Number(value)) ? Number(value) : 60;
+        session.state.dustLimit = dustLimit(value);
         return derive({ resample: true });
       },
-      setFilters(patch) { state.filters = { ...state.filters, ...patch }; return derive(); },
-      resetFilters() { state.filters = defaults(); return derive(); },
-      setRankingSort(key) {
-        state.rankingSortKey = state.movieIds.includes(id(key)) ? id(key) : "average";
-        return derive({ rerank: true });
+      setFilters(patch) {
+        for (const key of Object.keys(defaults(direction))) {
+          if (Object.hasOwn(patch, key)) session.state.filters = { ...session.state.filters, [key]: patch[key] };
+        }
+        return derive();
+      },
+      resetFilters() { session.state.filters = defaults(direction); return derive(); },
+      setRankingSort(key) { session.state.rankingSortKey = id(key); return derive({ rerank: true }); },
+      setRankingOrder(order) {
+        session.state.rankingOrder = order === "descending" ? "descending" : "ascending";
+        return publish();
       },
       setSelection(values) {
-        state.selectedAnimeIds = ids(values).filter(key => state.displayedDustIds.includes(key)).slice(0, 3);
+        session.state.selectedKeys = ids(values).filter(key => session.state.displayedKeys.includes(key)).slice(0, 3);
         return publish();
       },
       toggleSelection(value) {
-        const key = id(value);
-        if (!state.displayedDustIds.includes(key)) return snapshot();
-        if (state.selectedAnimeIds.includes(key)) return api.setSelection(state.selectedAnimeIds.filter(item => item !== key));
-        if (state.selectedAnimeIds.length >= 3) {
-          onNotice("Compare up to 3 anime. Remove a selected title before adding another.");
+        const key = id(value), { displayedKeys, selectedKeys } = session.state;
+        if (!displayedKeys.includes(key)) return snapshot();
+        if (selectedKeys.includes(key)) return api.setSelection(selectedKeys.filter(item => item !== key));
+        if (selectedKeys.length >= 3) {
+          onNotice(`Compare up to 3 ${direction === REVERSE ? "movies" : "anime"}. Remove a selected title before adding another.`);
           return snapshot();
         }
-        return api.setSelection([...state.selectedAnimeIds, key]);
+        return api.setSelection([...selectedKeys, key]);
       },
-      getLayout() { return layout; },
-      saveLayout(patch) { layout = { ...layout, ...patch }; persist(); },
-      resetPositions() { layout = { ...layout, magnetPositions: {}, particles: null }; persist(); }
+      getLayout() { return session.layout; },
+      saveLayout(patch) { session.layout = { ...session.layout, ...patch }; persist(); },
+      resetPositions() { api.saveLayout({ magnetPositions: {}, particles: null }); }
     };
     return api;
   }
-  return { VERSION, STORAGE_KEY, defaults, joinRecords, passesFilters, rankCorpus, createContext };
+  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, DIRECTIONS, keyFor, catalogueFor, defaults, joinRecords,
+    passesFilters, createScoreAccessor, forwardVectors, rankCorpus, sampleDust, createContext };
 });

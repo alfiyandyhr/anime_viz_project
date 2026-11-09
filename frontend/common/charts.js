@@ -36,7 +36,7 @@
 
           return d3.descending(a.count, b.count);
         })
-        .slice(0, 12);
+        .slice(0, context.countOnly ? Infinity : 12);
 
       if (!data.length) {
         renderEmpty(container, "No genre data match the current filters.");
@@ -119,13 +119,13 @@
           showTooltip(event, `
             <strong>${escapeHTML(item.genre)}</strong>
             <span>
-              Titles: ${item.count}<br>
+              Titles: ${item.count}${context.countOnly ? "" : `<br>
               Average score:
               ${Number.isFinite(item.averageScore)
                 ? item.averageScore.toFixed(1)
                 : "N/A"}<br>
               Total popularity:
-              ${formatNumber(item.totalPopularity)}
+              ${formatNumber(item.totalPopularity)}`}
             </span>
           `);
         })
@@ -169,7 +169,7 @@
 
       const width = Math.max(container.clientWidth, 480);
       const height = Math.max(container.clientHeight, 370);
-      const margin = { top: 24, right: 60, bottom: 52, left: 58 };
+      const margin = { top: 24, right: context.countOnly ? 20 : 60, bottom: 52, left: 58 };
 
       const svg = d3.select(container)
         .append("svg")
@@ -182,23 +182,6 @@
 
       const yCount = d3.scaleLinear()
         .domain([0, d3.max(data, (item) => item.count) || 1])
-        .nice()
-        .range([height - margin.bottom, margin.top]);
-
-      const scoreExtent = d3.extent(
-        data.filter((item) => Number.isFinite(item.averageScore)),
-        (item) => item.averageScore
-      );
-
-      const yScore = d3.scaleLinear()
-        .domain(
-          scoreExtent[0] === undefined
-            ? [0, 100]
-            : [
-              Math.max(0, scoreExtent[0] - 5),
-              Math.min(100, scoreExtent[1] + 5)
-            ]
-        )
         .nice()
         .range([height - margin.bottom, margin.top]);
 
@@ -230,18 +213,65 @@
           showTooltip(event, `
             <strong>${item.year}</strong>
             <span>
-              Sampled titles: ${item.count}<br>
+              Sampled titles: ${item.count}${context.countOnly ? "" : `<br>
               Average score:
               ${Number.isFinite(item.averageScore)
                 ? item.averageScore.toFixed(1)
                 : "N/A"}<br>
               Total popularity:
-              ${formatNumber(item.totalPopularity)}
+              ${formatNumber(item.totalPopularity)}`}
             </span>
           `);
         })
         .on("mousemove", moveTooltip)
         .on("mouseleave", hideTooltip);
+
+      const tickStep = Math.max(1, Math.ceil(data.length / 12));
+      const visibleYears = data
+        .map((item) => item.year)
+        .filter((_, index) => index % tickStep === 0);
+
+      svg.append("g")
+        .attr("class", "axis")
+        .attr("transform", `translate(0,${height - margin.bottom})`)
+        .call(
+          d3.axisBottom(x)
+            .tickValues(visibleYears)
+            .tickSizeOuter(0)
+        )
+        .selectAll("text")
+        .attr("transform", "rotate(-35)")
+        .attr("text-anchor", "end");
+
+      svg.append("g")
+        .attr("class", "axis")
+        .attr("transform", `translate(${margin.left},0)`)
+        .call(d3.axisLeft(yCount).ticks(5));
+
+      svg.append("text")
+        .attr("class", "axis-label")
+        .attr("x", margin.left)
+        .attr("y", 13)
+        .text("Title count");
+
+      if (context.countOnly) return;
+
+      const scoreExtent = d3.extent(
+        data.filter((item) => Number.isFinite(item.averageScore)),
+        (item) => item.averageScore
+      );
+
+      const yScore = d3.scaleLinear()
+        .domain(
+          scoreExtent[0] === undefined
+            ? [0, 100]
+            : [
+              Math.max(0, scoreExtent[0] - 5),
+              Math.min(100, scoreExtent[1] + 5)
+            ]
+        )
+        .nice()
+        .range([height - margin.bottom, margin.top]);
 
       const lineData = data.filter((item) => Number.isFinite(item.averageScore));
 
@@ -268,38 +298,10 @@
         .attr("stroke", "#08101c")
         .attr("stroke-width", 1.5);
 
-      const tickStep = Math.max(1, Math.ceil(data.length / 12));
-      const visibleYears = data
-        .map((item) => item.year)
-        .filter((_, index) => index % tickStep === 0);
-
-      svg.append("g")
-        .attr("class", "axis")
-        .attr("transform", `translate(0,${height - margin.bottom})`)
-        .call(
-          d3.axisBottom(x)
-            .tickValues(visibleYears)
-            .tickSizeOuter(0)
-        )
-        .selectAll("text")
-        .attr("transform", "rotate(-35)")
-        .attr("text-anchor", "end");
-
-      svg.append("g")
-        .attr("class", "axis")
-        .attr("transform", `translate(${margin.left},0)`)
-        .call(d3.axisLeft(yCount).ticks(5));
-
       svg.append("g")
         .attr("class", "axis")
         .attr("transform", `translate(${width - margin.right},0)`)
         .call(d3.axisRight(yScore).ticks(5));
-
-      svg.append("text")
-        .attr("class", "axis-label")
-        .attr("x", margin.left)
-        .attr("y", 13)
-        .text("Title count");
 
       svg.append("text")
         .attr("class", "axis-label")

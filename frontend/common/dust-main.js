@@ -1,149 +1,186 @@
 "use strict";
-// One analytical owner for the dust field and every mounted supporting chart.
+// Connect one directional dust snapshot to the field, details and analysis.
 (function (root) {
-  let context, composition, latest, metadataPayload = null, metadataError = false;
-  let sources = [], sourceMovies = "", sourceLimit, rankingPage = 0, rankingSignature = "";
-  let restored = false, scrollRestored = false, pendingNotice = "", focusedDustId = null;
+  let context, composition, latest, rankingPage = 0, rankingSignature = "";
+  let scrollRestored = false, pendingNotice = "";
   const $ = selector => document.querySelector(selector);
-  const movieColors = new Map();
-  function color(movieId) {
-    if (!movieColors.has(String(movieId))) {
-      const active = recommendationState.movieIds.filter(id => String(id) !== String(movieId));
-      const used = new Set(active.map(id => movieColors.get(String(id))));
-      movieColors.set(String(movieId), MAGNET_COLORS.find(value => !used.has(value)) || MAGNET_COLORS[0]);
-    }
-    return movieColors.get(String(movieId));
-  }
+  const magnetColors = new Map();
+  const isReverse = () => latest.direction === AnivizDust.REVERSE;
+  const dustNoun = () => isReverse() ? "movies" : "anime";
+  const detailHelpers = () => ({ escapeHTML, escapeAttribute, humanize, formatNumber });
+  const color = key => magnetColors.get(key);
   const notice = message => {
     pendingNotice = message;
-    if ($('[data-dust-notice]')) $('[data-dust-notice]').textContent = message;
+    $('[data-dust-notice]').textContent = message;
   };
+
   function controlsFromFilters(filters) {
-    const mapping = { search: "searchInput", genre: "genreFilter", studio: "studioFilter", format: "formatFilter",
-      yearFrom: "yearFrom", yearTo: "yearTo", minimumScore: "scoreFilter" };
-    Object.entries(mapping).forEach(([key, name]) => {
-      const fallback = key === "yearFrom" ? metadataPayload?.meta.year_min ?? 1900
-        : key === "yearTo" ? metadataPayload?.meta.year_max ?? new Date().getFullYear() : "";
-      const control = elements[name], value = filters[key] ?? fallback;
-      if (control.tagName === 'SELECT' && value !== '' && !Array.from(control.options).some(option => option.value === String(value))) {
-        const option = document.createElement('option'); option.value = value; option.textContent = value; control.append(option);
-      }
-      control.value = value;
-    });
+    elements.searchInput.value = filters.search;
+    elements.genreFilter.value = filters.genre;
+    elements.yearFrom.value = filters.yearFrom ?? elements.yearFrom.options[0]?.value;
+    elements.yearTo.value = filters.yearTo ?? elements.yearTo.options[elements.yearTo.length - 1]?.value;
+    if (isReverse()) return;
+    elements.studioFilter.value = filters.studio;
+    elements.formatFilter.value = filters.format;
+    elements.scoreFilter.value = filters.minimumScore;
     elements.scoreOutput.value = filters.minimumScore;
+  }
+  function populateFilterChoices() {
+    const records = [...latest.lookup.values()].map(row => row.record);
+    const choices = field => [...new Set(records.flatMap(record => record[field] || []))].sort();
+    populateSelect(elements.genreFilter, choices('genres'), 'All genres');
+    if (!isReverse()) {
+      populateSelect(elements.studioFilter, choices('studio_names'),
+        latest.metadataStatus === 'unavailable' ? 'Studios unavailable' : 'All studios');
+      populateSelect(elements.formatFilter, choices('format'), 'All formats', humanize);
+    }
+    const years = records.map(record => record.year).filter(Number.isFinite);
+    const first = years.length ? Math.min(...years) : 1900;
+    const last = years.length ? Math.max(...years) : new Date().getFullYear();
+    elements.yearFrom.innerHTML = elements.yearTo.innerHTML =
+      Array.from({ length: last - first + 1 }, (_, i) => `<option value="${first + i}">${first + i}</option>`).join('');
+    for (const [key, control] of [['genre', elements.genreFilter], ['yearFrom', elements.yearFrom],
+      ['yearTo', elements.yearTo], ...(!isReverse() ? [['studio', elements.studioFilter], ['format', elements.formatFilter]] : [])]) {
+      // Keep explicit saved filters visible if that metadata is currently unavailable.
+      const value = latest.filters[key];
+      if (value !== null && !Array.from(control.options).some(option => option.value === String(value))) {
+        const option = new Option(value, value);
+        if (key === 'yearFrom') control.insertBefore(option, control.options[1] || null);
+        else if (key === 'yearTo') control.insertBefore(option, control.options[control.length - 1] || null);
+        else control.add(option);
+      }
+    }
+    controlsFromFilters(latest.filters);
   }
   function setFilters(patch) {
     context.setFilters(patch);
-    controlsFromFilters(context.snapshot().filters);
+    controlsFromFilters(latest.filters);
     renderRecommendations();
   }
   function applyFilters() {
+    if (!recommendationState.data) return;
     let from = Number(elements.yearFrom.value), to = Number(elements.yearTo.value);
     if (from > to) [from, to] = [to, from];
     setFilters({ search: elements.searchInput.value.trim(), genre: elements.genreFilter.value,
       studio: elements.studioFilter.value, format: elements.formatFilter.value,
       yearFrom: from === Number(elements.yearFrom.options[0]?.value) ? null : from,
-      yearTo: to === Number(elements.yearTo.options[elements.yearTo.options.length - 1]?.value) ? null : to,
+      yearTo: to === Number(elements.yearTo.options[elements.yearTo.length - 1]?.value) ? null : to,
       minimumScore: Number(elements.scoreFilter.value) });
   }
-  function resetFilters() { context.resetFilters(); controlsFromFilters(context.snapshot().filters); renderRecommendations(); }
-  function movies() {
-    return (latest?.movieIds || []).map(id => recommendationState.data?.movies.find(movie => String(movie.id) === id)).filter(Boolean);
+  function resetFilters() { context.resetFilters(); controlsFromFilters(latest.filters); renderRecommendations(); }
+
+  function inspectTitle(key) {
+    const record = latest.lookup.get(key)?.record;
+    if (!record) return;
+    if (isReverse()) {
+      const match = latest.ranking.find(row => row.key === key);
+      elements.drawerContent.innerHTML = `<div class="dust-movie-drawer">${AnivizDustDetails.renderMovie({
+        record, match, magnets: latest.magnets, color, helpers: detailHelpers(), heading: 'h2'
+      })}</div>`;
+      openDrawer('Movie details');
+    } else {
+      openAnimeDetail({ ...record, cover: record.cover || {}, description: record.description || record.synopsis,
+        site_url: record.site_url || record.url || `https://anilist.co/anime/${record.id}` });
+    }
   }
-  function inspectAnime(id) {
-    const anime = latest?.lookup.get(String(id))?.anime;
-    if (!anime) return;
-    openAnimeDetail({ ...anime, cover: anime.cover || {},
-      description: anime.description || anime.synopsis,
-      site_url: anime.site_url || anime.url || `https://anilist.co/anime/${anime.id}` });
-  }
-  function select(id, { showDrawer = false } = {}) {
-    const key = String(id);
-    if (!latest.displayedDustIds.includes(key)) { inspectAnime(key); return; }
-    const wasSelected = latest.selectedAnimeIds.includes(key);
-    focusedDustId = showDrawer && wasSelected ? null : key;
-    const before = latest;
+  function select(key, { showDrawer = false } = {}) {
+    if (!latest.displayedKeys.includes(key)) return;
+    const wasSelected = latest.selectedKeys.includes(key);
+    if (pendingNotice.startsWith('Compare up to 3')) notice('');
     context.toggleSelection(key);
-    // At capacity the comparison does not publish a new snapshot.
-    if (latest === before) renderDetails();
-    if (showDrawer && !wasSelected) inspectAnime(key);
-  }
-  function setSelection(ids) {
-    focusedDustId = null;
-    context.setSelection(ids);
-  }
-  function deselectLast() {
-    if (latest && (latest.selectedAnimeIds.length || focusedDustId)) setSelection(latest.selectedAnimeIds.slice(0, -1));
+    if (showDrawer && !wasSelected) inspectTitle(key);
   }
   function renderDetails() {
-    if (!latest) return;
-    const result = AnivizDustDetails.render({ snapshot: latest, movies: movies(), color, focusedDustId,
-      helpers: { escapeHTML, escapeAttribute, humanize, formatNumber } });
-    const detail = $('#recommendation-detail'), cue = $('#dust-selection');
-    const focus = $('#dust-focus');
+    const result = AnivizDustDetails.render({ snapshot: latest, color, helpers: detailHelpers() });
+    const detail = $('#recommendation-detail'), cue = $('#dust-selection'), focus = $('#dust-focus');
     if (focus.innerHTML !== result.focusHtml) { focus.innerHTML = result.focusHtml; focus.scrollTop = 0; }
     detail.hidden = !result.html;
     detail.innerHTML = result.html;
     cue.hidden = !result.html;
-    cue.innerHTML = result.html ? `<a href="#recommendation-detail">${result.count > 1 ? `Comparing ${result.count} anime` : 'Selected anime'} · below ↓</a>` : '';
+    cue.innerHTML = result.html ? `<a href="#recommendation-detail">${result.count > 1
+      ? `Comparing ${result.count} ${dustNoun()}` : 'Selected title'} · below ↓</a>` : '';
   }
   function publish(snapshot) {
+    const switched = latest.direction !== snapshot.direction;
     latest = snapshot;
-    if (!snapshot.displayedDustIds.includes(focusedDustId)) focusedDustId = null;
-    recommendationState.animeId = snapshot.selectedAnimeIds.at(-1) || null;
-    recommendationState.dustMatches = snapshot.displayedDust;
-    const anime = snapshot.displayedDustIds.map(id => snapshot.lookup.get(id).anime);
+    if (switched) loadLayout();
+    const reverse = isReverse();
+    const used = new Set();
+    snapshot.magnetKeys.forEach(key => {
+      let value = magnetColors.get(key);
+      if (!MAGNET_COLORS.includes(value) || used.has(value)) value = MAGNET_COLORS.find(candidate => !used.has(candidate));
+      magnetColors.set(key, value);
+      used.add(value);
+    });
+    if (switched) updateDirectionControls();
+    const records = snapshot.displayedKeys.map(key => snapshot.lookup.get(key).record);
     const dustColors = new Map(snapshot.displayedDust.map(match => [
-      String(match.anime.id), color(snapshot.movieIds[match.closest])
+      String(match.record.id), color(snapshot.magnetKeys[match.closest])
     ]));
-    composition.update({ anime, movies: movies(), selectedIds: snapshot.selectedAnimeIds,
-      metric: $('[data-dust-genre-metric]').value,
-      onSelect: select,
-      dustColor: id => dustColors.get(id),
-      snapshot });
-    const count = snapshot.displayedDustIds.length, candidates = snapshot.candidateDustIds.length;
-    $('[data-dust-scope]').textContent = `${count} / ${candidates} anime`;
-    elements.filterSummary.textContent = `${count} / ${candidates} anime`;
-    $('[data-dust-notice]').textContent = pendingNotice;
+    const metric = reverse ? 'count' : $('[data-dust-genre-metric]').value;
+    const selectedIds = snapshot.selectedKeys.map(key => snapshot.lookup.get(key)?.record.id).filter(id => id != null).map(String);
+    composition.update({ anime: records, selectedIds, countOnly: reverse,
+      metric,
+      onSelect: id => select(AnivizDust.keyFor('anilist', id)),
+      dustColor: id => dustColors.get(id), snapshot });
+    const count = records.length, candidates = snapshot.candidateKeys.length;
+    $('[data-dust-scope]').textContent = elements.filterSummary.textContent = `${count} / ${candidates} ${dustNoun()}`;
+    $('#dust-limit').value = snapshot.dustLimit;
     const notes = {
-      genres: [$('[data-dust-genre-metric]').value === 'count' ? 'Genres' : 'Genre ' + $('[data-dust-genre-metric]').value,
-        row => row.genres.length && ($('[data-dust-genre-metric]').value === 'score' ? Number.isFinite(row.average_score) : $('[data-dust-genre-metric]').value !== 'popularity' || Number.isFinite(row.popularity)), 'Counts overlap.'],
-      years: ['Release years', row => Number.isFinite(row.year), 'Bars: titles · line: score.'],
-      studios: ['Titles with studio, score and popularity', row => row.studio_names.length && row.popularity > 0 && Number.isFinite(row.average_score), 'Circle area represents matching titles. Studio credits can overlap.'],
-      heatmap: ['Studio × genre', row => row.studio_names.length && row.genres.length,
-        'Up to 15 studios and 10 genres, ranked by displayed title count. Titles can appear in multiple cells.'],
-      reception: ['Ratings', row => row.popularity > 0 && Number.isFinite(row.average_score), 'Circle area: favourites · Color: closest magnet.']
+      genres: [metric === 'count' ? 'Genres' : 'Genre ' + metric,
+        row => row.genres.length && (metric === 'score' ? Number.isFinite(row.average_score) : metric !== 'popularity' || Number.isFinite(row.popularity)), 'Counts overlap.'],
+      years: ['Release years', row => Number.isFinite(row.year), reverse ? 'Bars show displayed movies by release year.' : 'Bars: titles · line: score.']
     };
+    if (reverse) {
+      $('[data-coverage="reception"]').textContent = 'The published TMDB sample has no ratings or popularity values.';
+      $('[data-coverage="studios"]').textContent = 'The published TMDB sample has no production company or cast credits.';
+      $('[data-coverage="heatmap"]').textContent = '';
+    } else {
+      Object.assign(notes, {
+        studios: ['Titles with studio, score and popularity', row => row.studio_names.length && row.popularity > 0 && Number.isFinite(row.average_score), 'Circle area represents matching titles. Studio credits can overlap.'],
+        heatmap: ['Studio × genre', row => row.studio_names.length && row.genres.length,
+          'Up to 15 studios and 10 genres, ranked by displayed title count. Titles can appear in multiple cells.'],
+        reception: ['Ratings', row => row.popularity > 0 && Number.isFinite(row.average_score), 'Circle area: favourites · Color: closest magnet.']
+      });
+    }
     Object.entries(notes).forEach(([kind, [label, predicate, suffix]]) => {
-      const available = anime.filter(predicate).length;
+      const available = records.filter(predicate).length;
       $(`[data-coverage="${kind}"]`).textContent = snapshot.metadataStatus === 'unavailable' && ['studios', 'heatmap', 'reception'].includes(kind)
-        ? `${label} unavailable: metadata failed to load.` : (available < count ? `${label}: ${available} of ${count} · ` : "") + suffix;
+        ? `${label} unavailable: metadata failed to load.` : (available < count ? `${label}: ${available} of ${count} · ` : '') + suffix;
     });
     $('[data-dust-chips]').replaceChildren();
     Object.entries(snapshot.filters).filter(([, value]) => value !== null && value !== "" && value !== "All" && value !== 0).forEach(([key, value]) => {
       const button = document.createElement('button'); button.type = 'button'; button.className = 'small-button ghost';
       button.textContent = `${key}: ${value} ×`; button.setAttribute('aria-label', `Remove ${key} filter: ${value}`);
-      button.addEventListener('click', () => setFilters({ [key]: AnivizDust.defaults()[key] }));
+      button.addEventListener('click', () => setFilters({ [key]: AnivizDust.defaults(snapshot.direction)[key] }));
       $('[data-dust-chips]').append(button);
     });
-    const signature = JSON.stringify([snapshot.movieIds, snapshot.rankingSortKey]);
+    const signature = JSON.stringify([snapshot.direction, snapshot.magnetKeys, snapshot.rankingSortKey, snapshot.rankingOrder]);
     if (signature !== rankingSignature) { rankingPage = 0; rankingSignature = signature; }
     const sort = $('[data-dust-ranking-sort]');
-    sort.innerHTML = '<option value="average">Average similarity</option>' + movies().map((movie, i) =>
-      `<option value="${escapeAttribute(movie.id)}">Closest to Magnet ${i + 1} — ${escapeHTML(movie.title)}</option>`).join('');
+    sort.innerHTML = '<option value="average">Average similarity</option>' + snapshot.magnets.map((magnet, i) =>
+      `<option value="${escapeAttribute(magnet.key)}">Closest to Magnet ${i + 1} — ${escapeHTML(magnet.title)}</option>`).join('');
     sort.value = snapshot.rankingSortKey;
+    $('[data-dust-ranking-order]').value = snapshot.rankingOrder;
     renderRanking();
-    if (recommendationState.data && recommendationState.dustMatches) { renderDustDetail(); highlightRecommendation(); }
+    renderDetails();
+    highlightRecommendation();
   }
   function renderRanking() {
-    const all = latest.ranking, active = movies(), size = 10, total = Math.max(1, Math.ceil(all.length / size));
+    const { ranking, magnets, rankingOrder } = latest, size = 10;
+    const total = Math.max(1, Math.ceil(ranking.length / size));
     rankingPage = Math.min(rankingPage, total - 1);
-    const order = $('[data-dust-ranking-order]').value;
-    const ordered = order === 'descending' ? [...all].reverse() : all;
+    const ordered = rankingOrder === 'descending' ? [...ranking].reverse() : ranking;
     const start = rankingPage * size, rows = ordered.slice(start, start + size);
-    $('[data-dust-ranking-note]').textContent = `${all.length} corpus anime · ${rows.length ? `ranks ${rows[0].rank}–${rows.at(-1).rank}` : 'Unavailable'}`;
-    $('[data-dust-ranking-head]').innerHTML = `<tr><th scope="col" aria-sort="${order}">Rank</th><th scope="col">Anime</th>${active.map((movie, i) => `<th scope="col">M${i + 1} · ${escapeHTML(movie.title)}</th>`).join('')}<th scope="col">Average similarity</th><th scope="col">Format / year</th><th scope="col">Displayed dust</th></tr>`;
-    $('[data-dust-ranking-body]').innerHTML = rows.map(match => `<tr><td>${match.rank}</td><td><button type="button" class="recommendation-title-button" data-dust-rank-id="${escapeAttribute(match.anime.id)}" aria-haspopup="dialog" aria-controls="detail-drawer">${escapeHTML(match.anime.title)}</button></td>${match.scores.map(score => `<td title="Cosine ${score}">${score.toFixed(3)}</td>`).join('')}<td title="Average cosine ${match.score}">${match.score.toFixed(3)}</td><td>${escapeHTML(humanize(match.anime.format))} / ${match.anime.year || 'Unknown'}</td><td>${match.displayed ? 'Yes' : '—'}</td></tr>`).join('');
+    $('[data-dust-ranking-note]').textContent = `${ranking.length} corpus ${dustNoun()} · ${rows.length ? `ranks ${rows[0].rank}–${rows.at(-1).rank}` : 'Unavailable'}`;
+    const title = isReverse() ? 'Movie' : 'Anime';
+    $('[data-dust-ranking-head]').innerHTML = `<tr><th scope="col" aria-sort="${rankingOrder}">Rank</th><th scope="col">${title}</th>${magnets.map((magnet, i) => `<th scope="col">M${i + 1} · ${escapeHTML(magnet.title)}</th>`).join('')}<th scope="col">Average similarity</th><th scope="col">${isReverse() ? 'Year' : 'Format / year'}</th><th scope="col">Displayed dust</th></tr>`;
+    $('[data-dust-ranking-body]').innerHTML = rows.map(match => {
+      const { record } = match;
+      const year = record.year || 'Unknown';
+      const format = isReverse() ? '' : escapeHTML(humanize(record.format)) + ' / ';
+      return `<tr><td>${match.rank}</td><td><button type="button" class="recommendation-title-button" data-dust-rank-id="${escapeAttribute(match.key)}" aria-haspopup="dialog" aria-controls="detail-drawer">${escapeHTML(record.title)}</button></td>${match.scores.map(score => `<td title="Cosine ${score}">${score.toFixed(3)}</td>`).join('')}<td title="Average cosine ${match.score}">${match.score.toFixed(3)}</td><td>${format}${year}</td><td>${match.displayed ? 'Yes' : '—'}</td></tr>`;
+    }).join('');
     const pages = [];
     for (let page = 0; page < total; page++) if (page === 0 || page === total - 1 || Math.abs(page - rankingPage) <= 1) pages.push(page);
     $('[data-dust-ranking-pages]').innerHTML = total < 2 ? '' :
@@ -152,125 +189,128 @@
       `<button type="button" class="page-btn" data-dust-page="${rankingPage + 1}" ${rankingPage === total - 1 ? 'disabled' : ''} aria-label="Next ranking page">›</button>`;
   }
   async function loadMetadata() {
-    try {
-      metadataPayload = await AnivizData.dashboard(); metadataError = false;
-      state.data = metadataPayload; populateControls();
-      controlsFromFilters(context.snapshot().filters);
-      context.setMetadata(metadataPayload.anime);
-    } catch (_) {
-      metadataError = true; context.setMetadata([], 'unavailable');
-      // Recommendation fields remain useful even when richer metadata cannot load.
-      populateFallbackControls();
-    }
-    renderRecommendations();
-  }
-  function populateFallbackControls() {
-    const anime = recommendationState.data?.anime || [];
-    populateSelect(elements.genreFilter, [...new Set(anime.flatMap(row => row.genres))].sort(), 'All genres');
-    populateSelect(elements.studioFilter, [], 'Studios unavailable');
-    populateSelect(elements.formatFilter, [...new Set(anime.map(row => row.format))].filter(Boolean).sort(), 'All formats', humanize);
-    const years = anime.map(row => row.year).filter(Number.isFinite);
-    const from = years.length ? Math.min(...years) : 1900, to = years.length ? Math.max(...years) : new Date().getFullYear();
-    const options = Array.from({ length: to - from + 1 }, (_, i) => `<option value="${from + i}">${from + i}</option>`).join('');
-    elements.yearFrom.innerHTML = options; elements.yearTo.innerHTML = options;
-    controlsFromFilters(context.snapshot().filters);
+    const metadata = await AnivizData.dashboard().catch(() => null);
+    latest = context.setMetadata(metadata?.anime || [], metadata ? 'ready' : 'unavailable');
+    if (!isReverse()) { populateFilterChoices(); renderRecommendations(); }
+    restoreScroll();
   }
   function bind() {
     let storage;
-    try { storage = sessionStorage; } catch (_) { notice('Session storage is unavailable. Changes work here, but may not survive navigation or reload.'); }
-    context = AnivizDust.createContext({ getDustMatches, storage, onNotice: notice });
-    restored = context.restore();
-    recommendationState.dustLimit = context.snapshot().dustLimit;
-    recommendationState.magnetPositions = context.getLayout().magnetPositions || {};
-    Object.entries(context.getLayout().movieColors || {}).forEach(([key, value]) => movieColors.set(key, value));
-    const particles = context.getLayout().particles;
-    if (particles?.positions?.length) dustChart = { ...particles, positions: new Map(particles.positions.map(node => [node.anime.id, node])), stop() {} };
-    $('#dust-limit').value = recommendationState.dustLimit;
+    try { storage = sessionStorage; } catch (_) { /* Context reports storage denial. */ }
+    context = AnivizDust.createContext({ storage, onNotice: notice });
+    context.restore();
+    latest = context.snapshot();
     composition = AnivizComposition.create({ onError: error => console.error(error) });
     document.querySelectorAll('[data-dust-chart]').forEach(container => {
       const kind = container.dataset.dustChart;
       composition.mount(container, kind === 'connections' ? AnivizDustConnections.create({ container, d3, color,
-          onSelect: id => select(id, { showDrawer: true }),
+          onSelect: key => select(key, { showDrawer: true }),
           onCoverage: text => { $('[data-coverage="connections"]').textContent = text; }, renderEmpty })
-        : AnivizCharts.create(kind, { container, d3, helpers: chartHelpers() }), { preserveHeight: kind === 'connections' });
+        : AnivizCharts.create(kind, { container, d3, helpers: chartHelpers() }), {
+          preserveHeight: kind === 'connections',
+          enabled: value => !value.countOnly || !container.matches('[data-anime-chart]')
+        });
     });
     context.subscribe(publish);
     $('[data-dust-genre-metric]').addEventListener('change', () => publish(context.snapshot()));
     $('[data-dust-ranking-sort]').addEventListener('change', event => context.setRankingSort(event.target.value));
-    $('[data-dust-ranking-order]').addEventListener('change', () => {
-      rankingPage = 0;
-      renderRanking();
-    });
+    $('[data-dust-ranking-order]').addEventListener('change', event => context.setRankingOrder(event.target.value));
     $('[data-dust-ranking-pages]').addEventListener('click', event => {
       const button = event.target.closest('[data-dust-page]');
       if (button && !button.disabled) { rankingPage = Number(button.dataset.dustPage); renderRanking(); }
     });
     $('[data-dust-ranking-body]').addEventListener('click', event => {
       const button = event.target.closest('[data-dust-rank-id]');
-      if (button) { inspectAnime(button.dataset.dustRankId); $('[data-dust-ranking-body]').querySelector(`[data-dust-rank-id="${CSS.escape(button.dataset.dustRankId)}"]`)?.focus({ preventScroll: true }); }
+      if (button) inspectTitle(button.dataset.dustRankId);
     });
     $('#recommendation-detail').addEventListener('click', event => {
       const remove = event.target.closest('[data-dust-remove]');
-      if (remove) setSelection(latest.selectedAnimeIds.filter(id => id !== remove.dataset.dustRemove));
-      if (event.target.closest('[data-dust-clear]')) setSelection([]);
+      if (remove) context.setSelection(latest.selectedKeys.filter(key => key !== remove.dataset.dustRemove));
+      if (event.target.closest('[data-dust-clear]')) context.setSelection([]);
     });
     bindRecommendationControls();
-    populateFallbackControls();
     void loadMetadata();
   }
-  function initialize(data) {
-    if (!restored) restored = context.migrateLegacy(data);
-    const saved = context.snapshot();
-    if (restored) {
-      recommendationState.movieIds = saved.movieIds.filter(id => data.movies.some(movie => String(movie.id) === id));
-      recommendationState.movieId = recommendationState.movieIds.at(-1) || null;
-      recommendationState.cohortSelected = true;
-    }
-    if (metadataError) populateFallbackControls();
-    saved.movieIds.forEach(color);
+  function loadLayout() {
+    const layout = context.getLayout();
+    recommendationState.magnetPositions = { ...layout.magnetPositions };
+    magnetColors.clear();
+    Object.entries(layout.magnetColors || {}).forEach(([key, value]) => magnetColors.set(key, value));
+    const particles = layout.particles;
+    const positions = Array.isArray(particles?.positions) ? particles.positions.filter(node =>
+      typeof node?.key === 'string' && Number.isFinite(node.x) && Number.isFinite(node.y)) : [];
+    dustChart = positions.length && particles.width > 0 && particles.height > 0
+      ? { ...particles, positions: new Map(positions.map(node => [node.key, node])), stop() {} } : null;
   }
-  function sync() {
-    if (!context || !recommendationState.data) return null;
-    const used = new Set();
-    recommendationState.movieIds.forEach(id => {
-      let value = movieColors.get(String(id));
-      if (!value || used.has(value)) value = MAGNET_COLORS.find(candidate => !used.has(candidate));
-      movieColors.set(String(id), value); used.add(value);
+  function updateDirectionControls() {
+    const reverse = isReverse();
+    $('#dust-direction').value = latest.direction;
+    $('#dust-limit-control span').textContent = reverse ? 'Movie dots' : 'Anime dots';
+    $('#filter-title').textContent = `Filter ${dustNoun()}`;
+    $('#dust-filter-search-label').textContent = reverse ? 'Search titles or aliases' : 'Search titles, studios, or actors';
+    elements.searchInput.placeholder = reverse ? 'e.g. Treasure Planet' : 'e.g. Attack on Titan';
+    $('#dust-focus').setAttribute('aria-label', reverse ? 'Movie in focus' : 'Anime in focus');
+    $('#dust-ranking-title').textContent = `Full ${reverse ? 'movie' : 'anime'} ranking`;
+    $('#reception h3').textContent = reverse ? 'Reception' : 'Score vs. popularity';
+    $('#creators h3').textContent = reverse ? 'Creators' : 'Studios';
+    document.querySelectorAll('[data-anime-only], [data-anime-chart]').forEach(node => { node.hidden = reverse; });
+    populateFilterChoices();
+    resetMagnetPicker();
+  }
+  function restoreScroll() {
+    if (scrollRestored || !recommendationState.data
+      || (latest.magnets.length && (!recommendationState.scores || (!isReverse() && latest.metadataStatus === 'loading')))) return;
+    scrollRestored = true;
+    const direction = latest.direction;
+    requestAnimationFrame(() => {
+      if (latest.direction !== direction) return;
+      const returning = ['back_forward', 'reload'].includes(performance.getEntriesByType('navigation')[0]?.type);
+      const target = !returning && ['#content', '#creators', '#reception'].includes(location.hash) ? $(location.hash) : null;
+      if (target) target.scrollIntoView();
+      else window.scrollTo(0, context.getLayout().scrollY || 0);
     });
-    if (sources[0] !== recommendationState.data || sources[1] !== recommendationState.scores) {
-      sources = [recommendationState.data, recommendationState.scores];
-      // Seed movies before the first derivation; legacy Top-20 IDs are never imported.
-      context.setSources(...sources);
-      context.setMovies(recommendationState.movieIds);
-      sourceMovies = JSON.stringify(recommendationState.movieIds);
-    }
-    const ids = JSON.stringify(recommendationState.movieIds);
-    if (sourceMovies !== ids) { context.setMovies(recommendationState.movieIds); sourceMovies = ids; }
-    if (sourceLimit !== recommendationState.dustLimit) { context.setDustLimit(recommendationState.dustLimit); sourceLimit = recommendationState.dustLimit; }
-    latest = context.snapshot();
-    if (!scrollRestored && recommendationState.scores && latest.metadataStatus !== "loading") {
-      scrollRestored = true;
-      requestAnimationFrame(() => {
-        const returning = ['back_forward', 'reload'].includes(performance.getEntriesByType('navigation')[0]?.type);
-        const target = !returning && ['#content', '#creators', '#reception'].includes(location.hash) ? $(location.hash) : null;
-        if (target) target.scrollIntoView();
-        else window.scrollTo(0, context.getLayout().scrollY || 0);
-      });
-    }
-    return latest;
   }
   function saveLayout() {
-    if (!context) return;
-    context.saveLayout({ magnetPositions: recommendationState.magnetPositions, movieColors: Object.fromEntries(movieColors),
-      particles: dustChart ? { width: dustChart.width, height: dustChart.height,
-        positions: [...dustChart.positions.values()].map(node => ({ anime: { id: node.anime.id }, x: node.x, y: node.y, vx: node.vx, vy: node.vy })) } : null,
-      scrollY: window.scrollY });
+    if (!context || !recommendationState.data) return;
+    const particles = dustChart ? { width: dustChart.width, height: dustChart.height,
+      positions: [...dustChart.positions.values()].map(({ key, x, y, vx, vy }) => ({ key, x, y, vx, vy })) } : null;
+    context.saveLayout({ magnetPositions: recommendationState.magnetPositions, magnetColors: Object.fromEntries(magnetColors),
+      particles, scrollY: scrollRestored ? window.scrollY : context.getLayout().scrollY });
   }
-  root.AnivizMain = { bind, initialize, sync, select, color, saveLayout, renderDetails, deselectLast,
-    clearSelection() { setSelection([]); },
-    resetPositions() { context.resetPositions(); recommendationState.magnetPositions = {}; dustChart = null; },
-    refresh() { composition?.setActive(true); composition?.refresh(); },
-    snapshot: () => context?.snapshot() };
+  root.AnivizMain = {
+    initialize(data) {
+      loadLayout();
+      context.setSources(data, null, { seedExample: true });
+      updateDirectionControls();
+      restoreScroll();
+    },
+    setScores(scores) { context.setSources(recommendationState.data, scores); restoreScroll(); },
+    switchDirection(direction) {
+      if (direction === latest.direction || !Object.hasOwn(AnivizDust.DIRECTIONS, direction)) return;
+      stopDustChart();
+      saveLayout();
+      closeDrawer();
+      if (!pendingNotice.startsWith('Session storage')) notice('');
+      context.setDirection(direction);
+      renderRecommendations();
+      scrollRestored = true;
+      window.scrollTo(0, context.getLayout().scrollY || 0);
+    },
+    setMagnets(keys) { context.setMagnets(keys); renderRecommendations(); },
+    setDustLimit(value) { context.setDustLimit(value); renderRecommendations(); },
+    select, color, saveLayout,
+    deselectLast() {
+      if (latest.selectedKeys.length) context.setSelection(latest.selectedKeys.slice(0, -1));
+    },
+    resetPositions() {
+      stopDustChart();
+      context.resetPositions();
+      recommendationState.magnetPositions = {};
+      dustChart = null;
+      renderRecommendations();
+    },
+    snapshot: () => latest
+  };
   registerPage({ usesDashboard: false, bindControls: bind, applyFilters, resetFilters,
     render() { composition?.setActive(!document.hidden); renderRecommendations(); composition?.refresh(); },
     pause() { saveLayout(); stopDustChart(); composition?.setActive(false); },

@@ -27,13 +27,20 @@
       finally { if (entry.preserveHeight) entry.container.style.removeProperty("min-height"); }
     }
     return {
-      mount(container, renderer, { preserveHeight = false } = {}) {
+      mount(container, renderer, { preserveHeight = false, enabled = () => true } = {}) {
         if (entries.has(container)) throw new Error("Container already mounted");
-        entries.set(container, { container, renderer, preserveHeight, visible: !observer, latest: null, dirty: false });
+        entries.set(container, { container, renderer, preserveHeight, enabled, visible: !observer, latest: null, dirty: false });
         observer?.observe(container);
       },
       update(value) {
         entries.forEach(entry => {
+          if (!entry.enabled(value)) {
+            entry.latest = null;
+            entry.renderer.pause?.();
+            entry.container.replaceChildren();
+            entry.container.style?.removeProperty("min-height");
+            return;
+          }
           entry.latest = value; entry.dirty = true;
           if (active && entry.visible) flush(entry);
           else {

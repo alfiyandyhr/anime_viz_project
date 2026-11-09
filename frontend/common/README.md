@@ -1,52 +1,44 @@
 # Dust context and chart interfaces
 
-The reorganization's Tasks 1–10 are implemented. `navigation.js` adds keyboard
-shortcuts and dismissal to the shared native four-view disclosure. Legacy page URLs now redirect to the composed views through `redirect.js`.
-Open `frontend/dust-magnet/index.html` to exercise the new composition.
+Open `frontend/dust-magnet/index.html` to exercise both directions. The shared
+four-view disclosure in `navigation.js` supports keyboard shortcuts and
+dismissal. Legacy URLs redirect through `redirect.js`.
 
 ## Ownership
 
-`dust-context.js` owns analytical state. `createContext({getDustMatches, storage,
-onNotice})` returns a store with `snapshot()` and `subscribe(callback)`. Treat
-snapshots as read-only. All IDs are strings, including joins to numeric dashboard
-IDs. Its versioned snapshot includes ordered `movieIds`, `dustLimit`,
-`candidateDustIds`, `displayedDustIds`, `perMovieScores`, `rankingSortKey`,
-`filters`, `selectedAnimeIds`, and `revision`.
+`dust-context.js` owns analytical state. `createContext({storage, onNotice})`
+returns a store with `snapshot()` and `subscribe(callback)`. Treat snapshots as
+read-only. The snapshot includes the active `direction`, ordered `magnets`,
+`candidateDust` and `displayedDust`, and `selectedKeys`. State keys are qualified
+by catalogue, for example `tmdb:27205` and `anilist:1`.
 
-- `setSources(recommendationJSON, matrix)`, `setMovies(ids)`, and
-  `setDustLimit(30 | 60 | 90)` derive candidates using the existing balanced
-  `getDustMatches` algorithm. Unchanged source/movie/count inputs reuse candidates.
-- `setFilters(patch)` narrows candidates without replacement. `resetFilters()`
-  restores the candidate set. Available recommendation text supports genre,
-  title, format and year filtering when richer dashboard metadata is missing.
-- `setSelection(ids)` keeps up to three displayed IDs for linked highlights.
-  Selection never scopes aggregate charts. Completed membership changes drop
-  selections outside the displayed set; metadata still loading does not discard
-  a restored selection prematurely. `toggleSelection(id)` adds/removes a title;
-  attempting a fourth preserves the existing three and emits an accessible notice.
-- `setRankingSort('average' | movieId)` ranks the complete recommendation corpus,
-  with exact per-movie scores, arithmetic mean and stable source-order ties.
-  Each row's `displayed` flag identifies membership in the field. Sorting never
-  changes candidates or field positions. Removed movie sorts fall back to average.
-- `saveLayout(patch)`, `getLayout()` and `resetPositions()` manage a separate
-  session envelope for normalized magnet positions, particle positions and
-  velocities, movie colors, and scroll position. They do not advance the
-  analytical revision or notify chart subscribers.
+- `setSources(recommendationJSON, matrix)` indexes the validated matrix by TMDB
+  movie ID and AniList anime ID. `setDirection(direction)` chooses which
+  catalogue supplies magnets. `setMagnets(keys)` scores each dust title once
+  against those magnets. Balanced sampling and ranking share the score vectors.
+- `setDustLimit(30 | 60 | 90)` resamples the same corpus. `setFilters(patch)`
+  narrows candidates without replacement. `resetFilters()` restores the
+  candidate set. The lookup joins optional dashboard metadata only for anime
+  dust. Unknown numeric metadata stays null.
+- `setSelection(keys)` and `toggleSelection(key)` keep up to three displayed
+  titles. Selection highlights contributions without changing chart scope.
+  Membership changes remove selections outside the field. Restored anime
+  selection waits for optional metadata to settle before pruning.
+- `setRankingSort('average' | magnetKey)` and `setRankingOrder(order)` sort the
+  full corpus. Each row has an exact score vector, arithmetic mean, and a
+  displayed flag. Ties use source order. Removing the active sort magnet
+  resets the basis to average.
+- `saveLayout(patch)`, `getLayout()`, and `resetPositions()` manage magnet and
+  particle positions, colors, and scroll without advancing the analytical
+  revision or notifying chart subscribers.
 
-The store's `lookup` preserves every recommendation record alongside nullable
-`metadata` and a normalized `anime` object. Missing numeric metadata stays null.
-`missingMetadataIds` counts candidates lacking a dashboard record;
-`filteredOutIds` counts candidates excluded by filters. These can overlap and
-must not be conflated. Version 1 uses only `aniviz-dust-session-v1`; catalogue
-filters and historical samples are independent. Storage errors and discarded
-writes produce a brief persistence notice while in-memory operation continues.
-`restore()` reads only supported versioned sessions. If it returns false,
-`migrateLegacy(recommendations)` resolves the old `aniviz_seed_movie.tmdbId`
-against published movies before source derivation. It imports only that seed,
-never legacy Top-20 IDs, ranking evidence, filters or selection. This also works
-when dashboard metadata arrives first. A restored versioned session, including
-an empty movie set, always wins. Unresolvable legacy seeds leave the default
-example available. Legacy keys are retained; only the versioned session is written.
+The v2 session stores separate state and layout for both directions and remembers
+which is active. A compatible v1 session imports into Movie → Anime. If no saved
+session exists, a resolvable legacy seed takes priority over the Inception
+example. Only the legacy title ID is imported. Cowboy Bebop seeds the reverse
+direction on first entry. Restoring any direction revalidates magnet and
+selection IDs and recomputes the dust membership. Storage failure leaves the
+context usable in memory and emits a notice.
 
 ## Charts
 
@@ -73,28 +65,23 @@ for deferred charts, clears obsolete marks, and pauses inactive renderers.
 `setActive(false)` and `destroy()` provide view lifecycle boundaries. Fixed chart
 extents prevent deferred rendering from displacing restored scroll positions.
 
-`dust-main.js` is the composition adapter. The field, displayed-set connection
-map, genre/year/studio/heatmap/scatter charts, filters and linked selection read
-one context. Full ranking deliberately uses the complete corpus and has separate
-pagination/sort controls. `dust-details.js` renders one-title metadata or automatic
-comparison for two/three selections, reusing the Explorer comparison transform.
-Runtime uses a common selected-title maximum, AniList scores use 0–100, and
-cosine scores use −1–1 across all columns; exact scores remain available on
-focus/hover in the comparison. Dust hover scores show three decimals.
-The latest selected anime appears in a separate right panel with catalogue
-banner/cover images, synopsis, tags and sampled Japanese cast. These long text
-sections are omitted from the comparison. Movie controls occupy the left panel;
-both panels scroll away with the playground.
-Ranking inspection outside the displayed set has separate inline evidence and
-never adds to the comparison or changes the focused dust. Empty-field clicks
-remove the latest selected dust, one at a time. Dragging and position reset
-preserve selection; toggles, individual removal and Clear selection also work.
+`dust-main.js` connects the active context to the field, connections, charts,
+ranking, and details. Movie dust uses count-only genre and release-year charts.
+The shared chart composition clears inactive marks when the direction changes.
+The `#reception`, `#content`, and `#creators` anchors work with either catalogue.
+
+`dust-details.js` renders the latest selection and a comparison below the field.
+Anime comparison shares Explorer’s metadata transforms. Movie comparison shows
+year and genres. Cosine meters span −1 to 1, with exact values available on
+hover or focus. Field tooltips, Movie in focus, and the movie details drawer show
+scores to three decimals. Any ranking row can open the appropriate details drawer
+independently of the comparison.
 Explorer uses the same extracted chart transforms and table instance. `collaboration-network.js` owns the extracted actor/character/work graph and
 inspection functions for Network. `network/app.js`
 is the dedicated Network adapter: `network/scope.js` reads the versioned dust
 snapshot without writing it, normalizes displayed IDs, and joins metadata.
-Current dust is the default when a main context exists (including an empty
-filtered set); direct entry falls back to Catalogue. Search, type toggles, and
+Current dust is the default for active anime dust, including an empty filtered
+set. With movie dust or on direct entry without a session, Network uses Catalogue. Search, type toggles, and
 scope changes are local. Missing metadata is reported separately from the
 35-most-popular-work rendering limit. Actor profiles cover the entire active
 scope, including works beyond that limit. Edge and node evidence supports

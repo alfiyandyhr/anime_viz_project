@@ -3,31 +3,12 @@
 const MAGNET_COLORS = ["#43d9e6", "#ff6fae", "#ffcc70"];
 let dustChart = null;
 
-// Keep a fair share of each magnet's strongest matches, then fill by mean score.
-// Every candidate is scored against every movie using the complete matrix.
+// Keep the original forward helper available to existing callers.
 function getDustMatches(data, scores, movieIds, limit = 60) {
-  if (!movieIds.length || !scores) return [];
-  const movieIndices = movieIds.map((id) => data.movies.findIndex((movie) => String(movie.id) === String(id)));
-  if (movieIndices.some((index) => index < 0)) return [];
-  const candidates = data.anime.map((anime, index) => {
-    const values = movieIndices.map((movieIndex) => scores[movieIndex * data.anime.length + index]);
-    return { anime, index, scores: values, score: values.reduce((a, b) => a + b, 0) / values.length,
-      closest: values.indexOf(Math.max(...values)), group: "dust" };
-  });
-  const ranked = candidates.slice().sort((a, b) => b.score - a.score || a.index - b.index);
-  ranked.forEach((match, index) => { match.rank = index + 1; });
-  const count = Math.min(data.anime.length, [30, 60, 90].includes(Number(limit)) ? Number(limit) : 60);
-  const chosen = new Set();
-  const perMovie = Math.floor(count / (movieIds.length * 2));
-  movieIds.forEach((_, movieIndex) => {
-    candidates.slice().sort((a, b) => b.scores[movieIndex] - a.scores[movieIndex] || a.index - b.index)
-      .slice(0, perMovie).forEach((match) => chosen.add(match.index));
-  });
-  for (const match of ranked) {
-    if (chosen.size >= count) break;
-    chosen.add(match.index);
-  }
-  return ranked.filter((match) => chosen.has(match.index));
+  const engine = typeof module !== "undefined" && module.exports ? require("../common/dust-context.js") : AnivizDust;
+  const count = [30, 60, 90].includes(Number(limit)) ? Number(limit) : 60;
+  return engine.sampleDust(engine.forwardVectors(data, scores, movieIds), movieIds.length, count)
+    .map(({ record, key, sortScore, ...match }) => ({ ...match, anime: record }));
 }
 
 function defaultMagnetPositions(count, width, height) {
@@ -130,7 +111,7 @@ function dustAttraction(node, anchors, target) {
 
 function createDustNodes(matches, anchors, width, height, previous) {
   return matches.map((match, index) => {
-    const saved = previous?.positions.get(match.anime.id);
+    const saved = previous?.positions.get(match.key ?? match.anime.id);
     if (saved) return { ...match, x: saved.x * width / previous.width,
       y: saved.y * height / previous.height, vx: saved.vx || 0, vy: saved.vy || 0 };
     const layout = anchors.length > 1 ? dustScoreLayout({ ...match }, anchors, width, height) : null;
@@ -260,144 +241,100 @@ function constrainMagnetPosition(anchor, x, y, anchors, width, height) {
   return best || desired;
 }
 
-function selectedMagnetMovies() {
-  return recommendationState.movieIds.map((id) => recommendationState.data.movies.find((movie) => movie.id === id));
-}
-
 function bindDustControls() {
   const deselectOnBackground = event => {
-    if (recommendationState.viz !== "magnets" || event.defaultPrevented
-      || event.target.closest(".dust-node, .dust-magnet, button")) return;
+    if (event.defaultPrevented || event.target.closest(".dust-node, .dust-magnet, button")) return;
     hideTooltip();
-    if (globalThis.AnivizMain) AnivizMain.deselectLast();
-    else clearDustSelection();
+    AnivizMain.deselectLast();
   };
   for (const selector of ["#recommendation-chart", "#dust-mirror"]) {
     document.querySelector(selector).addEventListener("click", deselectOnBackground);
   }
-  document.querySelector("#dust-limit").addEventListener("change", (event) => {
-    recommendationState.dustLimit = Number(event.target.value);
-    renderRecommendations();
-  });
-  document.querySelector("#movie-magnets").addEventListener("click", (event) => {
+  document.querySelector("#dust-limit").addEventListener("change", event => AnivizMain.setDustLimit(event.target.value));
+  document.querySelector("#movie-magnets").addEventListener("click", event => {
     const button = event.target.closest("[data-remove-magnet]");
     if (!button) return;
-    recommendationState.movieIds = recommendationState.movieIds.filter((id) => id !== button.dataset.removeMagnet);
-    if (!recommendationState.movieIds.includes(recommendationState.movieId) && recommendationState.movieIds.length) {
-      recommendationState.movieId = recommendationState.movieIds.at(-1);
-      recommendationState.tablePage = 0;
-    }
-    renderRecommendations();
+    AnivizMain.setMagnets(AnivizMain.snapshot().magnetKeys.filter(key => key !== button.dataset.removeMagnet));
     document.querySelector("#movie-search").focus();
   });
-  document.querySelector("#reset-magnets").addEventListener("click", () => {
-    if (globalThis.AnivizMain) AnivizMain.resetPositions();
-    else recommendationState.magnetPositions = {};
-    renderRecommendations();
-  });
-}
-
-function clearDustSelection() {
-  if (recommendationState.viz !== "magnets" || recommendationState.animeId === null) return;
-  recommendationState.animeId = null;
-  globalThis.AnivizMain?.clearSelection();
-  hideTooltip();
-  renderDustDetail();
-  highlightRecommendation();
+  document.querySelector("#reset-magnets").addEventListener("click", AnivizMain.resetPositions);
 }
 
 function renderDustRecommendations() {
-  const context = globalThis.AnivizMain?.sync();
-  const movies = selectedMagnetMovies();
-  const data = recommendationState.data;
+  const { magnets, displayedDust, direction, example } = AnivizMain.snapshot();
+  const reverse = direction === AnivizDust.REVERSE;
+  const noun = reverse ? "movies" : "anime";
   const container = document.querySelector("#recommendation-chart");
   const mirror = document.querySelector("#dust-mirror");
   const legend = document.querySelector("#dust-legend");
-  legend.hidden = !movies.length;
-  legend.innerHTML = movies.map((movie, index) => `
-    <span title="Anime most similar to ${escapeAttribute(movie.title)}"><i class="dust-legend-dot" style="--magnet-color:${(globalThis.AnivizMain?.color(movies[index].id) || MAGNET_COLORS[index])}" aria-hidden="true"></i>M${index + 1}</span>`).join("")
-    + (movies.length ? `<span><i class="dust-legend-dot is-selected" aria-hidden="true"></i>Selected</span>` : "");
-  stopDustChart();
+  legend.hidden = !magnets.length;
+  legend.innerHTML = magnets.map((magnet, index) => `
+    <span title="Titles most similar to ${escapeAttribute(magnet.title)}"><i class="dust-legend-dot" style="--magnet-color:${AnivizMain.color(magnet.key)}" aria-hidden="true"></i>M${index + 1}</span>`).join("")
+    + (magnets.length ? `<span><i class="dust-legend-dot is-selected" aria-hidden="true"></i>Selected</span>` : "");
   document.querySelector("#dust-layout-status").hidden = true;
   document.querySelector("#dust-layout-status").textContent = "";
   document.querySelector("#recommendation-content").hidden = false;
-  document.querySelector("#recommendation-chart-kicker").textContent = "Dust & Magnet";
-  document.querySelector("#recommendation-chart-title").textContent = "Anime shown";
-  document.querySelector("#recommendation-chart-guide").textContent = "Compare a dot’s distances to your movies: higher similarity places it nearer that magnet. Drag magnets to rearrange the field, or use arrow keys on a focused magnet. Hover or focus a dot for scores; select it to explore.";
-  document.querySelector("#recommendation-score-note").textContent = "Drag magnets · Select up to 3 dots · Distance: preference order · Cosine ≠ percentage.";
-  document.querySelector("#movie-magnets").innerHTML = movies.map((movie, index) => `
-    <div class="movie-magnet-chip" style="--magnet-color:${(globalThis.AnivizMain?.color(movies[index].id) || MAGNET_COLORS[index])}">
-      <span class="magnet-chip-number">${index + 1}</span><span>${escapeHTML(movie.title)} <small>${movie.year || ""}</small>${!recommendationState.cohortSelected && movies.length === 1 ? ' <em class="magnet-example">Example</em>' : ""}</span>
-      <button type="button" data-remove-magnet="${escapeAttribute(movie.id)}" aria-label="Remove ${escapeAttribute(movie.title)} magnet">×</button>
-    </div>`).join("") + (movies.length < 3 ? `<span class="magnet-empty-slot">${movies.length ? `${movies.length}/3 movies` : "Add a movie in the search panel"}</span>` : `<span class="magnet-empty-slot">3/3 movies · remove one to swap</span>`);
-  document.querySelectorAll("#movie-suggestions button").forEach((button) => {
-    const selected = recommendationState.movieIds.includes(button.dataset.movieId);
-    button.setAttribute("aria-pressed", selected);
-    button.disabled = !selected && movies.length >= 3;
+  document.querySelector("#recommendation-chart-title").textContent = reverse ? "Movies shown" : "Anime shown";
+  document.querySelector("#movie-magnets").innerHTML = magnets.map((magnet, index) => `
+    <div class="movie-magnet-chip" style="--magnet-color:${AnivizMain.color(magnet.key)}">
+      <span class="magnet-chip-number">${index + 1}</span><span>${escapeHTML(magnet.title)} <small>${magnet.year || ""}</small>${example ? ' <em class="magnet-example">Example</em>' : ""}</span>
+      <button type="button" data-remove-magnet="${escapeAttribute(magnet.key)}" aria-label="Remove ${escapeAttribute(magnet.title)} magnet">×</button>
+    </div>`).join("") + `<span class="magnet-empty-slot">${magnets.length}/3 magnets${magnets.length === 3 ? " · remove one to swap" : ""}</span>`;
+  document.querySelectorAll("#movie-suggestions button").forEach(button => {
+    button.setAttribute("aria-pressed", magnets.some(magnet => magnet.key === button.dataset.magnetKey));
   });
-  document.querySelector("#reset-magnets").disabled = !movies.length;
-  if (!movies.length) {
-    const message = "Add a movie in the search panel to find anime with similar stories.";
+  document.querySelector("#reset-magnets").disabled = !magnets.length;
+  if (!magnets.length) {
+    dustChart = null;
+    const message = `Add a title magnet to find ${noun} with similar stories.`;
     container.innerHTML = `<div class="dust-empty"><p>${message}</p></div>`;
     renderEmpty(mirror, message);
-    recommendationState.dustMatches = [];
-    renderDustDetail();
-    document.querySelector("#recommendation-status").textContent = "No magnets selected. Search for a movie or choose a suggestion.";
     return;
   }
   if (!recommendationState.scores) {
-    const message = recommendationState.scoresError
-      ? `Could not load full similarities: ${recommendationState.scoresError}` : "Gathering the anime dust…";
-    container.innerHTML = `<div class="dust-empty" role="status"><p>${escapeHTML(message)}</p>${recommendationState.scoresError ? `<button type="button" class="small-button ghost" id="dust-retry">Retry full scores</button>` : ""}</div>`;
+    const error = recommendationState.scoresError;
+    const message = error ? `Could not load full similarities: ${error}` : `Gathering ${noun}…`;
+    container.innerHTML = `<div class="dust-empty" role="status"><p>${escapeHTML(message)}</p>${error ? `<button type="button" class="small-button ghost" id="dust-retry">Retry full scores</button>` : ""}</div>`;
     renderEmpty(mirror, message);
-    recommendationState.dustMatches = [];
-    renderDustDetail();
     document.querySelector("#dust-retry")?.addEventListener("click", () => {
-      recommendationState.scoresError = null;
       void loadRecommendationScores();
       renderRecommendations();
     });
-    if (!recommendationState.scoresError && !recommendationState.scoresLoading) void loadRecommendationScores();
+    if (!error) void loadRecommendationScores();
     return;
   }
-  const matches = context?.displayedDust || getDustMatches(data, recommendationState.scores, recommendationState.movieIds, recommendationState.dustLimit);
-  recommendationState.dustMatches = matches;
-  if (!matches.some((match) => match.anime.id === recommendationState.animeId)) recommendationState.animeId = null;
-  if (!document.querySelector("#movie-search").value) document.querySelector("#recommendation-status").textContent =
-    "";
-  renderDustChart(container, mirror, movies, matches);
-  renderDustDetail();
+  renderDustChart(container, mirror, magnets, displayedDust);
   highlightRecommendation();
 }
 
 function createDustView(container, matches, anchors, width, height, onMove, label) {
   const svg = d3.select(container).append("svg").attr("viewBox", `0 0 ${width} ${height}`)
     .attr("width", width).attr("height", height).attr("class", "dust-map").attr("role", "group")
-    .attr("aria-label", `${label} similarity to ${anchors.map(({ movie }) => movie.title).join(", ")}`);
+    .attr("aria-label", `${label} similarity to ${anchors.map(({ magnet }) => magnet.title).join(", ")}`);
   const paths = svg.append("g").attr("aria-hidden", "true");
-  const dots = svg.append("g").selectAll("g").data(matches, (match) => match.anime.id).join("g")
-    .attr("class", "dust-node").attr("data-match-id", (match) => match.anime.id)
+  const dots = svg.append("g").selectAll("g").data(matches, (match) => match.key).join("g")
+    .attr("class", "dust-node").attr("data-match-id", (match) => match.key)
     .attr("role", "button").attr("tabindex", 0).attr("aria-controls", "dust-focus recommendation-detail")
-    .attr("aria-label", (match) => `${match.anime.title}. ${anchors.map(({ movie }, index) => `${movie.title}: cosine ${match.scores[index].toFixed(3)}`).join(". ")}. Toggle selection for details or comparison.`)
+    .attr("aria-label", (match) => `${match.record.title}. ${anchors.map(({ magnet }, index) => `${magnet.title}: cosine ${match.scores[index].toFixed(3)}`).join(". ")}. Toggle selection for details or comparison.`)
     .on("mouseenter focus", (event, match) => {
       const rect = event.currentTarget.getBoundingClientRect();
       const pointer = event.type === "focus" ? { clientX: rect.x + rect.width / 2, clientY: rect.y + rect.height / 2 } : event;
-      showTooltip(pointer, `<strong>${escapeHTML(match.anime.title)}</strong><span>${escapeHTML(humanize(match.anime.format))} · ${match.anime.year || "Year unknown"}</span>`
-        + anchors.map(({ movie, color }, index) => `<span class="dust-tooltip-score"><i style="background:${color}"></i>${escapeHTML(movie.title)} <b>${match.scores[index].toFixed(3)}</b></span>`).join("")
+      showTooltip(pointer, `<strong>${escapeHTML(match.record.title)}</strong><span>${match.key.startsWith("anilist:") ? escapeHTML(humanize(match.record.format)) + " · " : ""}${match.record.year || "Year unknown"}</span>`
+        + anchors.map(({ magnet, color }, index) => `<span class="dust-tooltip-score"><i style="background:${color}"></i>${escapeHTML(magnet.title)} <b>${match.scores[index].toFixed(3)}</b></span>`).join("")
         + "<span>Click to toggle selection</span>");
     })
     .on("mousemove", moveTooltip)
     .on("mouseleave blur", hideTooltip)
-    .on("click", (event, match) => { hideTooltip(); selectRecommendationAnime(match.anime.id); })
+    .on("click", (event, match) => { hideTooltip(); AnivizMain.select(match.key); })
     .on("keydown", (event, match) => {
-      if (["Enter", " "].includes(event.key)) { event.preventDefault(); hideTooltip(); selectRecommendationAnime(match.anime.id); }
+      if (["Enter", " "].includes(event.key)) { event.preventDefault(); hideTooltip(); AnivizMain.select(match.key); }
       if (event.key === "Escape") hideTooltip();
     });
   dots.append("circle").attr("class", "dust-hit-area").attr("r", 9);
   dots.append("circle").attr("class", "dust-grain").attr("r", 4.5).attr("fill", (match) => anchors[match.closest].color);
-  const magnets = svg.append("g").selectAll("g").data(anchors).join("g").attr("class", "dust-magnet")
+  const magnets = svg.append("g").selectAll("g").data(anchors, anchor => anchor.magnet.key).join("g").attr("class", "dust-magnet")
     .attr("role", "group").attr("tabindex", 0)
-    .attr("aria-label", (anchor) => `${anchor.movie.title} magnet. Drag or use arrow keys to move.`)
+    .attr("aria-label", (anchor) => `${anchor.magnet.title} magnet. Drag or use arrow keys to move.`)
     .on("keydown", (event, anchor) => {
       const delta = { ArrowLeft: [-12, 0], ArrowRight: [12, 0], ArrowUp: [0, -12], ArrowDown: [0, 12] }[event.key];
       if (!delta) return;
@@ -411,12 +348,12 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
   magnets.append("text").attr("class", "magnet-number").attr("text-anchor", "middle").attr("dy", 5)
     .attr("fill", (anchor) => anchor.color).text((_, index) => `M${index + 1}`);
   magnets.append("text").attr("class", "magnet-title").attr("text-anchor", "middle").attr("y", 49)
-    .text((anchor) => truncate(anchor.movie.title, width < 400 ? 16 : 23));
-  magnets.append("title").text((anchor) => `${anchor.movie.title} (${anchor.movie.year || "Year unknown"})`);
+    .text((anchor) => truncate(anchor.magnet.title, width < 400 ? 16 : 23));
+  magnets.append("title").text((anchor) => `${anchor.magnet.title} (${anchor.magnet.year || "Year unknown"})`);
 
   return {
     draw(positions) {
-      dots.attr("transform", (match) => { const node = positions.get(match.anime.id); return `translate(${node.x},${node.y})`; });
+      dots.attr("transform", (match) => { const node = positions.get(match.key); return `translate(${node.x},${node.y})`; });
       magnets.attr("transform", (anchor) => `translate(${anchor.x},${anchor.y})`);
     },
     drawLinks(links) {
@@ -429,26 +366,29 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
   };
 }
 
-function renderDustChart(container, mirror, movies, matches) {
+function renderDustChart(container, mirror, magnets, matches) {
   // Clear the field before measuring so the old SVG cannot size the flex item.
   container.innerHTML = "";
   mirror.innerHTML = "";
   const width = Math.max(240, container.clientWidth);
   const height = Math.max(260, container.clientHeight || (width < 400 ? 440 : 500));
-  const initial = defaultMagnetPositions(movies.length, width, height);
-  const anchors = movies.map((movie, index) => {
-    const saved = recommendationState.magnetPositions[`${movies.length}:${movie.id}`];
-    return { movie, color: (globalThis.AnivizMain?.color(movie.id) || MAGNET_COLORS[index]), ...(saved ? { x: saved.x * width, y: saved.y * height } : initial[index]) };
+  const initial = defaultMagnetPositions(magnets.length, width, height);
+  const anchors = magnets.map((magnet, index) => {
+    const saved = recommendationState.magnetPositions[`${magnets.length}:${magnet.key}`];
+    const hasPosition = Number.isFinite(saved?.x) && Number.isFinite(saved?.y);
+    const position = hasPosition ? { x: saved.x * width, y: saved.y * height } : initial[index];
+    return { magnet, color: AnivizMain.color(magnet.key), ...position };
   });
   for (const anchor of anchors) {
     Object.assign(anchor, constrainMagnetPosition(anchor, anchor.x, anchor.y, anchors, width, height));
   }
-  const views = [createDustView(container, matches, anchors, width, height, moveAnchor, "Anime"),
-    createDustView(mirror, matches, anchors, width, height, moveAnchor, "Mirror of anime")];
+  const noun = AnivizMain.snapshot().direction === AnivizDust.REVERSE ? "movies" : "anime";
+  const views = [createDustView(container, matches, anchors, width, height, moveAnchor, `Displayed ${noun}`),
+    createDustView(mirror, matches, anchors, width, height, moveAnchor, `Mirror of ${noun}`)];
   const nodes = createDustNodes(matches, anchors, width, height, dustChart);
   // First entry is already gathered; subsequent changes retain the same grains.
   if (!dustChart) for (let tick = 0; tick < 360; tick++) stepDust(nodes, anchors, width, height);
-  const positions = new Map(nodes.map((node) => [node.anime.id, node]));
+  const positions = new Map(nodes.map((node) => [node.key, node]));
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let frame = null, lastTime = null, quietFrames = 0;
   dustChart = { views, positions, anchors, width, height, stop() {
@@ -457,21 +397,21 @@ function renderDustChart(container, mirror, movies, matches) {
   } };
   function moveAnchor(anchor, x, y) {
     Object.assign(anchor, constrainMagnetPosition(anchor, x, y, anchors, width, height));
-    recommendationState.magnetPositions[`${movies.length}:${anchor.movie.id}`] = { x: anchor.x / width, y: anchor.y / height };
+    recommendationState.magnetPositions[`${magnets.length}:${anchor.magnet.key}`] = { x: anchor.x / width, y: anchor.y / height };
     // Keep each grain's identity and project only as far as needed to preserve
     // its score order when the moving bisectors cross it.
     stepDust(nodes, anchors, width, height, 0);
     draw();
     wake();
-    globalThis.AnivizMain?.saveLayout();
+    AnivizMain.saveLayout();
   }
   function draw() {
     views.forEach(view => view.draw(positions));
-    highlightDustConnections(recommendationState.animeId);
+    highlightDustConnections();
     const status = document.querySelector("#dust-layout-status");
     const approximate = nodes.some((node) => node.scoreLayout?.approximate);
     const message = approximate
-      ? "This magnet arrangement cannot show every score order. Each dot is still nearest its highest-scoring movie. Spread the magnets into a triangle or use Reset positions to compare all three distances."
+      ? "This magnet arrangement cannot show every score order. Each dot is still nearest its highest-scoring magnet. Spread the magnets into a triangle or use Reset positions to compare all three distances."
       : "";
     if (status.textContent !== message) status.textContent = message;
     status.hidden = !approximate;
@@ -484,7 +424,7 @@ function renderDustChart(container, mirror, movies, matches) {
     draw();
     quietFrames = movement < .015 ? quietFrames + 1 : 0;
     if (quietFrames < 24) frame = requestAnimationFrame(animate);
-    else { lastTime = null; globalThis.AnivizMain?.saveLayout(); }
+    else { lastTime = null; AnivizMain.saveLayout(); }
   }
   function wake() {
     quietFrames = 0;
@@ -498,45 +438,13 @@ function renderDustChart(container, mirror, movies, matches) {
   wake();
 }
 
-function highlightDustConnections(id) {
+function highlightDustConnections() {
   if (!dustChart?.views) return;
-  const selected = globalThis.AnivizMain?.snapshot()?.selectedAnimeIds || (id ? [id] : []);
-  const links = selected.flatMap(key => {
+  const links = AnivizMain.snapshot().selectedKeys.flatMap(key => {
     const node = dustChart.positions.get(key);
     return node ? dustChart.anchors.map(anchor => ({ anchor, node })) : [];
   });
   dustChart.views.forEach(view => view.drawLinks(links));
-}
-
-function renderDustDetail() {
-  if (globalThis.AnivizMain) { AnivizMain.renderDetails(); return; }
-  const detail = document.querySelector("#recommendation-detail");
-  const match = recommendationState.dustMatches?.find((item) => item.anime.id === recommendationState.animeId)
-    || globalThis.AnivizMain?.snapshot()?.ranking.find(item => String(item.anime.id) === recommendationState.animeId);
-  const selection = document.querySelector("#dust-selection");
-  selection.hidden = !match;
-  detail.hidden = !match;
-  detail.classList.remove("is-bottom");
-  if (!match) {
-    selection.innerHTML = "";
-    detail.innerHTML = "";
-    return;
-  }
-  const anime = match.anime, movies = selectedMagnetMovies();
-  selection.innerHTML = `<span>In focus · <strong>${escapeHTML(anime.title)}</strong></span>`;
-  detail.innerHTML = `
-    <p class="chart-kicker">Anime in focus</p><h3 tabindex="-1" aria-live="polite">${escapeHTML(anime.title)}</h3>
-    <p class="recommendation-detail-meta">${escapeHTML(humanize(anime.format))} · ${anime.year || "Year unknown"}</p>
-    <div class="dust-detail-scores">${movies.map((movie, index) => `
-      <div style="--magnet-color:${(globalThis.AnivizMain?.color(movies[index].id) || MAGNET_COLORS[index])}"><span><i></i>${escapeHTML(movie.title)}</span><strong>${match.scores[index].toFixed(3)}</strong></div>`).join("")}
-      <small>Cosine similarity · higher means closer</small>
-    </div>
-    <div class="genre-list">${anime.genres.map((genre) => `<span class="tag">${escapeHTML(genre)}</span>`).join("")}</div>
-    <div class="dust-story"><h4>Storyline</h4><p>${escapeHTML(anime.synopsis || "No synopsis available for this anime.")}</p></div>
-    <div class="recommendation-context"><h4>Story tags</h4><div class="genre-list">${anime.tags.slice(0, 8).map((tag) => `<span class="tag">${escapeHTML(tag)}</span>`).join("") || "<small>No tags available.</small>"}</div>
-      ${anime.tags.length > 8 ? `<details class="dust-more-tags"><summary>All ${anime.tags.length} tags</summary><div class="genre-list">${anime.tags.slice(8).map((tag) => `<span class="tag">${escapeHTML(tag)}</span>`).join("")}</div></details>` : ""}
-    </div>
-    <a class="button button-secondary" href="${escapeAttribute(anime.url)}" target="_blank" rel="noopener noreferrer">Explore on AniList ↗</a>`;
 }
 
 if (typeof module !== "undefined" && module.exports) {

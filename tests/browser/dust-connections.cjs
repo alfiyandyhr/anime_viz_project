@@ -30,35 +30,35 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       const evidence = await page.evaluate(() => {
         const s = AnivizMain.snapshot();
         const dustColors = new Map([...document.querySelectorAll('#recommendation-chart .dust-node')].map(el =>
-          [String(el.__data__.anime.id),getComputedStyle(el.querySelector('.dust-grain')).fill]));
-        return {count:s.displayedDust.length, corpus:s.ranking.length, movieCount:s.movieIds.length,
+          [el.__data__.key,getComputedStyle(el.querySelector('.dust-grain')).fill]));
+        return {count:s.displayedDust.length, corpus:s.ranking.length, movieCount:s.magnetKeys.length,
           coverage:document.querySelector('[data-coverage="connections"]').textContent,
           cards:[...document.querySelectorAll('.dust-connection-map')].map(card => {
             const magnets = [...card.querySelectorAll('[data-dust-connection-movie]')];
             const movieIndex = magnets.findIndex(button => button.getAttribute('aria-pressed') === 'true');
             const sorted = s.displayedDust.slice().sort((a,b) =>
               b.scores[movieIndex]-a.scores[movieIndex] || a.index-b.index);
-            const expected = sorted.map((row,i) => ({id:String(row.anime.id),rank:i+1,
+            const expected = sorted.map((row,i) => ({id:row.key,rank:i+1,
               score:row.scores[movieIndex].toFixed(3)}));
             const actual = [...card.querySelectorAll('[data-dust-connection-id]')].map(el => {
               const match = el.__data__;
-              return {id:String(match.anime.id),rank:match.rank,
+              return {id:match.key,rank:match.rank,
                 score:el.querySelector('.dust-connection-score').textContent};
             });
             const paints = [...card.querySelectorAll('[data-dust-connection-id]')].map(el => ({
-              dust:dustColors.get(String(el.__data__.anime.id)),
+              dust:dustColors.get(el.__data__.key),
               dot:getComputedStyle(el.querySelector('.dust-connection-dot')).backgroundColor,
               score:getComputedStyle(el.querySelector('.dust-connection-score')).color
             }));
             const lines = [...card.querySelectorAll('svg path')].map(el => ({
-              dust:dustColors.get(String(el.__data__.match.anime.id)),
+              dust:dustColors.get(el.__data__.match.key),
               color:getComputedStyle(el).stroke, width:Number(el.getAttribute('stroke-width')),
               score:el.__data__.match.similarity
             })).sort((a,b) => a.score-b.score);
             const members = card.parentElement.querySelector('.dust-member-panel');
             const memberMagnets = [...members.querySelectorAll('[data-dust-member-movie]')];
             const expectedMembers = sorted.filter(row => row.scores.indexOf(Math.max(...row.scores)) === movieIndex)
-              .map((row,i) => [i+1, row.anime.title, row.scores[movieIndex].toFixed(3)]);
+              .map((row,i) => [i+1, row.record.title, row.scores[movieIndex].toFixed(3)]);
             const actualMembers = [...members.querySelectorAll('tbody tr')].map(row =>
               [...row.cells].map((cell,i) => i === 0 ? Number(cell.textContent) : cell.textContent));
             return {expected,actual,paints,lines,movieIndex,magnetCount:magnets.length,
@@ -112,7 +112,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       await control('#dust-limit',String(count));
       assert.equal((await check()).count,count);
     }
-    const movieIds = await page.evaluate(() => AnivizMain.snapshot().movieIds);
+    const magnetKeys = await page.evaluate(() => AnivizMain.snapshot().magnetKeys);
     const original = await check();
     const extremes = [1,2,3,4,5,56,57,58,59,60];
     assert.deepEqual(await visibleRanks(),extremes);
@@ -142,34 +142,34 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     const members = chart.locator('.dust-member-panel');
     const [mapBounds, memberBounds] = await Promise.all([map.boundingBox(), members.boundingBox()]);
     assert.ok(memberBounds.x >= mapBounds.x + mapBounds.width, 'member ranking sits to the right of the map');
-    for (const sort of [...movieIds,'average']) {
+    for (const sort of [...magnetKeys,'average']) {
       await control('[data-dust-ranking-sort]',sort);
       assert.deepEqual((await check()).cards[0].actual,third.actual);
     }
 
-    const selection = () => page.evaluate(() => AnivizMain.snapshot().selectedAnimeIds);
+    const selection = () => page.evaluate(() => AnivizMain.snapshot().selectedKeys);
     const dust = page.locator('#recommendation-chart .dust-node');
     const [first, secondId, thirdId, fourth] = (await dust.evaluateAll(nodes =>
       nodes.slice(0, 4).map(node => node.dataset.matchId)));
     const dustById = id => dust.and(page.locator(`[data-match-id="${id}"]`));
-    const titleFor = id => page.evaluate(id => AnivizMain.snapshot().lookup.get(id).anime.title, id);
+    const titleFor = id => page.evaluate(id => AnivizMain.snapshot().lookup.get(id).record.title, id);
     for (const id of [first, secondId, thirdId]) {
       await dustById(id).focus();
       await page.keyboard.press('Enter');
     }
     await dustById(fourth).focus();
     await page.keyboard.press('Enter');
-    assert.equal(await page.locator('#dust-focus h3').innerText(), await titleFor(fourth));
+    assert.equal(await page.locator('#dust-focus h3').innerText(), await titleFor(thirdId));
     assert.deepEqual(await selection(), [first, secondId, thirdId]);
     assert.equal(await dustById(fourth).getAttribute('aria-pressed'), 'false');
 
     await check();
     const selectedRows = () => chart.locator('.dust-connection-row[aria-pressed="true"]').evaluateAll(rows =>
-      rows.map(row => String(row.__data__.anime.id)).sort());
+      rows.map(row => row.__data__.key).sort());
     assert.deepEqual(await selectedRows(), [first, secondId, thirdId].sort());
     await magnets.first().click();
     assert.deepEqual(await selectedRows(), [first, secondId, thirdId].sort());
-    const row = id => chart.locator(`[data-dust-connection-id="${movieIds[0]}:${id}"]`);
+    const row = id => chart.locator(`[data-dust-connection-id="${magnetKeys[0]}:${id}"]`);
     const drawer = page.locator('#detail-drawer');
     assert.notEqual(await row(first).evaluate(el => getComputedStyle(el).boxShadow), 'none');
     await row(fourth).click();
@@ -209,9 +209,9 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     });
     assert.ok(scrollTop > 0,'long member rankings scroll within the table');
     const member = members.locator('[data-dust-member-id]').last();
-    const memberId = await member.evaluate(el => String(el.__data__.anime.id));
+    const memberId = await member.evaluate(el => el.__data__.key);
     const memberRow = members.locator('tbody tr').last();
-    const mapRow = chart.locator(`[data-dust-connection-id="${movieIds[largestGroup]}:${memberId}"]`);
+    const mapRow = chart.locator(`[data-dust-connection-id="${magnetKeys[largestGroup]}:${memberId}"]`);
     await member.focus();
     await page.keyboard.press('Enter');
     assert.equal(await drawer.getAttribute('aria-hidden'),'false');
@@ -241,21 +241,21 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 
     const genre = await page.evaluate(() => {
       const s = AnivizMain.snapshot();
-      return s.lookup.get(s.displayedDustIds[0]).anime.genres[0];
+      return s.lookup.get(s.displayedKeys[0]).record.genres[0];
     });
     await control('#genre-filter',genre,'input');
     const filtered = await check();
     assert.ok(filtered.count>0 && filtered.count<60);
     await page.evaluate(() => document.querySelector('#reset-filters').click());
     const title = await page.evaluate(() => {
-      const s = AnivizMain.snapshot(); return s.lookup.get(s.displayedDustIds[0]).anime.title;
+      const s = AnivizMain.snapshot(); return s.lookup.get(s.displayedKeys[0]).record.title;
     });
     await control('#search-input',title,'input');
     const small = await check();
     assert.ok(small.count<=10,'small filtered sets show every local rank once');
     const emptyMagnet = await page.evaluate(() => {
       const s = AnivizMain.snapshot();
-      return s.movieIds.findIndex((_, index) => s.displayedDust.every(dust => dust.closest !== index));
+      return s.magnetKeys.findIndex((_, index) => s.displayedDust.every(dust => dust.closest !== index));
     });
     assert.ok(emptyMagnet >= 0,'the filtered fixture leaves a magnet with no members');
     await memberMagnets.nth(emptyMagnet).click();

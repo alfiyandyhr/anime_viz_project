@@ -1,6 +1,6 @@
 # AnIViz — Anime Industry Visualization
 
-A visual anime discovery tool that starts with familiar movies, built with Python/Flask, AniList GraphQL API, and D3.js. Dust & Magnet opens directly, with linked anime analysis below the field. One compact view dropdown connects Dust & Magnet, History, Network, and Full Catalogue.
+A visual story discovery tool built with Python/Flask, AniList GraphQL API, and D3.js. Dust & Magnet opens directly, with linked analysis below the field. One compact view dropdown connects Dust & Magnet, History, Network, and Full Catalogue.
 
 **Live site:** https://alfiyandyhr.github.io/anime_viz_project/
 
@@ -9,38 +9,35 @@ A visual anime discovery tool that starts with familiar movies, built with Pytho
 ## Four views
 
 The root URL opens **Dust & Magnet** with an **Example** Inception magnet.
-Search for movies to add up to three magnets; remove any movie directly with ×.
+Switch Direction to **Anime → Movies** for the **Example** Cowboy Bebop magnet. Search by title, alias, or year to add up to three magnets, and remove them with ×.
 The compact dropdown contains exactly four destinations:
 
 | View | Data and interactions |
 | --- | --- |
-| Dust & Magnet | Movie magnets and 30/60/90 anime dots. Scroll through Similarity connections → Score vs. popularity / playground mirror → Genres / Release years → Studios / Studio × genre → Full anime ranking. All charts are available without selecting a title. |
+| Dust & Magnet | Choose either direction and a field of 30, 60, or 90 dots. Both directions include similarity connections, a field mirror, genres, release years, and a full ranking. Anime dust also shows reception and studio charts. |
 | History | Six eras, annual Top 10 posters, sticky timeline and period rankings from an independent historical dataset. Popularity is current AniList list popularity, not historical audience figures. |
-| Network | Actor/character/work collaboration graph, defaulting to Current dust when a saved dust context exists, otherwise Catalogue. A local selector switches scopes without changing other views. The 35-work display cap and sampled Japanese cast credits are disclosed. |
+| Network | Actor/character/work collaboration graph, defaulting to Current dust when a saved anime-dust context exists, otherwise Catalogue. A local selector switches scopes without changing other views. The 35-work display cap and sampled Japanese cast credits are disclosed. |
 | Full Catalogue | The loaded 1,000-title metadata sample, with its own search, filters, sorting, pagination, details and automatic shortlist comparison. Saved movies never narrow its scope. |
 
-Movie search, removable magnet chips and **Field options** sit in the left panel.
-The right panel shows the latest selected anime with its banner, cover, synopsis,
-tags and sampled Japanese cast. Both panels scroll away above the analysis charts.
-Movie suggestions sit below search. **Field options** contains dot count, Reset
-positions and main-view filters.
-Filters update the **same displayed dusts** across the field and supporting
-charts. They narrow the original
-candidates without refilling them; removable chips and Reset filters undo them.
-The full similarity ranking covers every recommendation record, marks displayed
-rows, and sorts by any active movie or their arithmetic mean. Sorting and magnet
-dragging preserve membership, scores and selection. Removing the sorted movie
-returns the ranking to average similarity. Cosine scores are not percentages;
-field distances encode each anime's preference order across movies.
+Direction, title search, removable magnets, and **Field options** sit in the left panel.
+The right panel follows the latest selected title. Anime details include AniList
+images, synopsis, tags, and sampled Japanese cast. Movie details use published
+TMDB text, genres, keywords, and a TMDB link. Field options contains dot count,
+position reset, and dust filters. Movie dust supports title and alias search,
+genre, and release year.
 
-Click/tap or Enter/Space toggles a dust title. The latest selection appears in the right focus panel;
-two or three automatically compare metadata, runtime, ratings and every active
-movie's similarity on shared scales, directly below the field. A fourth is declined
-with a brief notice. Each click on empty playground space deselects the most
-recently selected dust. Dragging and Reset positions preserve selection.
-Explicit Remove / Clear controls also clear it. Overview charts keep their
-full displayed scope and highlight selected contributions. Every ranking title
-opens the Full Catalogue detail drawer without joining or changing the comparison.
+Filters narrow the sampled candidates without refilling them. The field and
+linked charts share the displayed set. The full similarity ranking covers every
+title in the dust catalogue, marks displayed rows, and sorts by any active
+magnet or their arithmetic mean. Sorting and dragging preserve membership,
+scores, and selection. Removing the active sort magnet returns to average
+similarity. Field distances express each title’s preference order across magnets.
+
+Click, tap, or use Enter/Space to toggle a title. Compare up to three titles and
+their exact per-magnet scores below the field. Clicking empty playground space
+deselects the latest selection. Dragging and Reset positions preserve selection.
+Remove or Clear selection also updates the comparison. Every ranking row opens
+the title’s details independently of the selection.
 Catalogue shortlists are independent and remain in memory for that page visit.
 
 ## Routes and session state
@@ -66,14 +63,13 @@ modes to local `scope=dust` / `scope=catalogue`; unavailable dust falls back to
 Catalogue. Other query parameters are preserved. Flask also serves `/history`
 and `/catalogue`, plus the legacy clean paths with or without trailing slashes.
 
-Versioned `aniviz-dust-session-v1` session storage preserves ordered movies,
-filters, dot count, ranking sort, selection, magnet/particle positions and scroll.
-A supported saved session takes priority, including an explicitly empty movie
-set. Without one, a resolvable legacy `aniviz_seed_movie.tmdbId` becomes one
-magnet; the current algorithm recomputes 60 candidates from the complete matrix.
-Old Top-20 IDs, ranks, filters and selection are never imported as dust membership.
-Unresolvable seeds fall back to the labelled example. Legacy keys are left intact;
-new main-view actions write only the versioned dust session. Catalogue filters
+Session storage uses `aniviz-dust-session-v2` to keep the active direction and
+separate magnets, filters, dot counts, sorts, selections, positions, and scroll
+for each direction. A saved session preserves an explicitly empty field. The
+previous v1 session imports into Movie → Anime. Otherwise, a resolvable
+`aniviz_seed_movie.tmdbId` takes priority over the Inception example. The current
+matrix recomputes dust membership on restore. Anime → Movies starts with Cowboy
+Bebop on first entry. Catalogue filters
 use `aniviz-catalogue-filters`; History's annual data and Network's local controls
 stay independent. Storage failure permits in-memory use with one concise notice.
 Explicit section links take priority over saved scroll on entry; reload and

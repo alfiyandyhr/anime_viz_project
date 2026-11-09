@@ -25,3 +25,21 @@ test('a filtered-to-empty current dust context stays empty; only absent context 
  assert.deepEqual(resolve(anime,dust,'dust'),{anime:[],total:0,missing:0});
  assert.deepEqual(resolve(anime,null,'dust'),{anime,total:1,missing:0});
 });
+
+test('a supported v2 session takes precedence over v1 and scopes only the active anime dust', () => {
+  const state = { magnetKeys: ['tmdb:1'], candidateKeys: ['anilist:1','anilist:2','tmdb:2'],
+    displayedKeys: ['anilist:1','anilist:1','tmdb:2','anilist:3'] };
+  const v2 = { version: 2, direction: 'movie-to-anime', sessions: {
+    'movie-to-anime': { state }, 'anime-to-movies': { state: { magnetKeys: ['anilist:1'], displayedKeys: ['tmdb:2'] } }
+  } };
+  const store = { getItem: key => JSON.stringify(key.endsWith('-v2') ? v2 : session()) };
+  assert.deepEqual(read(store), { ids: ['1'] });
+  state.displayedKeys = [];
+  assert.deepEqual(read(store), { ids: [] });
+  state.magnetKeys = [];
+  assert.equal(read(store), null);
+  v2.direction = 'anime-to-movies';
+  assert.deepEqual(read(store), { movieDust: true });
+  const anime = [{ id: 1 }];
+  assert.deepEqual(resolve(anime, read(store), 'dust'), { anime, total: 1, missing: 0 });
+});

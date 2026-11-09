@@ -574,7 +574,13 @@ body[data-chapter="dust-magnet"] .recommendation-picker {
   min-width: 0; max-height: var(--field-height); overflow-y: auto; overscroll-behavior: contain;
   margin: 0; padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
 }
-.recommendation-picker > .chart-kicker { margin: 0; }
+.dust-direction-label { display: grid; gap: 5px; font-size: .8rem; font-weight: 600; }
+.dust-direction-label select {
+  width: 100%; color: var(--text); background: var(--bg-soft); border: 1px solid var(--border-strong);
+  border-radius: 6px; padding: 7px; font: inherit;
+}
+.dust-movie-drawer { padding: 48px 24px 24px; overflow-wrap: anywhere; }
+.dust-movie-drawer > * { margin-bottom: 16px; }
 body[data-chapter="dust-magnet"] .recommendation-controls { display: block; min-width: 0; }
 body[data-chapter="dust-magnet"] .recommendation-controls input { min-height: 36px; padding: 8px; font-size: .8rem; }
 body[data-chapter="dust-magnet"] .movie-magnets { flex-direction: column; align-items: stretch; gap: 6px; margin: 0; min-width: 0; }

@@ -10,7 +10,7 @@
 
   <meta
     name="description"
-    content="Explore anime drawn to up to three favorite movies with interactive dust and magnets."
+    content="Explore similar stories in either direction with up to three movie or anime magnets."
   >
 
   <title>AnIViz — Dust &amp; Magnet</title>
@@ -73,17 +73,23 @@
         <h1 class="sr-only">Dust &amp; Magnet</h1>
 
         <div class="dust-playground">
-        <aside class="recommendation-picker" aria-label="Movie magnets and field controls">
-          <h2 class="chart-kicker">Movie magnets</h2>
+        <aside class="recommendation-picker" aria-label="Title magnets and field controls">
+          <label class="dust-direction-label" for="dust-direction">
+            <span>Direction</span>
+            <select id="dust-direction" disabled>
+              <option value="movie-to-anime">Movie → Anime</option>
+              <option value="anime-to-movies">Anime → Movies</option>
+            </select>
+          </label>
           <div class="recommendation-controls">
             <label class="movie-search-label" for="movie-search">
               <span id="movie-search-label">Add a movie magnet · up to 3</span>
               <input id="movie-search" type="search" placeholder="Add movie magnet… (up to 3)" autocomplete="off" aria-controls="movie-search-results" disabled>
             </label>
           </div>
-          <div id="movie-search-results" class="movie-search-results" aria-label="Movie search results" hidden></div>
-          <div id="movie-suggestions" class="movie-suggestions" aria-label="Movies to try"></div>
-          <div id="movie-magnets" class="movie-magnets" aria-label="Your movie magnets" hidden></div>
+          <div id="movie-search-results" class="movie-search-results" aria-label="Title search results" hidden></div>
+          <div id="movie-suggestions" class="movie-suggestions" aria-label="Suggested magnets"></div>
+          <div id="movie-magnets" class="movie-magnets" aria-label="Your title magnets" hidden></div>
           <details class="field-options" data-field-options>
             <summary>Field options</summary>
             <div class="field-options-panel">
@@ -104,7 +110,7 @@
 
                 <div class="filter-grid">
                   <label>
-                    <span>Search titles, studios, or actors</span>
+                    <span id="dust-filter-search-label">Search titles, studios, or actors</span>
                     <input
                       id="search-input"
                       type="search"
@@ -119,14 +125,14 @@
                     </select>
                   </label>
 
-                  <label>
+                  <label data-anime-only>
                     <span>Studio</span>
                     <select id="studio-filter">
                       <option value="All">All studios</option>
                     </select>
                   </label>
 
-                  <label>
+                  <label data-anime-only>
                     <span>Format</span>
                     <select id="format-filter">
                       <option value="All">All formats</option>
@@ -143,7 +149,7 @@
                     <select id="year-to"></select>
                   </label>
 
-                  <label class="range-control" for="score-filter">
+                  <label class="range-control" for="score-filter" data-anime-only>
                     <span>
                       Minimum score:
                       <output id="score-output">0</output>
@@ -182,7 +188,7 @@
               <p id="recommendation-chart-guide" class="recommendation-chart-guide"></p>
               <div id="dust-toolbar" class="dust-toolbar" hidden>
                 <p data-dust-scope role="status" aria-live="polite"></p>
-                <div id="dust-legend" class="dust-legend" role="group" aria-label="Anime colors by highest-scoring movie" hidden></div>
+                <div id="dust-legend" class="dust-legend" role="group" aria-label="Dust colors by highest-scoring magnet" hidden></div>
 
               </div>
               <p data-dust-notice role="status" aria-live="polite"></p>
@@ -197,38 +203,38 @@
         </div>
 
         <aside id="dust-focus" class="recommendation-detail dust-focus" aria-label="Anime in focus">
-          <div class="dust-detail-placeholder"><p class="chart-kicker">Anime in focus</p><h3>Every dot has a story.</h3><p>Select an anime dot to explore its storyline, genres, tags, and similarity to your movies.</p></div>
+          <div class="dust-detail-placeholder"><p class="chart-kicker">Anime in focus</p><h3>Every dot has a story.</h3><p>Select a dot to explore its storyline, genres, tags, and similarity to your magnets.</p></div>
         </aside>
         </div>
         <div id="dust-selection" class="dust-selection" role="status" aria-live="polite" hidden></div>
-        <aside id="recommendation-detail" class="recommendation-detail" aria-label="Selected anime comparison" hidden></aside>
+        <aside id="recommendation-detail" class="recommendation-detail" aria-label="Selected title comparison" hidden></aside>
 
         <section id="dust-analysis" aria-label="Displayed dust analysis">
 
           <article class="chart-card dust-analysis-wide"><p class="chart-kicker">Compare similarities &amp; differences</p>
             <h3>Which stories are similar—and which differ?</h3>
-            <p>Select a movie magnet to rank the displayed anime by similarity to that movie. Thicker curves mean higher similarity within the selected movie’s score range. Color identifies each anime’s closest magnet. The Dust members table ranks only the anime closest to the selected magnet. Scroll either panel to see more titles.</p>
-            <p>Outlined titles are selected for comparison in the playground and here. Click an outlined title to remove it. Click any other title to open its anime card and add it to the comparison if there’s room for it. Compare up to three titles.</p>
-            <p data-coverage="connections"></p><div class="dust-linked-chart" role="region" aria-label="Movie and anime similarity connections" data-dust-chart="connections"></div></article>
+            <p>Select a magnet to rank the displayed titles by cosine similarity. Thicker curves show higher similarity within that magnet’s score range. Color shows each title’s closest magnet. Dust members lists the titles closest to the selected magnet. Scroll either list to see more titles.</p>
+            <p>Outlined titles are selected for comparison in the playground and here. Click an outlined title to remove it. Click any other title to open its details and add it to the comparison if there’s room for it. Compare up to three titles.</p>
+            <p data-coverage="connections"></p><div class="dust-linked-chart" role="region" aria-label="Similarity connections" data-dust-chart="connections"></div></article>
           <div class="dust-analysis-wide dust-reception">
             <article class="chart-card" id="reception"><h3>Score vs. popularity</h3>
-              <p data-coverage="reception"></p><div class="dust-linked-chart" data-dust-chart="reception"></div></article>
+              <p data-coverage="reception"></p><div class="dust-linked-chart" data-dust-chart="reception" data-anime-chart></div></article>
             <article class="chart-card" aria-labelledby="dust-mirror-title">
               <h3 id="dust-mirror-title">Dust &amp; Magnet mirror</h3>
-              <p>Drag magnets or use arrow keys on a focused magnet. Select dots to compare anime, or click empty space to remove the latest selection.</p>
+              <p>Drag magnets or use arrow keys on a focused magnet. Select dots to compare titles, or click empty space to remove the latest selection.</p>
               <div class="dust-linked-chart" id="dust-mirror"></div>
             </article>
           </div>
           <article class="chart-card" id="content"><h3>Genres</h3>
-            <label class="dust-analysis-control">Metric <select data-dust-genre-metric><option value="count">Titles</option><option value="score">Average score</option><option value="popularity">Popularity</option></select></label>
+            <label class="dust-analysis-control" data-anime-only>Metric <select data-dust-genre-metric><option value="count">Titles</option><option value="score">Average score</option><option value="popularity">Popularity</option></select></label>
             <p data-coverage="genres"></p><div class="dust-linked-chart" data-dust-chart="genres"></div></article>
           <article class="chart-card"><h3>Release years</h3>
             <p data-coverage="years"></p><div class="dust-linked-chart" data-dust-chart="years"></div></article>
           <article class="chart-card" id="creators"><h3>Studios</h3>
-            <p data-coverage="studios"></p><div class="dust-linked-chart" data-dust-chart="studios"></div></article>
-          <article class="chart-card"><h3>Studio × genre</h3>
-            <p data-coverage="heatmap"></p><div class="dust-linked-chart" role="region" tabindex="0" aria-label="Studio genre chart, scroll horizontally" data-dust-chart="heatmap"></div></article>
-          <article class="chart-card dust-analysis-wide"><h3>Full anime ranking</h3>
+            <p data-coverage="studios"></p><div class="dust-linked-chart" data-dust-chart="studios" data-anime-chart></div></article>
+          <article class="chart-card" data-anime-only><h3>Studio × genre</h3>
+            <p data-coverage="heatmap"></p><div class="dust-linked-chart" role="region" tabindex="0" aria-label="Studio genre chart, scroll horizontally" data-dust-chart="heatmap" data-anime-chart></div></article>
+          <article class="chart-card dust-analysis-wide"><h3 id="dust-ranking-title">Full anime ranking</h3>
             <p data-dust-ranking-note></p>
             <label class="dust-analysis-control">Rank by <select data-dust-ranking-sort><option value="average">Average similarity</option></select></label>
             <label class="dust-analysis-control">Rank order <select data-dust-ranking-order>
@@ -244,11 +250,11 @@
         <details class="methodology">
           <summary>About / Data</summary>
           <div class="method-grid">
-            <article><h3>One million comparisons</h3><p id="recommendation-method-data">1,000 popular AniList anime × 1,000 popular TMDB movies. The dust field combines the strongest matches to each movie and shared favorites using the complete score matrix.</p></article>
+            <article><h3>One million comparisons</h3><p id="recommendation-method-data">1,000 popular AniList anime × 1,000 popular TMDB movies. Both directions use the same pair scores from the complete score matrix.</p></article>
             <article><h3>Story similarity</h3><p id="recommendation-method-model">Qwen3-Embedding-4B embeds titles, genres, tags, and synopses. Cosine similarity compares the normalized vectors; ratings and popularity do not affect the score.</p></article>
 
-            <article><h3>Reading the magnets</h3><p>Dots combine strong matches to each movie and the highest average scores across your movies. With multiple magnets, each dot stays closer to its higher-scoring movies, including when scores are zero or negative. Spacing respects this preference order. A single movie gathers a compact cloud through positive-score attraction. Moving magnets changes the layout, never the scores. Distances show each dot’s preference order across movies, not an exact cosine scale or a ranking of different anime. Some nearly collinear arrangements cannot show every preference; a message suggests spreading or resetting the magnets, while the highest-scoring movie stays nearest. Color identifies the highest-scoring movie; white outlines mark selected anime. Click or press Enter/Space on up to three dots to compare them below; select again to remove. Click empty playground space to deselect the most recently selected dot, one at a time. The right panel follows the last selected anime. Use Clear selection to remove all titles. Reset positions keeps selection. Hover or focus for cosine scores rounded to three decimals. Distances between anime carry no meaning.</p></article>
-            <article><h3>Reading the charts</h3><p>Popularity counts AniList list users. The catalogue is a popularity-sorted sample. A title can have multiple genres and studios, so counts overlap. Reception marker size shows favourites; unknown favourites use a minimum marker. Missing metric values are excluded only from the relevant chart.</p></article>
+            <article><h3>Reading the magnets</h3><p>The field samples each magnet’s strongest matches, then fills remaining slots by average cosine. Distances express each dot’s preference order across magnets. Color identifies its highest-scoring magnet. If three magnets approach a straight line, some distances become approximate. Spread the magnets or reset positions to recover the full ordering. Hover or focus a dot to see its scores rounded to three decimals. Select up to three dots with a click, tap, Enter, or Space. Select again to remove a title, or click empty space to remove the latest selection.</p></article>
+            <article><h3>Reading the charts</h3><p>Charts use the displayed titles. The full ranking uses the entire dust catalogue. Genres can overlap. With anime dust, AniList popularity counts list users and reception marker size shows favourites. With movie dust, the TMDB sample supplies genres and release years for analysis.</p></article>
             <article><h3>A starting point</h3><p>These are text-based recommendations, not predictions of your enjoyment. Seasons, sequels, and the same animated film in both databases can appear separately. Genre labels are context, not an explanation of the model’s score.</p></article>
           </div>
         <div class="data-freshness"><span id="footer-generated">Data not loaded</span> · <span id="footer-cache"></span></div></details>
@@ -263,7 +269,7 @@
     <footer class="data-footer">
         <div class="data-status" role="status" aria-live="polite">
           <span id="status-dot" class="status-dot loading"></span>
-          <span id="data-status">Loading anime data…</span>
+          <span id="data-status">Loading title data…</span>
         </div>
         <span class="source-credit">AniList × TMDB × D3.js</span>
       </footer>
@@ -275,7 +281,10 @@
     id="detail-drawer"
     class="detail-drawer"
     aria-hidden="true"
-    aria-label="Anime details"
+    role="dialog"
+    aria-modal="true"
+    inert
+    aria-label="Title details"
   >
     <button
       id="close-drawer"

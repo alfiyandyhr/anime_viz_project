@@ -1,3 +1,48 @@
+# Anime magnets and movie dust
+
+The forward regression fixture in `tests/fixtures/dust-forward-3342eb3.json`
+captures Inception alone and Inception + Interstellar + The Matrix on the
+`alfi` baseline at `3342eb3`. Each field uses 60 candidates. The fixture records
+candidate IDs, mean ranks, exact per-magnet cosine vectors, and the 1,000-title
+rank order for each sort basis. It also records displayed membership before and
+after filtering for Action and release year 2000 or later.
+
+1. Open Dust & Magnet on a fresh session and confirm the Inception example.
+   Choose **Anime → Movies**. Cowboy Bebop opens as the example and Treasure
+   Planet ranks first at `0.6052206158638`. Inception and Cowboy Bebop share
+   the exact score `0.5034430027008057` in either direction.
+2. Search with an alias or year, add a second and third anime magnet, and
+   exercise 30, 60, and 90 dots. Move a magnet with arrow keys. Reset positions
+   and check that selection and strongest-magnet colors remain intact.
+3. Compare movie dots. Inspect a title outside the field in the full ranking
+   and press Escape to return focus to the row. The drawer shows published
+   TMDB text, keywords, genres, and cosine evidence for that movie.
+4. Narrow movie dust by genre, then filter to empty and reset. Compare the
+   field, mirror, connections, chart counts, and displayed ranking flags.
+   Open the legacy Content, Reception, and Creators links. Reception and
+   Creators show coverage notes for the movie sample.
+5. Switch back to Movie → Anime and return to Anime → Movies. Check separate
+   selections, filters, ranking sorts, magnet positions, and scroll. Remove
+   every anime magnet and confirm that switching preserves the empty field.
+6. Open a legacy Current dust link while movie dust is active. Network falls
+   back to Catalogue even if v1 contains an older anime set. With active anime
+   dust filtered to zero, Network keeps Current dust and shows zero works.
+
+Run the existing browser suites and the directional walkthrough below with
+the Playwright setup documented later in this guide. The walkthrough includes
+desktop and touch/mobile layouts, reload and Back/Forward, and a matrix Retry
+while dashboard metadata is unavailable. It runs against both Flask and the
+prefixed static deployment.
+
+```sh
+NODE_PATH=/tmp/aniviz-browser/node_modules \
+  CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+  ANIVIZ_BASE_URL=http://127.0.0.1:8766/anime_viz_project/ \
+  node tests/browser/dust-directions.cjs
+```
+
+---
+
 # Route migration and final verification — Tasks 9–10 — 2026-11-06
 
 Completed on `alfi`, retaining the existing Tasks 1–8 work. The current contract

@@ -28,8 +28,7 @@ test("empty field clicks deselect once while dust, magnet, controls, drag and ou
     return controls.get(selector);
   };
   let deselections = 0;
-  const recommendationState = { viz: "magnets", animeId: "selected-anime" };
-  const context = vm.createContext({ document, recommendationState, hideTooltip() {},
+  const context = vm.createContext({ document, hideTooltip() {},
     AnivizMain: { deselectLast() { deselections++; } } });
   vm.runInContext(readFileSync(require.resolve("../frontend/recommendations/dust-magnet.js"), "utf8"), context);
   vm.runInContext("bindDustControls();", context);
@@ -45,9 +44,6 @@ test("empty field clicks deselect once while dust, magnet, controls, drag and ou
     click(playground);
     assert.equal(deselections, i);
   }
-  recommendationState.viz = "connections";
-  click(playground);
-  assert.equal(deselections, 3);
 });
 
 test("complete web matrix matches its hash, dimensions, and every exported top/bottom score", () => {

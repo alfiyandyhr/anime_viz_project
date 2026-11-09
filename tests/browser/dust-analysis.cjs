@@ -13,7 +13,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     await page.waitForFunction(() => AnivizMain.snapshot().metadataStatus === 'ready');
     await page.locator('#movie-search').fill('Interstellar');
     await page.locator('#movie-search').press('Enter');
-    await page.waitForFunction(() => AnivizMain.snapshot().movieIds.length === 2);
+    await page.waitForFunction(() => AnivizMain.snapshot().magnetKeys.length === 2);
 
     const chart = kind => page.locator(`[data-dust-chart="${kind}"]`);
     const tooltip = page.locator('#tooltip.visible');
@@ -54,7 +54,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       ['Total popularity (log scale)', 'Average score / 100']);
     const { studios, expected } = await studioMarks.evaluateAll(marks => {
       const snapshot = AnivizMain.snapshot();
-      const rows = snapshot.displayedDustIds.map(id => snapshot.lookup.get(id).anime);
+      const rows = snapshot.displayedKeys.map(id => snapshot.lookup.get(id).record);
       const aggregates = AnivizChartData.studios(rows)
         .filter(studio => studio.totalPopularity > 0 && Number.isFinite(studio.averageScore));
       return {
@@ -126,12 +126,12 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     const visibleRanks = () => page.locator('[data-dust-ranking-body] td:first-child').allTextContents();
     const visibleIds = () => page.locator('[data-dust-rank-id]')
       .evaluateAll(titles => titles.map(title => title.dataset.dustRankId));
-    const magnet = await page.evaluate(() => AnivizMain.snapshot().movieIds[0]);
+    const magnet = await page.evaluate(() => AnivizMain.snapshot().magnetKeys[0]);
     assert.equal(await rankOrder.inputValue(), 'ascending');
     assert.equal((await visibleRanks())[0], '1');
     for (const basis of ['average', magnet]) {
       await page.selectOption('[data-dust-ranking-sort]', basis);
-      const rankedIds = await page.evaluate(() => AnivizMain.snapshot().ranking.map(row => String(row.anime.id)));
+      const rankedIds = await page.evaluate(() => AnivizMain.snapshot().ranking.map(row => row.key));
       await page.getByRole('button', { name: 'Next ranking page' }).click();
       await rankOrder.selectOption('descending');
       assert.equal(await heading.getAttribute('aria-sort'), 'descending');

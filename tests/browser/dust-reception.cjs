@@ -17,7 +17,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     await field.locator('.dust-node').first().waitFor();
     await page.waitForFunction(() => AnivizMain.snapshot().metadataStatus === 'ready');
 
-    const selection = () => page.evaluate(() => AnivizMain.snapshot().selectedAnimeIds);
+    const selection = () => page.evaluate(() => AnivizMain.snapshot().selectedKeys);
     await scatter.evaluate(el => el.scrollIntoView({ block: 'center' }));
     const firstPoint = scatter.locator('.reception-dot').first();
     await firstPoint.waitFor();
@@ -79,7 +79,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       const points = [...container.querySelectorAll('.reception-dot')];
       const dust = document.querySelector('#recommendation-chart');
       const colorMatches = points.every(point => {
-        const grain = dust.querySelector(`[data-match-id="${point.__data__.id}"] .dust-grain`);
+        const grain = dust.querySelector(`[data-match-id="anilist:${point.__data__.id}"] .dust-grain`);
         return grain.getAttribute('fill') === point.getAttribute('fill');
       });
       const areaRatios = points.map(point => Number(point.getAttribute('r')) ** 2 / point.__data__.favourites);
@@ -87,7 +87,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
         const { x, y, width, height } = point.getBoundingClientRect();
         const hit = document.elementFromPoint(x + width / 2, y + height / 2);
         return hit === point && point.__data__.genres.length > 1
-          ? [{ index, id: point.__data__.id, genres: point.__data__.genres.join(', ') }] : [];
+          ? [{ index, id: `anilist:${point.__data__.id}`, genres: point.__data__.genres.join(', ') }] : [];
       });
       return { colorMatches, areaRatios, targets };
     });

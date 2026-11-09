@@ -77,7 +77,7 @@ test("Dust & Magnet owns contextual controls and details in normal flow; Network
 test('main and catalogue score controls and overflowing tables have accessible names', () => {
   for (const page of ['dust-magnet', 'explorer']) {
     const html = readFileSync(path.join(root, `frontend/${page}/index.html`), 'utf8');
-    assert.match(html, /<label class="range-control" for="score-filter">/);
+    assert.match(html, /<label class="range-control" for="score-filter"[^>]*>/);
     assert.match(html, /class="table-wrapper" (?:tabindex="0" role="region"|role="region" tabindex="0") aria-label="[^"]+"/);
   }
 });
