@@ -10,12 +10,16 @@ dismissal. Legacy URLs redirect through `redirect.js`.
 returns a store with `snapshot()` and `subscribe(callback)`. Treat snapshots as
 read-only. The snapshot includes the active `direction`, ordered `magnets`,
 `candidateDust` and `displayedDust`, and `selectedKeys`. State keys are qualified
-by catalogue, for example `tmdb:27205` and `anilist:1`.
+by catalogue, for example `tmdb:27205`, `anilist:1`, and `tmdb:genre:Science Fiction`.
 
 - `setSources(recommendationJSON, matrix)` indexes the validated matrix by TMDB
   movie ID and AniList anime ID. `setDirection(direction)` chooses which
   catalogue supplies magnets. `setMagnets(keys)` scores each dust title once
   against those magnets. Balanced sampling and ranking share the score vectors.
+- `genreCohorts` lists available cohorts from the magnet-side recommendation
+  records. Any of the three slots can hold a distinct cohort. Its vector averages
+  signed pair scores and is cached for the current bundle and direction. Dust
+  filters and optional dashboard metadata leave cohort membership fixed.
 - `setDustLimit(30 | 60 | 90)` resamples the same corpus. `setFilters(patch)`
   narrows candidates without replacement. `resetFilters()` restores the
   candidate set. The lookup joins optional dashboard metadata only for anime

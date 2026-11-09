@@ -72,15 +72,18 @@
   function inspectTitle(key) {
     const record = latest.lookup.get(key)?.record;
     if (!record) return;
+    const { ranking, magnets } = latest;
+    const match = ranking.find(row => row.key === key);
     if (isReverse()) {
-      const match = latest.ranking.find(row => row.key === key);
       elements.drawerContent.innerHTML = `<div class="dust-movie-drawer">${AnivizDustDetails.renderMovie({
-        record, match, magnets: latest.magnets, color, helpers: detailHelpers(), heading: 'h2'
+        record, match, magnets, color, helpers: detailHelpers(), heading: 'h2'
       })}</div>`;
       openDrawer('Movie details');
     } else {
+      const similarityHtml = magnets.some(magnet => magnet.kind === 'genre')
+        ? AnivizDustDetails.magnetScores(match, magnets, color, detailHelpers()) : '';
       openAnimeDetail({ ...record, cover: record.cover || {}, description: record.description || record.synopsis,
-        site_url: record.site_url || record.url || `https://anilist.co/anime/${record.id}` });
+        site_url: record.site_url || record.url || `https://anilist.co/anime/${record.id}` }, { similarityHtml });
     }
   }
   function select(key, { showDrawer = false } = {}) {
@@ -158,8 +161,10 @@
     const signature = JSON.stringify([snapshot.direction, snapshot.magnetKeys, snapshot.rankingSortKey, snapshot.rankingOrder]);
     if (signature !== rankingSignature) { rankingPage = 0; rankingSignature = signature; }
     const sort = $('[data-dust-ranking-sort]');
-    sort.innerHTML = '<option value="average">Average similarity</option>' + snapshot.magnets.map((magnet, i) =>
-      `<option value="${escapeAttribute(magnet.key)}">Closest to Magnet ${i + 1} — ${escapeHTML(magnet.title)}</option>`).join('');
+    sort.innerHTML = '<option value="average">Average similarity</option>' + snapshot.magnets.map((magnet, i) => {
+      const label = magnet.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : `Closest to Magnet ${i + 1} — ${magnet.title}`;
+      return `<option value="${escapeAttribute(magnet.key)}">${escapeHTML(label)}</option>`;
+    }).join('');
     sort.value = snapshot.rankingSortKey;
     $('[data-dust-ranking-order]').value = snapshot.rankingOrder;
     renderRanking();
@@ -174,12 +179,13 @@
     const start = rankingPage * size, rows = ordered.slice(start, start + size);
     $('[data-dust-ranking-note]').textContent = `${ranking.length} corpus ${dustNoun()} · ${rows.length ? `ranks ${rows[0].rank}–${rows.at(-1).rank}` : 'Unavailable'}`;
     const title = isReverse() ? 'Movie' : 'Anime';
-    $('[data-dust-ranking-head]').innerHTML = `<tr><th scope="col" aria-sort="${rankingOrder}">Rank</th><th scope="col">${title}</th>${magnets.map((magnet, i) => `<th scope="col">M${i + 1} · ${escapeHTML(magnet.title)}</th>`).join('')}<th scope="col">Average similarity</th><th scope="col">${isReverse() ? 'Year' : 'Format / year'}</th><th scope="col">Displayed dust</th></tr>`;
+    const cohortLabels = magnets.map(magnet => magnet.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : '');
+    $('[data-dust-ranking-head]').innerHTML = `<tr><th scope="col" aria-sort="${rankingOrder}">Rank</th><th scope="col">${title}</th>${magnets.map((magnet, i) => `<th scope="col">M${i + 1} · ${escapeHTML(cohortLabels[i] || magnet.title)}</th>`).join('')}<th scope="col">Average similarity</th><th scope="col">${isReverse() ? 'Year' : 'Format / year'}</th><th scope="col">Displayed dust</th></tr>`;
     $('[data-dust-ranking-body]').innerHTML = rows.map(match => {
       const { record } = match;
       const year = record.year || 'Unknown';
       const format = isReverse() ? '' : escapeHTML(humanize(record.format)) + ' / ';
-      return `<tr><td>${match.rank}</td><td><button type="button" class="recommendation-title-button" data-dust-rank-id="${escapeAttribute(match.key)}" aria-haspopup="dialog" aria-controls="detail-drawer">${escapeHTML(record.title)}</button></td>${match.scores.map(score => `<td title="Cosine ${score}">${score.toFixed(3)}</td>`).join('')}<td title="Average cosine ${match.score}">${match.score.toFixed(3)}</td><td>${format}${year}</td><td>${match.displayed ? 'Yes' : '—'}</td></tr>`;
+      return `<tr><td>${match.rank}</td><td><button type="button" class="recommendation-title-button" data-dust-rank-id="${escapeAttribute(match.key)}" aria-haspopup="dialog" aria-controls="detail-drawer">${escapeHTML(record.title)}</button></td>${match.scores.map((score, i) => `<td title="${escapeAttribute(cohortLabels[i] ? `${cohortLabels[i]}: ${score}` : `Cosine ${score}`)}">${score.toFixed(3)}</td>`).join('')}<td title="Average cosine ${match.score}">${match.score.toFixed(3)}</td><td>${format}${year}</td><td>${match.displayed ? 'Yes' : '—'}</td></tr>`;
     }).join('');
     const pages = [];
     for (let page = 0; page < total; page++) if (page === 0 || page === total - 1 || Math.abs(page - rankingPage) <= 1) pages.push(page);

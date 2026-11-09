@@ -255,7 +255,8 @@ function bindDustControls() {
     const button = event.target.closest("[data-remove-magnet]");
     if (!button) return;
     AnivizMain.setMagnets(AnivizMain.snapshot().magnetKeys.filter(key => key !== button.dataset.removeMagnet));
-    document.querySelector("#movie-search").focus();
+    document.querySelector("#recommendation-status").textContent = "";
+    focusMagnetPicker();
   });
   document.querySelector("#reset-magnets").addEventListener("click", AnivizMain.resetPositions);
 }
@@ -277,7 +278,7 @@ function renderDustRecommendations() {
   document.querySelector("#recommendation-chart-title").textContent = reverse ? "Movies shown" : "Anime shown";
   document.querySelector("#movie-magnets").innerHTML = magnets.map((magnet, index) => `
     <div class="movie-magnet-chip" style="--magnet-color:${AnivizMain.color(magnet.key)}">
-      <span class="magnet-chip-number">${index + 1}</span><span>${escapeHTML(magnet.title)} <small>${magnet.year || ""}</small>${example ? ' <em class="magnet-example">Example</em>' : ""}</span>
+      <span class="magnet-chip-number">${index + 1}</span><span>${escapeHTML(magnet.title)} <small>${magnet.kind === "genre" ? escapeHTML(AnivizDust.cohortDescription(magnet)) : magnet.year || ""}</small>${example ? ' <em class="magnet-example">Example</em>' : ""}</span>
       <button type="button" data-remove-magnet="${escapeAttribute(magnet.key)}" aria-label="Remove ${escapeAttribute(magnet.title)} magnet">×</button>
     </div>`).join("") + `<span class="magnet-empty-slot">${magnets.length}/3 magnets${magnets.length === 3 ? " · remove one to swap" : ""}</span>`;
   document.querySelectorAll("#movie-suggestions button").forEach(button => {
@@ -286,7 +287,7 @@ function renderDustRecommendations() {
   document.querySelector("#reset-magnets").disabled = !magnets.length;
   if (!magnets.length) {
     dustChart = null;
-    const message = `Add a title magnet to find ${noun} with similar stories.`;
+    const message = `Add a title magnet or genre cohort to find ${noun} with similar stories.`;
     container.innerHTML = `<div class="dust-empty"><p>${message}</p></div>`;
     renderEmpty(mirror, message);
     return;
@@ -315,12 +316,12 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
   const dots = svg.append("g").selectAll("g").data(matches, (match) => match.key).join("g")
     .attr("class", "dust-node").attr("data-match-id", (match) => match.key)
     .attr("role", "button").attr("tabindex", 0).attr("aria-controls", "dust-focus recommendation-detail")
-    .attr("aria-label", (match) => `${match.record.title}. ${anchors.map(({ magnet }, index) => `${magnet.title}: cosine ${match.scores[index].toFixed(3)}`).join(". ")}. Toggle selection for details or comparison.`)
+    .attr("aria-label", (match) => `${match.record.title}. ${anchors.map(({ magnet }, index) => `${AnivizDust.magnetScoreLabel(magnet)}: ${match.scores[index].toFixed(3)}`).join(". ")}. Toggle selection for details or comparison.`)
     .on("mouseenter focus", (event, match) => {
       const rect = event.currentTarget.getBoundingClientRect();
       const pointer = event.type === "focus" ? { clientX: rect.x + rect.width / 2, clientY: rect.y + rect.height / 2 } : event;
       showTooltip(pointer, `<strong>${escapeHTML(match.record.title)}</strong><span>${match.key.startsWith("anilist:") ? escapeHTML(humanize(match.record.format)) + " · " : ""}${match.record.year || "Year unknown"}</span>`
-        + anchors.map(({ magnet, color }, index) => `<span class="dust-tooltip-score"><i style="background:${color}"></i>${escapeHTML(magnet.title)} <b>${match.scores[index].toFixed(3)}</b></span>`).join("")
+        + anchors.map(({ magnet, color }, index) => `<span class="dust-tooltip-score"><i style="background:${color}"></i>${escapeHTML(magnet.kind === "genre" ? AnivizDust.magnetScoreLabel(magnet) : magnet.title)} <b>${match.scores[index].toFixed(3)}</b></span>`).join("")
         + "<span>Click to toggle selection</span>");
     })
     .on("mousemove", moveTooltip)
@@ -349,7 +350,7 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
     .attr("fill", (anchor) => anchor.color).text((_, index) => `M${index + 1}`);
   magnets.append("text").attr("class", "magnet-title").attr("text-anchor", "middle").attr("y", 49)
     .text((anchor) => truncate(anchor.magnet.title, width < 400 ? 16 : 23));
-  magnets.append("title").text((anchor) => `${anchor.magnet.title} (${anchor.magnet.year || "Year unknown"})`);
+  magnets.append("title").text(({ magnet }) => `${magnet.title} (${magnet.kind === "genre" ? AnivizDust.cohortDescription(magnet) : magnet.year || "Year unknown"})`);
 
   return {
     draw(positions) {

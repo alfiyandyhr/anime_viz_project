@@ -77,6 +77,13 @@ function bindRecommendationControls() {
       if (button) addMagnet(button.dataset.magnetKey);
     });
   }
+  document.querySelector("#magnet-type").addEventListener("change", updateMagnetPickerMode);
+  const genreChoice = document.querySelector("#genre-magnet-choice");
+  genreChoice.addEventListener("change", () => {
+    document.querySelector("#add-genre-magnet").disabled = !genreChoice.value;
+    document.querySelector("#recommendation-status").textContent = "";
+  });
+  document.querySelector("#add-genre-magnet").addEventListener("click", () => addMagnet(genreChoice.value, "genre"));
   document.querySelector("#dust-direction").addEventListener("change", event => AnivizMain.switchDirection(event.target.value));
   document.querySelector("#recommendation-retry").addEventListener("click", () => {
     recommendationState.error = null;
@@ -93,18 +100,42 @@ function pickerCatalogue() {
 
 function resetMagnetPicker() {
   const { direction, magnet, records, label } = pickerCatalogue();
+  const { genreCohorts } = AnivizMain.snapshot();
   const search = document.querySelector("#movie-search");
   search.value = "";
   search.placeholder = `Search ${label} titles or aliases`;
   document.querySelector("#movie-search-label").textContent = `Add ${label === "anime" ? "an" : "a"} ${label} magnet · up to 3`;
-  document.querySelector("#movie-search-results").hidden = true;
-  document.querySelector("#recommendation-status").textContent = "";
   const titles = direction === AnivizDust.REVERSE
     ? ["Attack on Titan", "ONE PIECE", "Naruto", "Your Name.", "Death Note"]
     : ["Inception", "Interstellar", "The Matrix", "The Dark Knight", "Titanic"];
   document.querySelector("#movie-suggestions").innerHTML = `<span>Try a favorite</span>` + titles
     .map(title => records.find(record => record.title === title)).filter(Boolean)
     .map(record => `<button type="button" data-magnet-key="${escapeAttribute(AnivizDust.keyFor(magnet, record.id))}">${escapeHTML(record.title)}</button>`).join("");
+  const choice = document.querySelector("#genre-magnet-choice");
+  choice.innerHTML = '<option value="">Select a genre…</option>' + genreCohorts.map(cohort =>
+    `<option value="${escapeAttribute(cohort.key)}">${escapeHTML(cohort.title)} (${cohort.memberIds.length})</option>`).join("");
+  choice.disabled = !genreCohorts.length;
+  document.querySelector("#genre-magnet-source").textContent = genreCohorts.length
+    ? `Source: ${genreCohorts[0].source}. Counts are sampled titles.` : "No genre cohorts are available in this sample.";
+  document.querySelector("#add-genre-magnet").disabled = true;
+  document.querySelector('#magnet-type [value="title"]').checked = true;
+  updateMagnetPickerMode();
+}
+
+function updateMagnetPickerMode() {
+  const genre = document.querySelector('#magnet-type [value="genre"]').checked;
+  document.querySelector("#genre-magnet-picker").hidden = !genre;
+  document.querySelector("#title-magnet-search").hidden = genre;
+  document.querySelector("#movie-suggestions").hidden = genre;
+  document.querySelector("#movie-search-results").hidden = true;
+  document.querySelector("#recommendation-status").textContent = "";
+  if (!genre) renderMovieSearchResults();
+}
+
+function focusMagnetPicker() {
+  const genre = !document.querySelector("#genre-magnet-picker").hidden;
+  const input = document.querySelector(genre ? "#genre-magnet-choice" : "#movie-search");
+  (input.disabled ? document.querySelector('#magnet-type input:checked') : input).focus({ preventScroll: true });
 }
 
 async function loadRecommendations() {
@@ -130,8 +161,9 @@ async function loadRecommendations() {
     document.querySelector("#movie-search").disabled = false;
     AnivizMain.initialize(data);
     document.querySelector("#dust-direction").disabled = false;
+    document.querySelector("#magnet-type").disabled = false;
     document.querySelector("#recommendation-method-data").textContent =
-      `${numberFormatter.format(data.meta.anime_count)} AniList anime × ${numberFormatter.format(data.meta.movie_count)} TMDB movies: ${numberFormatter.format(data.meta.pair_count)} pairs. Both directions read the same cosine for each movie–anime pair. Use up to three titles from the chosen magnet catalogue. Computed ${formatDate(data.meta.generated_at)}.`;
+      `${numberFormatter.format(data.meta.anime_count)} AniList anime × ${numberFormatter.format(data.meta.movie_count)} TMDB movies: ${numberFormatter.format(data.meta.pair_count)} pairs. Both directions read the same cosine for each movie–anime pair. Use up to three magnets in any mix of titles and genre cohorts from the chosen magnet catalogue. Computed ${formatDate(data.meta.generated_at)}.`;
     document.querySelector("#recommendation-method-model").textContent =
       `${data.meta.model} embeds titles, genres, tags, and synopses. Cosine similarity compares normalized vectors; ratings and popularity do not affect the score.`;
   } catch (error) {
@@ -189,21 +221,25 @@ function renderMovieSearchResults() {
     : `No ${noun} match “${query}” in this sample.`;
 }
 
-function addMagnet(key) {
-  const { magnetKeys } = AnivizMain.snapshot();
+function addMagnet(key, type = "title") {
+  const { magnetKeys, genreCohorts } = AnivizMain.snapshot();
   const status = document.querySelector("#recommendation-status");
+  const genre = type === "genre";
+  if (genre && !genreCohorts.some(cohort => cohort.key === key)) {
+    status.textContent = "That genre cohort is unavailable in this sample.";
+    return;
+  }
   if (magnetKeys.includes(key)) {
-    status.textContent = "That title is already a magnet.";
+    status.textContent = `That ${genre ? "genre cohort" : "title"} is already a magnet.`;
     return;
   }
   if (magnetKeys.length >= 3) {
-    status.textContent = "Three magnets are in place. Remove one to add another title.";
+    status.textContent = "Three magnets are in place. Remove one to add another magnet.";
     return;
   }
   AnivizMain.setMagnets([...magnetKeys, key]);
-  const search = document.querySelector("#movie-search");
-  search.value = "";
-  search.focus({ preventScroll: true });
+  document.querySelector("#movie-search").value = "";
+  focusMagnetPicker();
   document.querySelector("#movie-search-results").hidden = true;
   status.textContent = "";
 }

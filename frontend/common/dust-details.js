@@ -26,8 +26,10 @@
     return `<div class="dust-detail-scores">${magnets.map((magnet, index) => {
       const score = match.scores[index];
       const rounded = score.toFixed(3);
-      const label = attr(`Cosine ${exactEvidence ? score : rounded}`);
-      return `<div style="--magnet-color:${color(magnet.key)}"><span><i></i>${escape(magnet.title)}</span><strong tabindex="0" title="${label}" aria-label="${label}">${rounded}</strong></div>`;
+      const cohort = magnet.kind === 'genre';
+      const name = cohort ? root.AnivizDust.magnetScoreLabel(magnet) : magnet.title;
+      const label = attr(cohort ? `${name}: ${score}` : `Cosine ${exactEvidence ? score : rounded}`);
+      return `<div style="--magnet-color:${color(magnet.key)}"><span><i></i>${escape(name)}</span><strong tabindex="0" title="${label}" aria-label="${label}">${rounded}</strong></div>`;
     }).join('')}<small>Cosine similarity · higher means closer</small></div>`;
   }
 
@@ -57,7 +59,14 @@
       ];
       const rows = [
         ...metadataRows,
-        ...magnets.map((magnet, index) => [`M${index + 1} · ${magnet.title}`, (_, i) => score(matches[i].scores[index], -1, 1, matches[i].scores[index].toFixed(3), `Cosine ${matches[i].scores[index]}`)]),
+        ...magnets.map((magnet, index) => {
+          const cohort = magnet.kind === 'genre';
+          const label = cohort ? root.AnivizDust.magnetScoreLabel(magnet) : magnet.title;
+          return [`M${index + 1} · ${label}`, (_, i) => {
+            const value = matches[i].scores[index];
+            return score(value, -1, 1, value.toFixed(3), cohort ? `${label}: ${value}` : `Cosine ${value}`);
+          }];
+        }),
         ['Average cosine similarity', (_, i) => score(matches[i].score, -1, 1, matches[i].score.toFixed(3), `Average cosine ${matches[i].score}`)]
       ];
       return `<div class="dust-comparison-scroll" role="region" tabindex="0" aria-label="Selected ${noun} comparison, scroll horizontally">
@@ -104,5 +113,5 @@
       html: selected.length ? `<section aria-label="Selected dust ${noun}"><div class="dust-details-heading"><h3>${selected.length > 1 ? `Comparing ${selected.length} ${noun}` : escape(recordFor(selected[0]).title)}</h3><button type="button" class="small-button ghost" data-dust-clear>Clear selection</button></div>${table(selected)}</section>` : ''
     };
   }
-  root.AnivizDustDetails = { render, renderMovie };
+  root.AnivizDustDetails = { render, renderMovie, magnetScores };
 })(globalThis);

@@ -16,6 +16,8 @@
   };
   const keyFor = (catalogue, id) => `${catalogue}:${id}`;
   const catalogueFor = (data, catalogue) => (catalogue === "tmdb" ? data?.movies : data?.anime) || [];
+  const magnetScoreLabel = magnet => magnet.kind === "genre" ? `Mean cosine to ${magnet.title}` : `Cosine to ${magnet.title}`;
+  const cohortDescription = magnet => `${magnet.source} · ${magnet.memberIds.length} ${magnet.noun}`;
   const defaults = direction => ({ search: "", genre: "All", yearFrom: null, yearTo: null, ...(direction === REVERSE ? {} : { studio: "All", format: "All", minimumScore: 0 }) });
   const id = (value) => String(value);
   const ids = (values) => [...new Set((values || []).filter(v => typeof v === "string" || typeof v === "number").map(id))];
@@ -61,11 +63,36 @@
     };
   }
 
-  function scoreDust(records, magnets, direction, pairScore) {
+  function genreCohorts(records, catalogue) {
+    const groups = new Map();
+    const source = catalogue === "tmdb" ? "TMDB" : "AniList";
+    const noun = catalogue === "tmdb" ? "movies" : "anime";
+    for (const record of records) {
+      for (const genre of new Set(record.genres || [])) {
+        if (!groups.has(genre)) groups.set(genre, []);
+        groups.get(genre).push(record.id);
+      }
+    }
+    return [...groups.keys()].sort((a, b) => a.localeCompare(b)).map(genre => ({
+      key: keyFor(catalogue, `genre:${genre}`), kind: "genre", genre, title: `${genre} ${noun}`, source, noun, memberIds: groups.get(genre)
+    }));
+  }
+
+  function scoreDust(records, magnets, direction, pairScore, cohortVectors) {
     if (!pairScore || !magnets.length) return [];
-    const reverse = direction === REVERSE;
+    const scorePair = direction === REVERSE
+      ? (magnetId, dustId) => pairScore(dustId, magnetId) : pairScore;
+    const columns = magnets.map(magnet => {
+      if (magnet.kind !== "genre") return records.map(record => scorePair(magnet.id, record.id));
+      if (!cohortVectors.has(magnet.key)) {
+        const vector = records.map(record => magnet.memberIds.reduce((sum, memberId) =>
+          sum + scorePair(memberId, record.id), 0) / magnet.memberIds.length);
+        cohortVectors.set(magnet.key, vector);
+      }
+      return cohortVectors.get(magnet.key);
+    });
     return records.map((record, index) => {
-      const scores = magnets.map(magnet => reverse ? pairScore(record.id, magnet.id) : pairScore(magnet.id, record.id));
+      const scores = columns.map(column => column[index]);
       return { record, key: keyFor(DIRECTIONS[direction].dust, record.id), index, scores,
         score: scores.reduce((sum, value) => sum + value, 0) / scores.length,
         closest: scores.indexOf(Math.max(...scores)), group: "dust" };
@@ -152,6 +179,9 @@
     let direction = FORWARD, data, matrix, pairScore, metadata = [], metadataStatus = "loading";
     let session = { state: blankState(direction), layout: blankLayout() };
     const sessions = new Map();
+    // Catalogue-qualified keys separate directions. A new data or matrix object invalidates the bundle cache.
+    const cohortVectors = new Map();
+    let cohorts = [];
     let catalogue = new Map(), lookup = new Map(), magnets = [], vectors = [], candidates = [], displayed = [], ranking = [];
     let persistent = true, warned = false, revision = 0;
     const listeners = new Set();
@@ -176,7 +206,7 @@
     function snapshot() {
       const state = session.state;
       const visible = new Set(state.displayedKeys);
-      return { ...state, version: VERSION, direction, revision, magnets, candidateDust: candidates, displayedDust: displayed,
+      return { ...state, version: VERSION, direction, revision, magnets, genreCohorts: cohorts, candidateDust: candidates, displayedDust: displayed,
         ranking, lookup, metadataStatus, persistent,
         missingMetadataIds: direction === FORWARD ? state.candidateKeys.filter(key => !lookup.get(key)?.metadata) : [],
         filteredOutIds: state.candidateKeys.filter(key => !visible.has(key)) };
@@ -198,16 +228,22 @@
     }
     function activate() {
       const { magnet } = DIRECTIONS[direction];
-      catalogue = new Map(catalogueFor(data, magnet).map(record =>
+      const records = catalogueFor(data, magnet);
+      catalogue = new Map(records.map(record =>
         [keyFor(magnet, record.id), { ...record, id: id(record.id), key: keyFor(magnet, record.id) }]));
+      cohorts = genreCohorts(records, magnet);
+      for (const cohort of cohorts) catalogue.set(cohort.key, cohort);
       refreshLookup();
+    }
+    function validMagnets(values) {
+      return ids(values).filter(key => catalogue.has(key)).slice(0, 3);
     }
     function derive({ rescore = false, resample = false, rerank = false } = {}) {
       const state = session.state;
       if (rescore) {
-        state.magnetKeys = state.magnetKeys.filter(key => catalogue.has(key));
+        state.magnetKeys = validMagnets(state.magnetKeys);
         magnets = state.magnetKeys.map(key => catalogue.get(key));
-        vectors = scoreDust(catalogueFor(data, DIRECTIONS[direction].dust), magnets, direction, pairScore);
+        vectors = scoreDust(catalogueFor(data, DIRECTIONS[direction].dust), magnets, direction, pairScore, cohortVectors);
       }
       if (rescore || resample) {
         candidates = sampleDust(vectors, magnets.length, state.dustLimit);
@@ -263,7 +299,10 @@
       setSources(recommendations, scores, { seedExample = false } = {}) {
         const changed = data !== recommendations || matrix !== scores;
         data = recommendations; matrix = scores;
-        if (changed) pairScore = data && matrix ? createScoreAccessor(data, matrix) : null;
+        if (changed) {
+          cohortVectors.clear();
+          pairScore = data && matrix ? createScoreAccessor(data, matrix) : null;
+        }
         activate();
         if (seedExample && !sessions.has(direction) && !api.migrateLegacy(data)) seed();
         sessions.set(direction, session);
@@ -286,8 +325,8 @@
         return derive();
       },
       setMagnets(values) {
-        const keys = ids(values).filter(key => catalogue.has(key)).slice(0, 3);
-        if (keys.join() === session.state.magnetKeys.join()) return snapshot();
+        const keys = validMagnets(values);
+        if (keys.length === session.state.magnetKeys.length && keys.every((key, index) => key === session.state.magnetKeys[index])) return snapshot();
         session.state.magnetKeys = keys;
         session.state.example = false;
         return derive({ rescore: true });
@@ -328,6 +367,6 @@
     };
     return api;
   }
-  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, DIRECTIONS, keyFor, catalogueFor, defaults, joinRecords,
+  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, DIRECTIONS, keyFor, catalogueFor, magnetScoreLabel, cohortDescription, defaults, joinRecords,
     passesFilters, createScoreAccessor, forwardVectors, rankCorpus, sampleDust, createContext };
 });

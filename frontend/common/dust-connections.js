@@ -36,7 +36,9 @@
       }
       container.replaceChildren();
       drawLines = null;
-      onCoverage(`${displayedDust.length} displayed ${noun} · Signed cosine similarity.`);
+      const magnet = magnets[magnetIndex];
+      const cohortLabel = magnet?.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : '';
+      onCoverage(`${displayedDust.length} displayed ${noun} · ${cohortLabel || 'Signed cosine similarity'}.`);
       if (!magnetKeys.length || !displayedDust.length) {
         offsets = [0, 0];
         renderEmpty(container, magnetKeys.length ? `No ${noun} match the current dust filters. Broaden or reset filters to see connections.`
@@ -57,7 +59,7 @@
         .attr('aria-hidden', 'true').attr('focusable', 'false');
       function magnetButtons(parent, className, dataAttribute) {
         const buttons = parent.append('div').attr('class', className)
-          .attr('role', 'group').attr('aria-label', 'Title magnets')
+          .attr('role', 'group').attr('aria-label', 'Magnets')
           .selectAll('button').data(magnetKeys).join('button')
           .attr('type', 'button').attr('class', 'dust-connection-magnet')
           .attr(dataAttribute, id => id).attr('title', (_, i) => titleFor(i))
@@ -93,13 +95,13 @@
           .attr('aria-pressed', isSelected)
           .attr('aria-haspopup', match => isSelected(match) ? null : 'dialog')
           .attr('aria-controls', 'recommendation-detail detail-drawer')
-          .attr('aria-label', match => `Dust rank ${match.rank} of ${ranking.length}: ${match.record.title}. Cosine to ${title}: ${match.similarity}.`)
+          .attr('aria-label', match => `Dust rank ${match.rank} of ${ranking.length}: ${match.record.title}. ${AnivizDust.magnetScoreLabel(magnet)}: ${match.similarity}.`)
           .attr('title', match => match.record.title)
           .on('click', (event, match) => onSelect(match.key));
         rows.append('span').attr('class', 'dust-connection-dot').attr('aria-hidden', 'true');
         rows.append('span').attr('class', 'dust-connection-rank').text(match => match.rank);
         rows.append('span').attr('class', 'dust-connection-title').text(match => match.record.title);
-        rows.append('span').attr('class', 'dust-connection-score').attr('title', match => `Cosine ${match.similarity}`).text(match => match.similarity.toFixed(3));
+        rows.append('span').attr('class', 'dust-connection-score').attr('title', match => cohortLabel ? `${cohortLabel}: ${match.similarity}` : `Cosine ${match.similarity}`).text(match => match.similarity.toFixed(3));
         const panel = list.node(), end = panel.scrollHeight - panel.clientHeight;
         panel.scrollTop = index === 0 ? offsets[index] : end - offsets[index];
         list.on('scroll', () => {
@@ -121,7 +123,7 @@
           .attr('tabindex', 0).attr('aria-label', `Dust member ranking for ${title}`).attr('data-dust-member-scroll', '');
         const table = scroll.append('table').attr('aria-label', `Dust members for ${title}`)
           .style('--magnet-color', color(selectedMagnetKey));
-        table.append('thead').append('tr').selectAll('th').data(['Rank', noun === 'movies' ? 'Movie' : 'Anime', 'Similarity']).join('th')
+        table.append('thead').append('tr').selectAll('th').data(['Rank', noun === 'movies' ? 'Movie' : 'Anime', cohortLabel || 'Similarity']).join('th')
           .attr('scope', 'col').text(label => label);
         const rows = table.append('tbody').selectAll('tr').data(members).join('tr')
           .classed('dust-member-selected', isSelected)
@@ -134,7 +136,7 @@
           .attr('data-dust-member-id', match => `${selectedMagnetKey}:${match.key}`)
           .attr('aria-pressed', isSelected).attr('aria-haspopup', match => isSelected(match) ? null : 'dialog')
           .attr('aria-controls', 'recommendation-detail detail-drawer').text(match => match.record.title);
-        rows.append('td').attr('class', 'dust-member-score').attr('title', match => `Cosine ${match.similarity}`).text(match => match.similarity.toFixed(3));
+        rows.append('td').attr('class', 'dust-member-score').attr('title', match => cohortLabel ? `${cohortLabel}: ${match.similarity}` : `Cosine ${match.similarity}`).text(match => match.similarity.toFixed(3));
         scroll.node().scrollTop = memberScrollTop;
       } else {
         memberPanel.append('p').attr('class', 'dust-member-empty').text(`None of the displayed ${noun} are closest to ${title}.`);

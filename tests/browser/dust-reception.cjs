@@ -48,7 +48,8 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     )].map(el => ['transform', 'x1', 'y1', 'x2', 'y2', 'stroke'].map(attr => el.getAttribute(attr))));
     const dragFirstMagnet = async view => {
       const core = view.locator('.magnet-core').first();
-      await core.scrollIntoViewIfNeeded();
+      // Center the drag target so the sticky header cannot intercept the pointer.
+      await core.evaluate(el => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
       const { x, y, width, height } = await core.boundingBox();
       const centerX = x + width / 2, centerY = y + height / 2;
       await page.mouse.move(centerX, centerY);

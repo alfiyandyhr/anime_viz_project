@@ -1,3 +1,26 @@
+# Genre cohort magnets
+
+1. In **Movie → Anime**, keep Inception and add **Genre cohort → Science Fiction movies**.
+   Its chip shows **TMDB · 214 movies**. The combined full-ranking top 30 has six
+   new titles compared with Inception alone.
+2. Focus a dot in the field or mirror, compare two dots, select the cohort in
+   Similarity connections, and inspect the full ranking. Each labels the score
+   **Mean cosine to Science Fiction movies**. Sort by the cohort and remove it.
+   The ranking returns to average similarity with the remaining magnets.
+3. Switch to **Anime → Movies** and add **Sci-Fi anime** (165 AniList anime).
+   Try it on its own. The **Science Fiction** dust genre filter narrows the movie
+   dots while the cohort scores and 1,000-row ranking stay fixed.
+4. Move the cohort magnet and reload. Verify the position and magnets restore
+   for each direction. On a narrow viewport, add and remove a cohort, move it
+   with the arrow keys, and select a dot with Enter to read its scores.
+5. Add Action and Romance to the Sci-Fi anime cohort for a three-cohort field.
+   Reload and switch directions to verify all three restore together. Try a
+   fourth magnet and confirm the picker reports the shared three-slot limit.
+
+Run `node tests/browser/dust-genres.cjs` with the Playwright setup below.
+
+---
+
 # Anime magnets and movie dust
 
 The forward regression fixture in `tests/fixtures/dust-forward-3342eb3.json`

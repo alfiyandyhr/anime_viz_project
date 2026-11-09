@@ -10,7 +10,7 @@
 
   <meta
     name="description"
-    content="Explore similar stories in either direction with up to three movie or anime magnets."
+    content="Explore similar stories in either direction with up to three title and genre cohort magnets."
   >
 
   <title>AnIViz — Dust &amp; Magnet</title>
@@ -73,7 +73,7 @@
         <h1 class="sr-only">Dust &amp; Magnet</h1>
 
         <div class="dust-playground">
-        <aside class="recommendation-picker" aria-label="Title magnets and field controls">
+        <aside class="recommendation-picker" aria-label="Magnets and field controls">
           <label class="dust-direction-label" for="dust-direction">
             <span>Direction</span>
             <select id="dust-direction" disabled>
@@ -81,7 +81,12 @@
               <option value="anime-to-movies">Anime → Movies</option>
             </select>
           </label>
-          <div class="recommendation-controls">
+          <fieldset class="magnet-type-picker" id="magnet-type" disabled>
+            <legend>Magnet type</legend>
+            <label><input type="radio" name="magnet-type" value="title" checked> Title</label>
+            <label><input type="radio" name="magnet-type" value="genre"> Genre cohort</label>
+          </fieldset>
+          <div class="recommendation-controls" id="title-magnet-search">
             <label class="movie-search-label" for="movie-search">
               <span id="movie-search-label">Add a movie magnet · up to 3</span>
               <input id="movie-search" type="search" placeholder="Add movie magnet… (up to 3)" autocomplete="off" aria-controls="movie-search-results" disabled>
@@ -89,7 +94,15 @@
           </div>
           <div id="movie-search-results" class="movie-search-results" aria-label="Title search results" hidden></div>
           <div id="movie-suggestions" class="movie-suggestions" aria-label="Suggested magnets"></div>
-          <div id="movie-magnets" class="movie-magnets" aria-label="Your title magnets" hidden></div>
+          <div id="genre-magnet-picker" hidden>
+            <label class="dust-direction-label" for="genre-magnet-choice">
+              <span>Choose a genre</span>
+              <select id="genre-magnet-choice" aria-describedby="genre-magnet-source"></select>
+            </label>
+            <p id="genre-magnet-source"></p>
+            <button id="add-genre-magnet" class="small-button" type="button" disabled>Add genre magnet</button>
+          </div>
+          <div id="movie-magnets" class="movie-magnets" aria-label="Your magnets" hidden></div>
           <details class="field-options" data-field-options>
             <summary>Field options</summary>
             <div class="field-options-panel">
@@ -252,6 +265,7 @@
           <div class="method-grid">
             <article><h3>One million comparisons</h3><p id="recommendation-method-data">1,000 popular AniList anime × 1,000 popular TMDB movies. Both directions use the same pair scores from the complete score matrix.</p></article>
             <article><h3>Story similarity</h3><p id="recommendation-method-model">Qwen3-Embedding-4B embeds titles, genres, tags, and synopses. Cosine similarity compares the normalized vectors; ratings and popularity do not affect the score.</p></article>
+            <article><h3>Genre cohorts</h3><p>A cohort uses every sampled title with that genre in the magnet catalogue. Its score is the mean of the signed cosines to those titles. A title can belong to multiple cohorts and contribute to each of their scores. Each magnet contributes one score to the combined average. Field options filter the dust while the cohorts stay fixed.</p></article>
 
             <article><h3>Reading the magnets</h3><p>The field samples each magnet’s strongest matches, then fills remaining slots by average cosine. Distances express each dot’s preference order across magnets. Color identifies its highest-scoring magnet. If three magnets approach a straight line, some distances become approximate. Spread the magnets or reset positions to recover the full ordering. Hover or focus a dot to see its scores rounded to three decimals. Select up to three dots with a click, tap, Enter, or Space. Select again to remove a title, or click empty space to remove the latest selection.</p></article>
             <article><h3>Reading the charts</h3><p>Charts use the displayed titles. The full ranking uses the entire dust catalogue. Genres can overlap. With anime dust, AniList popularity counts list users and reception marker size shows favourites. With movie dust, the TMDB sample supplies genres and release years for analysis.</p></article>

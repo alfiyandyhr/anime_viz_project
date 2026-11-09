@@ -9,7 +9,7 @@ A visual story discovery tool built with Python/Flask, AniList GraphQL API, and 
 ## Four views
 
 The root URL opens **Dust & Magnet** with an **Example** Inception magnet.
-Switch Direction to **Anime → Movies** for the **Example** Cowboy Bebop magnet. Search by title, alias, or year to add up to three magnets, and remove them with ×.
+Switch Direction to **Anime → Movies** for the **Example** Cowboy Bebop magnet. Use **Title** to search by title, alias, or year. Use **Genre cohort** to add a group of titles by genre. Fill up to three slots with any mix of distinct titles and cohorts. Remove any magnet with ×.
 The compact dropdown contains exactly four destinations:
 
 | View | Data and interactions |
@@ -19,7 +19,7 @@ The compact dropdown contains exactly four destinations:
 | Network | Actor/character/work collaboration graph, defaulting to Current dust when a saved anime-dust context exists, otherwise Catalogue. A local selector switches scopes without changing other views. The 35-work display cap and sampled Japanese cast credits are disclosed. |
 | Full Catalogue | The loaded 1,000-title metadata sample, with its own search, filters, sorting, pagination, details and automatic shortlist comparison. Saved movies never narrow its scope. |
 
-Direction, title search, removable magnets, and **Field options** sit in the left panel.
+Direction, the magnet picker, removable magnets, and **Field options** sit in the left panel.
 The right panel follows the latest selected title. Anime details include AniList
 images, synopsis, tags, and sampled Japanese cast. Movie details use published
 TMDB text, genres, keywords, and a TMDB link. Field options contains dot count,
@@ -223,9 +223,12 @@ node --test tests/*.test.cjs
 ## Dust & Magnet recommendations
 
 Open the root URL, choose **Dust & Magnet** in the dropdown, or visit
-`frontend/dust-magnet/index.html`. Search for up to three favorite movies and
-remove a magnet with its × button. Suggested movies appear under **Try a favorite**
-below search. **Field options** contains the 30/60/90 dot choices, filters, and
+`frontend/dust-magnet/index.html`. Start with a title search or pick **Genre cohort**.
+Try **Inception** with **Science Fiction movies** (214 TMDB movies), or **Sci-Fi anime**
+(165 AniList anime) in the reverse direction. Each cohort score averages the signed
+cosines to its sampled titles. A cohort occupies one slot and contributes one score
+to the combined average. Its membership stays fixed when you filter the dust.
+**Field options** contains the 30/60/90 dot choices, filters, and
 **Reset positions**. Drag magnets, or focus
 one and use arrow keys, to rearrange the field. Hover or keyboard-focus an anime
 for its title and cosine scores rounded to three decimals. Click or press Enter
@@ -237,13 +240,13 @@ Dragging and resetting positions preserve selection. All linked charts remain
 available by scrolling.
 
 The dust field defaults to **60 dots**, with 30 and 90 options. It reserves half
-the candidate budget equally for each movie's strongest matches, then fills
+the candidate budget equally for each magnet's strongest matches, then fills
 remaining slots with the highest mean cosine scores, deduplicating overlap.
 All candidates use the complete matrix. Color identifies the highest-scoring
-movie; white outlines mark selected anime. Selected dots show connections;
+magnet; white outlines mark selected anime. Selected dots show connections;
 hover and keyboard focus show score tooltips without selecting an anime.
 
-With two or three magnets, each dot is closer to its higher-scoring movies.
+With two or three magnets, each dot is closer to its higher-scoring magnets.
 Targets fit squared-distance differences to cosine-score differences, including
 zero and negative scores. Each dot is constrained to the intersection of the
 appropriate sides of the magnets' perpendicular bisectors. Collision separation

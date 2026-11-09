@@ -353,6 +353,114 @@ test('published Cowboy Bebop column and Inception row agree, and Treasure Planet
   assert.equal(reverse.ranking[0].score, 0.6052206158638);
 });
 
+test('genre cohorts average signed movie rows and anime columns, preserving ties and one vote per magnet', () => {
+  const fixture = {
+    movies: [{ id: 1, genres: ['Action', 'Action', 'Drama'] }, { id: 2, genres: ['Action'] }, { id: 3, genres: ['Comedy', 'Drama'] }],
+    anime: [{ id: 1, genres: ['Action'] }, { id: 2, genres: ['Action'] }, { id: 3, genres: ['Sci-Fi'] }, { id: 4 }]
+  };
+  const matrix = [-.75, .25, .5, -.25, .25, -.75, .5, -.5, -.5, -.5, .75, .125];
+  const context = createContext();
+  context.setSources(fixture, matrix);
+  const values = snapshot => snapshot.ranking.map(row => [row.key, row.score]);
+  const actionMovies = 'tmdb:genre:Action';
+  const actionAnime = 'anilist:genre:Action';
+  const forward = context.setMagnets(['tmdb:genre:Empty', actionMovies, actionMovies]);
+  assert.deepEqual(forward.magnetKeys, [actionMovies]);
+  assert.deepEqual(forward.magnets[0].memberIds, [1, 2]);
+  assert.deepEqual(values(forward), [['anilist:3', .5], ['anilist:1', -.25], ['anilist:2', -.25], ['anilist:4', -.375]]);
+  const threeCohorts = [actionMovies, 'tmdb:genre:Comedy', 'tmdb:genre:Drama'];
+  const allGenres = context.setMagnets([actionMovies, actionMovies, ...threeCohorts.slice(1), 'tmdb:1']);
+  assert.deepEqual(allGenres.magnetKeys, threeCohorts);
+  assert.deepEqual(allGenres.ranking.map(row => [row.key, row.scores, row.score]), [
+    ['anilist:3', [.5, .75, .625], 1.875 / 3], ['anilist:4', [-.375, .125, -.0625], -.3125 / 3],
+    ['anilist:2', [-.25, -.5, -.125], -.875 / 3], ['anilist:1', [-.25, -.5, -.625], -1.375 / 3]
+  ]);
+  const overlap = context.setMagnets([actionMovies, 'tmdb:1', 'tmdb:2', 'tmdb:3']);
+  assert.deepEqual(overlap.magnetKeys, [actionMovies, 'tmdb:1', 'tmdb:2']);
+  const mixed = context.setMagnets([actionMovies, 'tmdb:1']);
+  assert.deepEqual(values(mixed), [['anilist:3', .5], ['anilist:2', 0], ['anilist:4', -.3125], ['anilist:1', -.5]]);
+  context.setMetadata([{ id: 3, genres: ['Action'] }]);
+  context.setDirection(REVERSE);
+  const reverse = context.setMagnets([actionAnime, actionMovies]);
+  assert.deepEqual(reverse.magnetKeys, [actionAnime]);
+  assert.deepEqual(reverse.magnets[0].memberIds, [1, 2]);
+  assert.deepEqual(values(reverse), [['tmdb:1', -.25], ['tmdb:2', -.25], ['tmdb:3', -.5]]);
+});
+
+test('cohort vectors are reused within a bundle and saved choices are revalidated by direction', () => {
+  const { context, storage } = setup();
+  const fixture = { movies: [{ id: 1, genres: ['Action'] }], anime: [{ id: 1, genres: ['Action'] }] };
+  const actionMovies = 'tmdb:genre:Action', actionAnime = 'anilist:genre:Action';
+  let reads = 0;
+  const matrix = { get 0() { reads++; return .25; } };
+  context.setSources(fixture, matrix);
+  context.setMagnets([actionMovies]);
+  assert.equal(reads, 1);
+  context.setRankingSort(actionMovies);
+  context.setFilters({ genre: 'Drama' });
+  context.setDustLimit(90);
+  context.setMagnets([]);
+  context.setMagnets([actionMovies]);
+  context.setRankingSort(actionMovies);
+  assert.equal(reads, 1);
+  context.setDirection(REVERSE);
+  context.setMagnets([actionAnime]);
+  const reverseReads = reads;
+  context.setDirection(FORWARD);
+  assert.equal(reads, reverseReads);
+  assert.equal(context.snapshot().ranking[0].score, .25);
+  assert.equal(context.setSources(fixture, [-.5]).ranking[0].score, -.5);
+
+  const restored = createContext({ storage });
+  assert.equal(restored.restore(), true);
+  const restoredForward = restored.setSources(fixture, matrix);
+  assert.deepEqual(restoredForward.magnetKeys, [actionMovies]);
+  assert.equal(restoredForward.rankingSortKey, actionMovies);
+  assert.deepEqual(restoredForward.displayedKeys, []);
+  assert.deepEqual(restored.setDirection(REVERSE).magnetKeys, [actionAnime]);
+  restored.setDirection(FORWARD);
+  const unavailable = restored.setSources({ ...fixture, movies: [{ id: 1 }] }, matrix);
+  assert.deepEqual(unavailable.genreCohorts, []);
+  assert.deepEqual(unavailable.magnetKeys, []);
+  assert.deepEqual(unavailable.ranking, []);
+  assert.equal(unavailable.rankingSortKey, 'average');
+});
+
+test('published genre affinities match the matrix in both directions and change six Inception top-30 entries', () => {
+  const { context } = setup();
+  const inception = context.setMagnets(['tmdb:27205']).ranking;
+  const scienceFiction = 'tmdb:genre:Science Fiction';
+  const combined = context.setMagnets(['tmdb:27205', scienceFiction]);
+  assert.equal(combined.magnets[1].memberIds.length, 214);
+  const movieRows = data.movies.flatMap((movie, i) => movie.genres.includes('Science Fiction') ? [i] : []);
+  for (const row of combined.ranking) {
+    const mean = movieRows.reduce((sum, i) => sum + scores[i * data.anime.length + row.index], 0) / movieRows.length;
+    assert.equal(row.scores[1], mean);
+    assert.equal(row.score, (row.scores[0] + mean) / 2);
+  }
+  const originalTop = new Set(inception.slice(0, 30).map(row => row.key));
+  assert.equal(combined.ranking.slice(0, 30).filter(row => !originalTop.has(row.key)).length, 6);
+  context.setRankingSort(scienceFiction);
+  assert.equal(context.setMagnets(['tmdb:27205']).rankingSortKey, 'average');
+  assert.deepEqual(context.snapshot().ranking, inception);
+
+  context.setDirection(REVERSE);
+  const reverse = context.setMagnets(['anilist:genre:Sci-Fi']);
+  const animeColumns = data.anime.flatMap((anime, i) => anime.genres.includes('Sci-Fi') ? [i] : []);
+  assert.equal(reverse.magnets[0].memberIds.length, 165);
+  for (const row of reverse.ranking) {
+    const mean = animeColumns.reduce((sum, i) => sum + scores[row.index * data.anime.length + i], 0) / animeColumns.length;
+    assert.equal(row.score, mean);
+  }
+  const filtered = context.setFilters({ genre: 'Science Fiction' });
+  assert.ok(filtered.displayedKeys.length > 0 && filtered.displayedKeys.length < reverse.displayedKeys.length);
+  assert.equal(filtered.candidateDust, reverse.candidateDust);
+  assert.equal(filtered.magnets, reverse.magnets);
+  const evidence = ({ ranking }) => ranking.map(({ key, score }) => [key, score]);
+  assert.deepEqual(evidence(filtered), evidence(reverse));
+  assert.deepEqual(evidence(context.setDustLimit(30)), evidence(reverse));
+});
+
 test('v1 imports typed selections, sorts and layouts and keeps both directions independent during loading', () => {
   const { context: initial } = setup();
   const selected = initial.snapshot().displayedKeys[0].slice('anilist:'.length);

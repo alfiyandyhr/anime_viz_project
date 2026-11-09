@@ -418,7 +418,7 @@ function filterScopeSummary() {
 function renderFilterSummary() {
   elements.filterSummary.textContent = filterScopeSummary();
 }
-function openAnimeDetail(anime) {
+function openAnimeDetail(anime, { similarityHtml = "" } = {}) {
   const banner = anime.banner_image || anime.cover.extra_large || "";
   const cover = anime.cover.extra_large || anime.cover.large || "";
 
@@ -438,6 +438,8 @@ function openAnimeDetail(anime) {
         >
 
         <h2>${escapeHTML(anime.title)}</h2>
+
+        ${similarityHtml}
 
         <div class="genre-list">
           ${anime.genres.map((genre) => (
