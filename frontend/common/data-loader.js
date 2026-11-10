@@ -22,6 +22,23 @@
       return payload;
     }),
     recommendations: () => once("recommendations", () => json("data/movie_recommendations.json")),
+    movieDetails: data => {
+      const movieIds = data.movies.map(movie => String(movie.id)).sort();
+      return once(`movie-details:${movieIds.join(",")}`, async () => {
+        const payload = await json("data/movie_details.json");
+        const movies = payload?.movies;
+        if (payload?.schema_version !== 1 || payload.source !== "TMDB"
+          || payload.record_count !== movieIds.length || !movies || Object.keys(movies).length !== movieIds.length
+          || movieIds.some(id => !Object.hasOwn(movies, id) || !movies[id] || typeof movies[id] !== "object")) {
+          throw new Error("Invalid TMDB details for this movie sample");
+        }
+        // Reception always comes from the archived popularity and ratings, collected separately.
+        return Object.fromEntries(movieIds.map(id => {
+          const { poster_path, backdrop_path, runtime } = movies[id];
+          return [id, { poster_path, backdrop_path, runtime: Number.isInteger(runtime) && runtime > 0 ? runtime : null }];
+        }));
+      });
+    },
     moviePopularity: data => {
       const movieIds = data.movies.map(movie => String(movie.id));
       return once(`movie-popularity:${movieIds.join(",")}`, async () => {

@@ -213,7 +213,7 @@
 
   function createContext({ storage, onNotice = () => {} } = {}) {
     let direction = FORWARD, data, matrix, pairScore, metadata = [], metadataStatus = "loading";
-    let movieDetails = {};
+    let movieDetails = {}, movieReception = {};
     let session = { state: blankState(direction), layout: blankLayout() };
     const sessions = new Map();
     // Catalogue-qualified keys separate directions. A new data or matrix object invalidates the bundle cache.
@@ -267,7 +267,7 @@
           [keyFor("anilist", id), { record: row.anime, metadata: row.metadata }]));
       } else {
         lookup = new Map(catalogueFor(data, "tmdb").map(record =>
-          [keyFor("tmdb", record.id), { record: { ...movieDetails[record.id], ...record } }]));
+          [keyFor("tmdb", record.id), { record: { ...record, ...movieDetails[record.id], ...movieReception[record.id] } }]));
       }
     }
     function activate() {
@@ -382,11 +382,17 @@
       getMagnetRecord(key) {
         const magnet = magnets.find(magnet => magnet.key === key && magnet.kind === undefined);
         if (!magnet) return null;
-        return direction === FORWARD ? magnet
+        return direction === FORWARD ? { ...magnet, ...movieDetails[magnet.id] }
           : joinAnimeRecord(magnet, metadata.find(row => id(row.id) === magnet.id));
       },
+      setMovieDetails(details) {
+        movieDetails = details;
+        if (direction !== REVERSE) return snapshot();
+        refreshLookup();
+        return publish();
+      },
       setMoviePopularity(payload, status) {
-        movieDetails = payload?.movies || {};
+        movieReception = payload?.movies || {};
         popularitySources[REVERSE] = { status, snapshotDate: payload?.snapshot_date,
           values: new Map(Object.entries(payload?.popularity || {})) };
         if (direction !== REVERSE) return snapshot();

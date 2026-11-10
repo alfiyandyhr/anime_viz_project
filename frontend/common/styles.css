@@ -590,6 +590,10 @@ input[type="range"] {
   background: var(--surface-light);
 }
 
+.title-artwork .detail-banner { height: 120px; border-radius: 8px; }
+.title-artwork .detail-cover { display: block; position: relative; width: 80px; height: 112px; margin: -42px 0 12px 10px; border-width: 3px; border-radius: 8px; }
+.title-artwork .detail-cover:first-child { margin: 0 0 12px; }
+
 .detail-main h2 {
   margin: 15px 0 8px;
   font-family: "Space Grotesk", sans-serif;

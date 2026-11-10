@@ -88,6 +88,7 @@
 .recommendation-title-button { border: 0; padding: 4px 0; color: var(--text); background: transparent; text-align: left; font-weight: 600; }
 .recommendation-title-button:hover { color: var(--pink); }
 .recommendation-title-button:focus-visible { outline: 2px solid var(--purple); outline-offset: 4px; }
+[data-dust-ranking-body] .anime-cell img { flex: none; width: 30px; height: 42px; border-radius: 3px; }
 .recommendation-rank { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .recommendation-score { color: var(--cyan); font-weight: 600; font-variant-numeric: tabular-nums; }
 #recommendation-table-body tr.is-selected { background: rgba(255,111,174,.075); }
@@ -545,6 +546,7 @@ body[data-chapter="recommendations"] .filterbar { display: none; }
 .dust-member-scroll th { font-size: .68rem; }
 .dust-member-scroll th:first-child { width: 3.25rem; }
 .dust-member-scroll th:last-child { width: 5.25rem; overflow-wrap: anywhere; }
+.dust-member-scroll th.dust-member-similarity { width: 6rem; white-space: nowrap; }
 .dust-member-scroll :is(th, td):is(:first-child, :last-child) { text-align: right; font-variant-numeric: tabular-nums; }
 .dust-member-scroll td:nth-child(2) { padding-block: 0; }
 .dust-member-scroll tbody tr:last-child td { border-bottom: 0; }
@@ -629,9 +631,6 @@ body[data-chapter="dust-magnet"] [data-dust-chips]:empty { display: none; }
 body[data-chapter="dust-magnet"] [data-dust-chips] { flex: none; }
 body[data-chapter="dust-magnet"] .recommendation-detail { position: static; padding: 20px; }
 body[data-chapter="dust-magnet"] .dust-focus { max-height: var(--field-height); overflow-y: auto; overscroll-behavior: contain; min-width: 0; padding: 16px; border-radius: 10px; }
-.dust-focus-hero .detail-banner { height: 120px; border-radius: 8px; }
-.dust-focus-hero .detail-cover { display: block; position: relative; width: 80px; height: 112px; margin: -42px 0 12px 10px; border-width: 3px; border-radius: 8px; }
-.dust-focus-hero .detail-cover:first-child { margin: 0 0 12px; }
 .dust-focus .dust-detail-scores > div > span { min-width: 0; overflow-wrap: anywhere; }
 .dust-focus .dust-story p, .dust-focus .recommendation-context { font-size: .8rem; color: var(--text-soft); }
 .dust-focus .dust-story h4 { margin-bottom: 8px; }
@@ -649,7 +648,7 @@ body[data-chapter="dust-magnet"] .dust-selection { margin: 0; padding-top: 4px; 
   body[data-chapter="dust-magnet"] .movie-magnets { flex-direction: row; flex-wrap: wrap; }
   .field-options-panel .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .field-options-panel .filter-grid > label:first-child { grid-column: 1 / -1; }
-  .dust-focus-hero .detail-banner { height: 160px; }
+  .dust-focus .title-artwork .detail-banner { height: 160px; }
   body[data-chapter="dust-magnet"] .dust-legend { margin-left: 0; }
 }
 

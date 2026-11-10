@@ -20,6 +20,7 @@ function dashboard(storage = new Map()) {
   });
   vm.runInContext(source('frontend/common/data-loader.js'), context);
   vm.runInContext(source('frontend/common/chart-data.js'), context);
+  vm.runInContext(source('frontend/common/title-artwork.js'), context);
   vm.runInContext(source('frontend/common/explorer-table.js'), context);
   vm.runInContext(source('frontend/common/app.js'), context);
   return context;

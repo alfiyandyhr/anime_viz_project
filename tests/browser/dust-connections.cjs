@@ -282,6 +282,13 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     await page.waitForSelector('.dust-node');
     await page.waitForFunction(() => AnivizMain.snapshot().metadataStatus === 'ready');
     await check();
+    await chart.evaluate(el => el.scrollIntoView({block:'center'}));
+    const similarityLines = await members.getByRole('columnheader', {name:'Similarity', exact:true}).evaluate(el => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      return range.getClientRects().length;
+    });
+    assert.equal(similarityLines, 1, 'the Similarity header fits on one line');
     const [mobileMapBounds, mobileMemberBounds] = await Promise.all([map.boundingBox(), members.boundingBox()]);
     assert.ok(mobileMemberBounds.y >= mobileMapBounds.y + mobileMapBounds.height,'member ranking stacks below the map on mobile');
     const overflow = await page.evaluate(() => ({width:innerWidth,scroll:document.documentElement.scrollWidth,

@@ -3,7 +3,7 @@
 (function (root) {
   let context, composition, latest, rankingPage = 0, rankingSignature = "";
   let scrollRestored = false, pendingNotice = "", metadataLoading = false;
-  let focusedMagnetKey = null;
+  let movieDetailsRequest, focusedMagnetKey = null, inspectedMovieKey = null;
   const $ = selector => document.querySelector(selector);
   const magnetColors = new Map();
   const isReverse = () => latest.direction === AnivizDust.REVERSE;
@@ -76,14 +76,17 @@
     const { ranking, magnets } = latest;
     const match = ranking.find(row => row.key === key);
     if (isReverse()) {
-      elements.drawerContent.innerHTML = `<div class="dust-movie-drawer">${AnivizDustDetails.renderMovie({
+      inspectedMovieKey = key;
+      elements.drawerContent.innerHTML = `<div class="dust-movie-drawer">${AnivizArtwork.movieHero(record, escapeAttribute)}${AnivizDustDetails.renderMovie({
         record, match, magnets, color, helpers: detailHelpers(), heading: 'h2'
       })}</div>`;
       openDrawer('Movie details');
+      loadMovieDetails();
     } else {
       const similarityHtml = magnets.some(magnet => magnet.kind !== undefined)
         ? AnivizDustDetails.magnetScores(match, magnets, color, detailHelpers()) : '';
-      openAnimeDetail({ ...record, cover: record.cover || {}, description: record.description || record.synopsis,
+      const cover = { ...record.cover, large: record.cover?.large || AnivizArtwork.animeThumbnail(record) };
+      openAnimeDetail({ ...record, cover, description: record.description || record.synopsis,
         site_url: record.site_url || record.url || `https://anilist.co/anime/${record.id}` }, { similarityHtml });
     }
   }
@@ -99,6 +102,7 @@
     if (!context.getMagnetRecord(key)) return;
     focusedMagnetKey = key;
     renderFocus();
+    if (!isReverse()) loadMovieDetails();
   }
   function renderFocus(result = detailResult()) {
     const focus = $('#dust-focus');
@@ -141,7 +145,11 @@
     const selectedIds = snapshot.selectedKeys.map(key => snapshot.lookup.get(key)?.record.id).filter(id => id != null).map(String);
     composition.update({ anime: records, selectedIds, countOnly: reverse,
       metric, movieRankLimit: reverse ? Math.max(2, snapshot.lookup.size) : null,
-      onSelect: id => select(AnivizDust.keyFor(AnivizDust.DIRECTIONS[snapshot.direction].dust, id)),
+      onSelect: id => {
+        const key = AnivizDust.keyFor(AnivizDust.DIRECTIONS[snapshot.direction].dust, id);
+        select(key);
+        inspectTitle(key);
+      },
       dustColor: id => dustColors.get(id), snapshot });
     const count = records.length, candidates = snapshot.candidateKeys.length;
     $('[data-dust-scope]').textContent = elements.filterSummary.textContent = `${count} / ${candidates} ${dustNoun()}`;
@@ -212,12 +220,15 @@
     $('[data-dust-ranking-head]').innerHTML = `<tr><th scope="col" aria-sort="${rankingOrder}">Rank</th><th scope="col">${title}</th>${magnets.map((magnet, i) => `<th scope="col">M${i + 1} · ${escapeHTML(mixed ? AnivizDust.magnetScoreLabel(magnet) : cohortLabels[i] || magnet.title)}</th>`).join('')}<th scope="col">${average}</th><th scope="col">${isReverse() ? 'Year' : 'Format / year'}</th><th scope="col">Displayed dust</th></tr>`;
     $('[data-dust-ranking-body]').innerHTML = rows.map(match => {
       const { record } = match;
+      const artwork = latest.lookup.get(match.key).record;
+      const cover = isReverse() ? AnivizArtwork.movieThumbnail(artwork) : AnivizArtwork.animeThumbnail(artwork);
+      const thumbnail = cover ? `<img src="${escapeAttribute(cover)}" alt="" loading="lazy">` : '';
       const year = record.year || 'Unknown';
       const format = isReverse() ? '' : escapeHTML(humanize(record.format)) + ' / ';
       const scores = match.scores.map((score, i) => mixed
         ? `<td title="${escapeAttribute(AnivizDust.mixedEvidence(match, magnets[i], i))}">${AnivizDust.formatRawScore(match.rawScores[i], magnets[i])}<br><small>Percentile ${AnivizDust.formatPercentile(score)}</small></td>`
         : `<td title="${escapeAttribute(cohortLabels[i] ? `${cohortLabels[i]}: ${score}` : `Cosine ${score}`)}">${score.toFixed(3)}</td>`);
-      return `<tr><td>${match.rank ?? 'Unavailable'}</td><td><button type="button" class="recommendation-title-button" data-dust-rank-id="${escapeAttribute(match.key)}" aria-haspopup="dialog" aria-controls="detail-drawer">${escapeHTML(record.title)}</button></td>${scores.join('')}<td title="${mixed ? average : 'Average cosine'} ${match.score ?? 'unavailable'}">${AnivizDust.formatPercentile(match.score)}</td><td>${format}${year}</td><td>${match.displayed ? 'Yes' : '—'}</td></tr>`;
+      return `<tr><td>${match.rank ?? 'Unavailable'}</td><td><button type="button" class="recommendation-title-button anime-cell" data-dust-rank-id="${escapeAttribute(match.key)}" aria-haspopup="dialog" aria-controls="detail-drawer">${thumbnail}${escapeHTML(record.title)}</button></td>${scores.join('')}<td title="${mixed ? average : 'Average cosine'} ${match.score ?? 'unavailable'}">${AnivizDust.formatPercentile(match.score)}</td><td>${format}${year}</td><td>${match.displayed ? 'Yes' : '—'}</td></tr>`;
     }).join('');
     const pages = [];
     for (let page = 0; page < total; page++) if (page === 0 || page === total - 1 || Math.abs(page - rankingPage) <= 1) pages.push(page);
@@ -250,6 +261,22 @@
     if (isReverse()) renderRecommendations();
     restoreScroll();
   }
+  function loadMovieDetails() {
+    movieDetailsRequest ??= AnivizData.movieDetails(recommendationState.data)
+      .then(details => {
+        context.setMovieDetails(details);
+        if (!isReverse() && focusedMagnetKey) renderFocus();
+        if (isReverse() && elements.drawer.classList.contains('open')) {
+          const drawer = elements.drawerContent.querySelector('.dust-movie-drawer');
+          const record = latest.lookup.get(inspectedMovieKey)?.record;
+          if (drawer && record) {
+            drawer.querySelector('.title-artwork')?.remove();
+            drawer.insertAdjacentHTML('afterbegin', AnivizArtwork.movieHero(record, escapeAttribute));
+          }
+        }
+      })
+      .catch(() => { movieDetailsRequest = null; });
+  }
   function bind() {
     let storage;
     try { storage = sessionStorage; } catch (_) { /* Context reports storage denial. */ }
@@ -276,8 +303,11 @@
       if (button && !button.disabled) { rankingPage = Number(button.dataset.dustPage); renderRanking(); }
     });
     $('[data-dust-ranking-body]').addEventListener('click', event => {
-      const button = event.target.closest('[data-dust-rank-id]');
-      if (button) inspectTitle(button.dataset.dustRankId);
+      const button = event.target.closest('tr')?.querySelector('[data-dust-rank-id]');
+      if (button) {
+        button.focus({ preventScroll: true });
+        inspectTitle(button.dataset.dustRankId);
+      }
     });
     $('#recommendation-detail').addEventListener('click', event => {
       const remove = event.target.closest('[data-dust-remove]');
@@ -339,7 +369,10 @@
       loadLayout();
       context.setSources(data, null, { seedExample: true });
       updateDirectionControls();
-      if (isReverse()) void loadPopularity();
+      if (isReverse()) {
+        void loadPopularity();
+        loadMovieDetails();
+      }
       restoreScroll();
     },
     setScores(scores) { context.setSources(recommendationState.data, scores); restoreScroll(); },
@@ -350,7 +383,10 @@
       closeDrawer();
       if (!pendingNotice.startsWith('Session storage')) notice('');
       context.setDirection(direction);
-      if (isReverse()) void loadPopularity();
+      if (isReverse()) {
+        void loadPopularity();
+        loadMovieDetails();
+      }
       renderRecommendations();
       scrollRestored = true;
       window.scrollTo(0, context.getLayout().scrollY || 0);
