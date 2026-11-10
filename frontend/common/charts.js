@@ -17,6 +17,11 @@
       studios: (anime, selected) => metricData("studios", () => transforms.studios(anime, selected)).slice(),
       timeline: (anime, selected) => metricData("years", () => transforms.timeline(anime, selected))
     };
+    const scoreMax = () => context.movieRankLimit ? 10 : 100;
+    const averageScore = item => Number.isFinite(item.averageScore)
+      ? `${item.averageScore.toFixed(1)} / ${scoreMax()}` : "N/A";
+    const popularityLabel = () => context.movieRankLimit ? "Total TMDB popularity score" : "Total popularity";
+
     function renderGenreChart() {
       clearChart(container);
 
@@ -36,7 +41,7 @@
 
           return d3.descending(a.count, b.count);
         })
-        .slice(0, context.countOnly ? Infinity : 12);
+        .slice(0, context.movieRankLimit ? Infinity : 12);
 
       if (!data.length) {
         renderEmpty(container, "No genre data match the current filters.");
@@ -119,13 +124,9 @@
           showTooltip(event, `
             <strong>${escapeHTML(item.genre)}</strong>
             <span>
-              Titles: ${item.count}${context.countOnly ? "" : `<br>
-              Average score:
-              ${Number.isFinite(item.averageScore)
-                ? item.averageScore.toFixed(1)
-                : "N/A"}<br>
-              Total popularity:
-              ${formatNumber(item.totalPopularity)}`}
+              Titles: ${item.count}<br>
+              Average score: ${averageScore(item)}<br>
+              ${popularityLabel()}: ${formatNumber(item.totalPopularity)}
             </span>
           `);
         })
@@ -169,7 +170,7 @@
 
       const width = Math.max(container.clientWidth, 480);
       const height = Math.max(container.clientHeight, 370);
-      const margin = { top: 24, right: context.countOnly ? 20 : 60, bottom: 52, left: 58 };
+      const margin = { top: 24, right: 60, bottom: 52, left: 58 };
 
       const svg = d3.select(container)
         .append("svg")
@@ -213,13 +214,9 @@
           showTooltip(event, `
             <strong>${item.year}</strong>
             <span>
-              Sampled titles: ${item.count}${context.countOnly ? "" : `<br>
-              Average score:
-              ${Number.isFinite(item.averageScore)
-                ? item.averageScore.toFixed(1)
-                : "N/A"}<br>
-              Total popularity:
-              ${formatNumber(item.totalPopularity)}`}
+              Titles: ${item.count}<br>
+              Average score: ${averageScore(item)}<br>
+              ${popularityLabel()}: ${formatNumber(item.totalPopularity)}
             </span>
           `);
         })
@@ -254,26 +251,18 @@
         .attr("y", 13)
         .text("Title count");
 
-      if (context.countOnly) return;
-
-      const scoreExtent = d3.extent(
-        data.filter((item) => Number.isFinite(item.averageScore)),
-        (item) => item.averageScore
-      );
+      const lineData = data.filter((item) => Number.isFinite(item.averageScore));
+      if (!lineData.length) return;
+      const scoreExtent = d3.extent(lineData, (item) => item.averageScore);
+      const scorePadding = scoreMax() * 0.05;
 
       const yScore = d3.scaleLinear()
-        .domain(
-          scoreExtent[0] === undefined
-            ? [0, 100]
-            : [
-              Math.max(0, scoreExtent[0] - 5),
-              Math.min(100, scoreExtent[1] + 5)
-            ]
-        )
+        .domain([
+          Math.max(0, scoreExtent[0] - scorePadding),
+          Math.min(scoreMax(), scoreExtent[1] + scorePadding)
+        ])
         .nice()
         .range([height - margin.bottom, margin.top]);
-
-      const lineData = data.filter((item) => Number.isFinite(item.averageScore));
 
       svg.append("path")
         .datum(lineData)
@@ -309,7 +298,7 @@
         .attr("y", 13)
         .attr("text-anchor", "end")
         .attr("fill", "#43d9e6")
-        .text("Average score");
+        .text(context.movieRankLimit ? "TMDB score / 10" : "Average score");
     }
 
     function renderStudioChart() {
@@ -691,17 +680,17 @@
     const renderers = { genres: renderGenreChart, years: renderTimeline, studios: renderStudioChart,
       heatmap: renderHeatmap, reception: renderScatterplot };
     if (!renderers[kind]) throw new Error(`Unknown chart: ${kind}`);
-    function keyboardMarks() {
+    function keyboardMarks(hasSelection) {
       const selectable = kind === "reception";
       d3.select(container).selectAll("rect, circle").filter(function () {
         return Boolean(d3.select(this).on("mouseenter"));
       }).attr("tabindex", 0).attr("role", selectable ? "button" : "img")
-        .attr("aria-pressed", item => selectable ? context.selectedIds.includes(String(item.id)) : null)
+        .attr("aria-pressed", item => selectable && hasSelection ? context.selectedIds.includes(String(item.id)) : null)
         .attr("aria-label", item => item.title && (context.movieRankLimit
           ? `${item.title}: TMDB score ${item.vote_average} / 10; TMDB popularity rank #${formatNumber(item.popularity_rank)}; genres ${item.genres.join(", ") || "Unknown"}`
           : `${item.title}: score ${item.average_score} / 100; popularity ${formatNumber(item.popularity)}; favourites ${Number.isFinite(item.favourites) ? formatNumber(item.favourites) : 'Unknown'}; genres ${item.genres.join(", ") || "Unknown"}`) || item.genre && item.studio && `${item.studio} × ${item.genre}: ${item.count}`
-          || item.genre && `${item.genre}: ${item.count} titles` || item.studio && `${item.studio}: total popularity ${formatNumber(item.totalPopularity)}; average score ${item.averageScore.toFixed(1)} / 100; ${item.count} matching titles`
-          || `${item.year}: ${item.count} titles`)
+          || item.studio && `${item.studio}: total popularity ${formatNumber(item.totalPopularity)}; average score ${item.averageScore.toFixed(1)} / 100; ${item.count} matching titles`
+          || `${item.genre ?? item.year}: ${item.count} titles; average score ${averageScore(item)}; ${popularityLabel()} ${formatNumber(item.totalPopularity)}`)
         .on("keydown", selectable ? function (event, item) {
           if (["Enter", " "].includes(event.key)) {
             event.preventDefault(); d3.select(this).on("click").call(this, event, item);
@@ -721,7 +710,7 @@
         dataIdentity = value.anime; selectionKey = nextSelection;
         context = { selectedIds: [], onSelect() {},
           dustColor: () => "#9d7bff", ...value };
-        renderers[kind](); keyboardMarks();
+        renderers[kind](); keyboardMarks(Boolean(value.selectedIds));
         if (focused) [...container.querySelectorAll('[tabindex="0"][aria-label]')].find(node => node.getAttribute('aria-label') === focused)?.focus({ preventScroll: true });
       },
       destroy() { container.replaceChildren(); context = null; }

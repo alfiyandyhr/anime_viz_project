@@ -461,12 +461,6 @@ body[data-chapter="recommendations"] .filterbar { display: none; }
 .dust-linked-chart svg { display: block; width: 100%; height: auto; }
 .dust-reception .dust-linked-chart { height: 473px; min-height: 473px; }
 #dust-mirror .dust-map { height: 100%; }
-.reception-dot, .studio-dot { outline: none; paint-order: stroke fill; }
-.reception-dot { cursor: pointer; }
-.reception-dot:not([fill="transparent"]):is(:hover, :focus-visible, [aria-pressed="true"]) { stroke: white; stroke-width: 2; }
-.studio-dot:is(:hover, :focus-visible) { fill-opacity: 1; }
-.reception-dot:focus-visible, .studio-dot:focus-visible { filter: drop-shadow(0 0 2px white); }
-.reception-selection-ring { fill: none; pointer-events: none; }
 #dust-analysis [data-dust-chart="heatmap"] { margin-top: 0; min-height: 480px; }
 [data-dust-chips] { display: flex; flex-wrap: wrap; gap: 8px; }
 [data-dust-ranking-pages] { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }

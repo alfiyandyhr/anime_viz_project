@@ -7,7 +7,11 @@ Object.assign(elements, {
   tableBody: document.querySelector("#anime-table-body"),
   tableNote: document.querySelector("#table-note"),
   filterGrid: document.querySelector("#filterbar .filter-grid"),
-  movieStatus: document.querySelector("#movie-catalogue-status")
+  movieStatus: document.querySelector("#movie-catalogue-status"),
+  catalogueAnalysis: document.querySelector("#catalogue-analysis"),
+  catalogueKpis: document.querySelector("#catalogue-kpis"),
+  insightCards: document.querySelector("#insight-cards"),
+  catalogueGenreMetric: document.querySelector("#catalogue-genre-metric")
 });
 
 const shortlist = new Set();
@@ -18,6 +22,88 @@ let movieCatalogue;
 let filteredMovies = [];
 let movieLoading = false;
 let catalogueButtons = [];
+let catalogueCharts;
+
+function renderCatalogueSummary(titles, movie) {
+  const scoreMax = movie ? 10 : 100;
+  const scored = titles.filter(title => Number.isFinite(title.average_score));
+  const withPopularity = titles.filter(title => Number.isFinite(title.popularity));
+  const genres = AnivizChartData.genres(titles);
+  const studios = movie ? [] : AnivizChartData.studios(titles);
+  const actors = new Map();
+  if (!movie) {
+    for (const title of titles) {
+      for (const actor of title.voice_actors || []) {
+        if (!actors.has(actor.id)) actors.set(actor.id, { name: actor.name, titles: new Set() });
+        actors.get(actor.id).titles.add(title.id);
+      }
+    }
+  }
+  const kpis = [
+    [movie ? "Visible movies" : "Visible anime", formatNumber(titles.length), "after current filters"],
+    ["Average score", d3.mean(scored, title => title.average_score)?.toFixed(1) ?? "N/A", `out of ${scoreMax}`],
+    ["Total popularity", withPopularity.length ? compactFormatter.format(d3.sum(withPopularity, title => title.popularity)) : "N/A",
+      movie ? "combined TMDB popularity scores" : "combined list users"],
+    ...(movie ? [["Genres represented", formatNumber(genres.length), "TMDB genres"]] : [
+      ["Studios represented", formatNumber(studios.length), "primary studios"],
+      ["Voice actors represented", formatNumber(actors.size), "Japanese main-role cast"]
+    ])
+  ];
+  elements.catalogueKpis.innerHTML = kpis.map(([label, value, detail]) => `
+    <article class="kpi-card">
+      <span>${escapeHTML(label)}</span><strong>${escapeHTML(value)}</strong><small>${escapeHTML(detail)}</small>
+    </article>`).join("");
+
+  if (!titles.length) {
+    elements.insightCards.innerHTML = '<article class="insight-card"><strong>No titles match the current filters.</strong></article>';
+    return;
+  }
+
+  const mostPopular = d3.greatest(withPopularity, title => title.popularity);
+  const highestRated = d3.greatest(scored, title => title.average_score);
+  const topGenre = d3.greatest(genres.filter(genre => genre.count >= 3 && genre.scoreCount), genre => genre.averageScore);
+  const topStudio = d3.greatest(studios.filter(studio => Number.isFinite(studio.totalPopularity)), studio => studio.totalPopularity);
+  const topActor = d3.greatest(actors.values(), actor => actor.titles.size);
+  const correlation = AnivizChartData.correlation(scored.filter(title => title.popularity > 0)
+    .map(title => [Math.log10(title.popularity), title.average_score]));
+  const facts = [
+    ["Most popular", mostPopular?.title ?? "N/A", mostPopular
+      ? `${formatNumber(mostPopular.popularity)} ${movie ? "TMDB popularity score" : "list users"}` : "No popularity data"],
+    ["Highest rated", highestRated?.title ?? "N/A", highestRated ? `${highestRated.average_score}/${scoreMax}` : "No scored titles"],
+    ["Top recurring genre", topGenre?.genre ?? "N/A", topGenre
+      ? `${topGenre.averageScore.toFixed(1)}/${scoreMax} across ${topGenre.scoreCount} scored titles` : "Requires a genre with at least three titles and score data"],
+    ...(movie ? [] : [
+      ["Largest studio reach", topStudio?.studio ?? "N/A", topStudio
+        ? `${compactFormatter.format(topStudio.totalPopularity)} combined popularity` : "No studio popularity data"],
+      ["Most represented actor", topActor?.name ?? "N/A", topActor ? `${topActor.titles.size} matching anime` : "No cast data"]
+    ]),
+    ["Score–popularity correlation", correlation === null ? "N/A" : `r = ${correlation.toFixed(2)}`,
+      movie ? "Pearson correlation using log TMDB popularity scores" : "Pearson correlation using log popularity"]
+  ];
+  elements.insightCards.innerHTML = facts.map(([label, value, detail]) => `
+    <article class="insight-card">
+      <span>${escapeHTML(label)}</span><strong>${escapeHTML(value)}</strong><p>${escapeHTML(detail)}</p>
+    </article>`).join("");
+}
+
+function renderCatalogueCharts(titles, movie) {
+  const byId = new Map(titles.map(title => [String(title.id), title]));
+  catalogueCharts.update({
+    anime: titles,
+    metric: elements.catalogueGenreMetric.value,
+    movieRankLimit: movie ? Math.max(2, movieCatalogue.titles.length) : null,
+    onSelect: id => movie ? openCatalogueMovie(byId.get(id)) : openAnimeDetail(byId.get(id))
+  });
+}
+
+function renderCatalogueAnalysis() {
+  const movie = catalogueView === "movie";
+  elements.catalogueAnalysis.hidden = movie && !movieCatalogue;
+  if (elements.catalogueAnalysis.hidden) return;
+  const titles = movie ? filteredMovies : state.filteredAnime;
+  renderCatalogueSummary(titles, movie);
+  renderCatalogueCharts(titles, movie);
+}
 
 function activeShortlist() {
   return catalogueView === "movie" ? movieShortlist : shortlist;
@@ -188,6 +274,7 @@ function switchCatalogue(view) {
   catalogueView = view;
   const movie = view === "movie";
   document.body.dataset.catalogueView = view;
+  elements.catalogueGenreMetric.querySelector('[value="popularity"]').textContent = movie ? "Popularity score" : "Popularity";
   catalogueButtons.forEach(button => {
     button.setAttribute("aria-pressed", String(button.dataset.catalogueTarget === view));
   });
@@ -216,6 +303,13 @@ registerPage({
   bindControls() {
     explorerTable = AnivizExplorer.create({ body: elements.tableBody, pagination: elements.tablePagination,
       note: elements.tableNote, d3, helpers: chartHelpers() });
+    catalogueCharts = AnivizComposition.create({ onError: error => console.error(error) });
+    document.querySelectorAll("[data-catalogue-chart]").forEach(container => {
+      catalogueCharts.mount(container, AnivizCharts.create(container.dataset.catalogueChart, { container, d3, helpers: chartHelpers() }), {
+        enabled: value => !value.movieRankLimit || !container.closest('[data-catalogue-only="anime"]')
+      });
+    });
+    elements.catalogueGenreMetric.addEventListener("change", renderCatalogueAnalysis);
     elements.tableBody.addEventListener("change", (event) => {
       const input = event.target.closest("[data-shortlist-id]");
       if (!input) return;
@@ -255,10 +349,11 @@ registerPage({
       applyCatalogueFilters();
     }
   },
-  destroy() { explorerTable.destroy(); },
+  destroy() { explorerTable.destroy(); catalogueCharts.destroy(); },
   render() {
     catalogueButtons.forEach(button => { button.disabled = false; });
     renderCatalogueTable();
     renderComparison();
+    renderCatalogueAnalysis();
   }
 });
