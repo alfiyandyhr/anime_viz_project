@@ -88,6 +88,7 @@ function renderAnimeTable() {
 function openCatalogueMovie(movie) {
   elements.drawerContent.innerHTML = `
     <div class="detail-main movie-detail">
+      ${AnivizArtwork.movieHero(movie, escapeAttribute)}
       <h2>${escapeHTML(movie.title)}</h2>
       <div class="genre-list">${movie.genres.map(genre => `<span class="tag">${escapeHTML(genre)}</span>`).join("")}</div>
       <div class="detail-stats">
@@ -146,10 +147,13 @@ async function loadMovieCatalogue() {
   try {
     const data = await AnivizData.recommendations();
     if (!Array.isArray(data?.movies) || !data.movies.length) throw new Error("Movie sample unavailable");
-    const snapshot = await AnivizData.moviePopularity(data).catch(() => null);
+    const [snapshot, artwork] = await Promise.all([
+      AnivizData.moviePopularity(data).catch(() => null),
+      AnivizData.movieDetails(data).catch(() => null)
+    ]);
     const titles = data.movies.map(movie => {
       const detail = snapshot?.movies[movie.id];
-      return { ...movie, ...detail, average_score: detail?.vote_average, studio_names: [] };
+      return { ...movie, ...artwork?.[movie.id], ...detail, average_score: detail?.vote_average, studio_names: [] };
     });
     const years = titles.map(movie => movie.year).filter(Number.isFinite);
     movieCatalogue = { titles, meta: {

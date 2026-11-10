@@ -40,6 +40,7 @@
   <script src="../common/explorer-table.js" defer></script>
   <script src="../common/chart-composition.js" defer></script>
   <script src="../common/dust-context.js" defer></script>
+  <script src="../common/title-artwork.js" defer></script>
   <script src="../common/dust-details.js" defer></script>
   <script src="../common/dust-connections.js" defer></script>
   <script src="../common/app.js" defer></script>
@@ -275,7 +276,7 @@
             <article><h3>High popularity</h3><p>One popularity magnet can use AniList list users for anime or the TMDB popularity metric for movies. The picker shows the snapshot date and sample coverage. With popularity active, each magnet’s raw scores become attraction percentiles from 0 to 1 over the same titles with known popularity. Ties share the average rank and a sample of one gets 0.5. Magnets contribute equally to the average attraction percentile. Dot count and filters leave the reference sample fixed. The full ranking retains titles with unavailable popularity and supports sorting by raw evidence.</p></article>
 
             <article><h3>Reading the magnets</h3><p>The field samples each magnet’s strongest matches, then fills remaining slots by average cosine or average attraction percentile. Distances express each dot’s preference order across magnets. Color identifies its highest-scoring magnet. If three magnets approach a straight line, some distances become approximate. Spread the magnets or reset positions to recover the full ordering. Hover or focus a dot to see its scores. Select up to three dots with a click, tap, Enter, or Space. Select again to remove a title, or click empty space to remove the latest selection.</p></article>
-            <article><h3>Reading the charts</h3><p>Charts use the displayed titles. The full ranking uses the entire dust catalogue. Genres can overlap. With anime dust, AniList popularity counts list users and reception marker size shows favourites. With movie dust, reception plots archived TMDB user scores and ranks computed by sorting the full sample by archived popularity. The Movie catalogue and High popularity magnet use the same snapshot.</p></article>
+            <article><h3>Reading the charts</h3><p>Charts use the displayed titles. The full ranking uses the entire dust catalogue. Genres can overlap. With anime dust, AniList popularity counts list users and reception marker size shows favourites. With movie dust, reception plots archived TMDB user scores and ranks computed by sorting the full sample by archived popularity. The Movie catalogue and High popularity magnet use the same snapshot. Movie posters and runtimes come from a separate TMDB details snapshot for those same titles.</p></article>
             <article><h3>A starting point</h3><p>These are text-based recommendations, not predictions of your enjoyment. Seasons, sequels, and the same animated film in both databases can appear separately. Genre labels are context, not an explanation of the model’s score.</p></article>
           </div>
         <div class="data-freshness"><span id="footer-generated">Data not loaded</span> · <span id="footer-cache"></span></div></details>

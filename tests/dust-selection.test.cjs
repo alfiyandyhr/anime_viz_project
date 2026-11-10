@@ -42,6 +42,7 @@ test('direct selection toggles, caps at three without replacement, and leaves an
 
 function renderDetails(context, data, externalId) {
   const sandbox = vm.createContext({AnivizChartData:ChartData});
+  vm.runInContext(readFileSync(require.resolve('../frontend/common/title-artwork.js'),'utf8'),sandbox);
   vm.runInContext(readFileSync(require.resolve('../frontend/common/dust-details.js'),'utf8'),sandbox);
   const escape = value => String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
   return sandbox.AnivizDustDetails.render({snapshot:context.snapshot(), externalId,
@@ -113,7 +114,7 @@ test('focus uses the latest selected anime with catalogue images, and falls back
   assert.equal(result.html,'');
 });
 
-test('archived movie ratings can arrive after selection and leave missing scores unknown', () => {
+test('movie artwork, runtime, and archived reception can arrive independently after selection', () => {
   const { context, data } = fixture();
   context.setDirection('anime-to-movies');
   context.setSelection(['tmdb:b', 'tmdb:a']);
@@ -128,9 +129,19 @@ test('archived movie ratings can arrive after selection and leave missing scores
     }
   }, 'ready');
 
-  const { html } = renderDetails(context, data);
+  context.setMovieDetails({
+    a: { poster_path: '/poster-a.jpg', backdrop_path: '/backdrop-a.jpg', runtime: 130 },
+    b: { poster_path: null, backdrop_path: null, runtime: null }
+  });
+
+  const { html, focusHtml } = renderDetails(context, data);
   assert.equal(context.snapshot().lookup.get('tmdb:a').record.popularity_rank, 1);
+  assert.match(focusHtml, /https:\/\/image\.tmdb\.org\/t\/p\/w185\/poster-a\.jpg/);
+  assert.match(html, /<th scope="row">Runtime<\/th><td>Unknown<\/td><td>.*130 min/);
   assert.match(html, /<th scope="row">TMDB score<\/th><td>Unknown<\/td><td>.*0 \/ 10/);
+  context.setMoviePopularity(null, 'unavailable');
+  assert.match(renderDetails(context, data).focusHtml, /poster-a\.jpg/);
+  assert.match(renderDetails(context, data).html, /130 min/);
   assert.deepEqual(context.snapshot().selectedKeys, before.selectedKeys);
   assert.deepEqual(context.snapshot().ranking, before.ranking);
 });

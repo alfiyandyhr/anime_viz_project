@@ -21,9 +21,12 @@ The compact dropdown contains exactly four destinations:
 
 Direction, the magnet picker, removable magnets, dot count, and **Reset positions** sit in the left panel.
 The right panel follows the latest selected title. Anime details include AniList
-images, synopsis, tags, and sampled Japanese cast. Movie details show the archived
-synopsis, genres, keywords, and a TMDB link. The movie comparison includes
-release years, genres, and archived TMDB scores out of 10.
+images, synopsis, tags, and sampled Japanese cast. Movie details show TMDB
+posters, the archived synopsis, genres, keywords, and a TMDB link. The movie
+comparison includes release years, genres, runtimes, and archived TMDB scores
+out of 10. Movie reception plots the archived user scores against popularity
+ranks across the movie sample. Posters and runtimes come from a separate TMDB
+details snapshot for the same movies.
 Open **Filter** for dust filters.
 Movie dust supports title and alias search,
 genre, and release year.

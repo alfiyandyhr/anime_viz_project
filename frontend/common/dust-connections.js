@@ -131,7 +131,7 @@
         const table = scroll.append('table').attr('aria-label', `Dust members for ${title}`)
           .style('--magnet-color', color(selectedMagnetKey));
         table.append('thead').append('tr').selectAll('th').data(['Rank', noun === 'movies' ? 'Movie' : 'Anime', mixed ? scoreLabel : cohortLabel || 'Similarity']).join('th')
-          .attr('scope', 'col').text(label => label);
+          .attr('scope', 'col').classed('dust-member-similarity', label => label === 'Similarity').text(label => label);
         const rows = table.append('tbody').selectAll('tr').data(members).join('tr')
           .classed('dust-member-selected', isSelected)
           .on('click', (event, match) => {

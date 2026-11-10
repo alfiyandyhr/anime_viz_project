@@ -3,6 +3,7 @@ const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const { movies } = require('../../data/movie_recommendations.json');
 const { popularity, vote_average: ratings } = require('../../data/movie_popularity.json');
+const { movies: details } = require('../../data/movie_details.json');
 const popularityOrder = movies.map(movie => movie.id)
   .filter(id => Number.isFinite(popularity[id]))
   .sort((a, b) => popularity[b] - popularity[a]);
@@ -72,11 +73,16 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
 
     await page.goto(url(''));
     await ready();
+    await ranking.first().locator('img').waitFor();
+    assert.match(await ranking.first().locator('img').getAttribute('src'), /^https:\/\/s4\.anilist\.co\//);
     assert.match(await page.locator('#movie-magnets').innerText(), /Inception.*Example/);
     const inception = await evidence();
     await field.locator('.magnet-core').first().click();
     assert.equal(await page.locator('#dust-focus h3').innerText(), 'Inception');
     assert.equal(await page.locator('#dust-focus').getAttribute('aria-label'), 'Movie in focus');
+    const magnetPoster = page.getByRole('img', { name: 'Poster for Inception' });
+    await magnetPoster.waitFor();
+    assert.equal(await magnetPoster.getAttribute('src'), `https://image.tmdb.org/t/p/w185${details['27205'].poster_path}`);
     assert.deepEqual(await evidence(), inception);
     const receptionChart = page.locator('[data-dust-chart="reception"]');
     await receptionChart.scrollIntoViewIfNeeded();
@@ -94,6 +100,15 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
     assert.equal(await page.locator('#tooltip .dust-tooltip-score b').textContent(), '0.549');
     await page.keyboard.press('Enter');
     assert.equal(await page.locator('#dust-focus h3').innerText(), 'Pacific Rim');
+    const focusPoster = page.getByRole('img', { name: 'Poster for Pacific Rim' });
+    await focusPoster.waitFor();
+    assert.equal(await focusPoster.getAttribute('src'), `https://image.tmdb.org/t/p/w185${details['68726'].poster_path}`);
+    assert.equal(await ranking.first().locator('img').getAttribute('src'), `https://image.tmdb.org/t/p/w92${details['68726'].poster_path}`);
+    const drawer = page.getByRole('dialog', { name: 'Movie details' });
+    const posterSrc = (id, size) => `https://image.tmdb.org/t/p/${size}${details[id].poster_path}`;
+    const assertDrawerPoster = async key => {
+      assert.equal(await drawer.locator('.detail-cover').getAttribute('src'), posterSrc(key.split(':')[1], 'w185'));
+    };
     assert.match(await page.locator('#dust-focus').innerText(), /Keywords/);
     const focusScore = page.locator('#dust-focus .dust-detail-scores strong');
     assert.equal(await focusScore.textContent(), '0.549');
@@ -119,10 +134,17 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
     await moviePoint.waitFor();
     const pacificRimRank = popularityOrder.indexOf('68726') + 1;
     assert.equal(await moviePoint.getAttribute('aria-label'), `Pacific Rim: TMDB score ${ratings['68726']} / 10; TMDB popularity rank #${pacificRimRank}; genres Action, Science Fiction, Adventure`);
+    assert.ok(await receptionChart.getByText('TMDB popularity rank', { exact: true }).isVisible());
+    await moviePoint.focus();
+    assert.ok((await page.locator('#tooltip').innerText()).includes(`TMDB popularity rank: #${pacificRimRank}`));
     assert.equal(await moviePoint.getAttribute('aria-pressed'), 'true');
     await moviePoint.press('Enter');
     assert.deepEqual((await evidence()).selectedKeys, []);
+    await assertDrawerPoster('tmdb:68726');
+    await page.keyboard.press('Escape');
     await moviePoint.press('Space');
+    await assertDrawerPoster('tmdb:68726');
+    await page.keyboard.press('Escape');
     assert.equal(await page.locator('#dust-focus h3').innerText(), 'Pacific Rim');
     assert.equal(await receptionChart.locator('.reception-selection-ring').count(), 1);
 
@@ -158,6 +180,9 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
     assert.match(await page.locator('[data-dust-notice]').innerText(), /Compare up to 3 movies/);
     assert.match(await page.locator('#recommendation-detail').innerText(), /Comparing 3 movies[\s\S]*Release year[\s\S]*Genres/i);
     const comparison = page.locator('.dust-comparison-table');
+    const runtimes = selected.map(key => details[key.split(':')[1]].runtime);
+    assert.deepEqual(await comparison.getByRole('row', { name: /^Runtime/ }).locator('meter').evaluateAll(meters => meters.map(meter => [meter.value, meter.max])),
+      runtimes.map(runtime => [runtime, Math.max(...runtimes)]));
     assert.deepEqual(await comparison.getByRole('row', { name: /^TMDB score/ }).locator('meter').evaluateAll(meters => meters.map(meter => [meter.value, meter.max])),
       selected.map(key => [ratings[key.split(':')[1]], 10]));
     const colors = () => field.locator('.dust-grain').evaluateAll(nodes => nodes.map(node => node.getAttribute('fill')));
@@ -171,7 +196,13 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
     const moved = await positions();
 
     await assertScope();
-    const drawer = page.getByRole('dialog', { name: 'Movie details' });
+    const fourthPoint = receptionChart.locator('.reception-dot[aria-pressed="false"]').first();
+    const fourthMovieId = await fourthPoint.evaluate(node => node.__data__.id);
+    await fourthPoint.press('Enter');
+    await assertDrawerPoster(`tmdb:${fourthMovieId}`);
+    assert.deepEqual((await evidence()).selectedKeys, selected);
+    assert.equal(await fourthPoint.getAttribute('aria-pressed'), 'false');
+    await page.keyboard.press('Escape');
     const assertDrawerScores = async key => {
       const expected = await page.evaluate(key =>
         AnivizMain.snapshot().ranking.find(row => row.key === key).scores.map(score => score.toFixed(3)), key);
@@ -184,12 +215,16 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
       const key = await entry.evaluate(node => node.__data__.key);
       await entry.click();
       await assertDrawerScores(key);
+      await assertDrawerPoster(key);
       await page.keyboard.press('Escape');
     }
     await page.selectOption('[data-dust-ranking-order]', 'descending');
     const outside = ranking.first();
     const outsideTitle = await outside.innerText();
     assert.equal(await outside.locator('../..').locator('td').last().innerText(), '—');
+    await outside.locator('../..').locator('td').last().click();
+    await assertDrawerPoster(await outside.getAttribute('data-dust-rank-id'));
+    await page.keyboard.press('Escape');
     await outside.press('Enter');
     assert.equal(await drawer.locator('h2').innerText(), outsideTitle);
     await assertDrawerScores(await outside.getAttribute('data-dust-rank-id'));
@@ -268,6 +303,15 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
     await page.goto(url('frontend/network/index.html?scope=dust'));
     await page.waitForFunction(() => state.networkScopeInfo?.total === 0);
     assert.equal(await page.inputValue('#network-scope'), 'dust');
+
+    await page.goto(url('frontend/explorer/index.html?mode=catalogue'));
+    await page.locator('[data-catalogue-target="movie"]').click();
+    const catalogueRow = page.locator('#movie-table-body tr').first();
+    await catalogueRow.waitFor();
+    const catalogueId = await catalogueRow.getAttribute('data-movie-id');
+    assert.equal(await catalogueRow.locator('img').getAttribute('src'), posterSrc(catalogueId, 'w92'));
+    await catalogueRow.press('Enter');
+    assert.equal(await page.locator('#detail-drawer .detail-cover').getAttribute('src'), posterSrc(catalogueId, 'w185'));
 
     const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true,
       hasTouch: true, deviceScaleFactor: 1, reducedMotion: 'reduce' });

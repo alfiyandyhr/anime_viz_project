@@ -21,6 +21,12 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     await scatter.evaluate(el => el.scrollIntoView({ block: 'center' }));
     const firstPoint = scatter.locator('.reception-dot').first();
     await firstPoint.waitFor();
+    const drawer = page.getByRole('dialog', { name: 'Anime details' });
+    const firstTitle = await firstPoint.evaluate(el => el.__data__.title);
+    const assertDrawerCover = async title => {
+      assert.equal(await drawer.locator('h2').innerText(), title);
+      assert.match(await drawer.locator('.detail-cover').getAttribute('src'), /^https:\/\//);
+    };
     const chartTop = () => scatter.evaluate(el => new Promise(resolve => {
       requestAnimationFrame(() => requestAnimationFrame(() => resolve(el.getBoundingClientRect().top)));
     }));
@@ -28,6 +34,8 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     for (const count of [1, 0]) {
       await firstPoint.click();
       assert.equal((await selection()).length, count);
+      await assertDrawerCover(firstTitle);
+      await drawer.locator('#close-drawer').click();
       assert.ok(Math.abs(await chartTop() - restingTop) < 2, 'point clicks keep the chart in place');
       assert.deepEqual(await firstPoint.evaluate(el => {
         const style = getComputedStyle(el);
@@ -102,13 +110,25 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     const point = target => scatter.locator('.reception-dot').nth(target.index);
     await point(targets[0]).hover();
     assert.ok((await page.locator('#tooltip').innerText()).includes(targets[0].genres));
-    for (const target of targets) await point(target).click();
+    for (const target of targets) {
+      const title = await point(target).evaluate(el => el.__data__.title);
+      await point(target).click();
+      await assertDrawerCover(title);
+      await page.keyboard.press('Escape');
+    }
     const selected = [firstId, ...targets.map(target => target.id)];
     assert.deepEqual(await selection(), selected);
     assert.match(await page.locator('#recommendation-detail').innerText(), /Comparing 3 anime/);
     const rings = scatter.locator('.reception-selection-ring');
     assert.equal(await rings.count(), 3);
     assert.equal(await rings.first().evaluate(el => getComputedStyle(el).strokeDasharray), '2px, 2px');
+    const fourthPoint = scatter.locator('.reception-dot[aria-pressed="false"]').first();
+    const fourthTitle = await fourthPoint.evaluate(el => el.__data__.title);
+    await fourthPoint.press('Enter');
+    await assertDrawerCover(fourthTitle);
+    await page.keyboard.press('Escape');
+    assert.equal(await fourthPoint.getAttribute('aria-pressed'), 'false');
+    assert.deepEqual(await selection(), selected);
     assert.equal(await mirror.locator('.dust-selected-link').count(), 9);
     const selectedGeometry = await geometry(field);
     assert.deepEqual(await geometry(mirror), selectedGeometry);
@@ -148,7 +168,9 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       assert.equal(await mirror.locator('.dust-selected-link').count(), count * 3);
     }
     await point(targets[0]).click();
+    await page.keyboard.press('Escape');
     await point(targets[1]).press('Enter');
+    await page.keyboard.press('Escape');
     assert.deepEqual(await selection(), selected);
     await scatter.click({ position: { x: 5, y: 5 } });
     assert.deepEqual(await selection(), selected);

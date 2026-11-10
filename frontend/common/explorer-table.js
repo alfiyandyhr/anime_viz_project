@@ -49,7 +49,7 @@
       body.innerHTML = displayed.map((title, index) => {
         const id = String(title.id);
         const selected = context.selectedIds.includes(id);
-        const cover = title.cover?.medium || title.cover?.large || "";
+        const cover = movie ? root.AnivizArtwork.movieThumbnail(title) : root.AnivizArtwork.animeThumbnail(title);
         const rank = movie ? title.popularity_rank ?? "N/A" : cohortRanks.get(id) ?? pageStart + index + 1;
         const rankLabel = movie ? "Popularity rank in the archived movie sample"
           : context.cohort ? "Original movie similarity rank" : "Position in the current sort order";
@@ -60,11 +60,11 @@
           <td title="${rankLabel}">${rank}</td>
           <td>
             <div class="anime-cell">
-              ${movie ? "" : `<img
+              ${cover ? `<img
                 src="${escapeAttribute(cover)}"
                 alt=""
                 loading="lazy"
-              >`}
+              >` : ""}
               <div>
                 <strong>${escapeHTML(title.title)}</strong>
                 ${context.compact ? "" : `<small>${escapeHTML(title.titles.romaji || "")}</small>`}
