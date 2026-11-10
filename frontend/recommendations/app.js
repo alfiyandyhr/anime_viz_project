@@ -47,36 +47,111 @@ function getRecommendationRanking(data, scores, movie) {
     .map((match, index) => ({ ...match, rank: index + 1 }));
 }
 
+function closeMovieSearch() {
+  document.querySelector("#movie-search-popup").hidden = true;
+}
+
+function bindMovieSearch() {
+  const picker = document.querySelector("#title-magnet-search");
+  const search = document.querySelector("#movie-search");
+  const popup = document.querySelector("#movie-search-popup");
+  const results = document.querySelector("#movie-search-results");
+  const sidebar = picker.closest(".recommendation-picker");
+  const header = document.querySelector(".site-header");
+  const viewport = window.visualViewport;
+
+  function positionPopup() {
+    if (popup.hidden) return;
+    const anchor = search.getBoundingClientRect();
+    const panel = sidebar.getBoundingClientRect();
+    const gap = 8;
+    const left = viewport?.offsetLeft ?? 0;
+    const top = Math.max(viewport?.offsetTop ?? 0, header.getBoundingClientRect().bottom);
+    const right = left + (viewport?.width ?? document.documentElement.clientWidth);
+    const bottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight);
+    if (anchor.bottom <= Math.max(top, panel.top) || anchor.top >= Math.min(bottom, panel.bottom)) {
+      closeMovieSearch();
+      return;
+    }
+    const below = bottom - anchor.bottom - 2 * gap;
+    const above = anchor.top - top - 2 * gap;
+    const opensAbove = below < 260 && above > below;
+    const width = Math.min(320, right - left - 2 * gap);
+    popup.classList.toggle("opens-above", opensAbove);
+    popup.style.width = `${width}px`;
+    popup.style.left = `${Math.max(left + gap, Math.min(anchor.left, right - width - gap))}px`;
+    popup.style.top = `${opensAbove ? anchor.top - gap : anchor.bottom + gap}px`;
+    popup.style.setProperty("--movie-search-space", `${Math.max(0, opensAbove ? above : below)}px`);
+  }
+
+  function openSearch() {
+    if (!recommendationState.data) return;
+    popup.hidden = false;
+    renderMovieSearchResults(search.value);
+    positionPopup();
+  }
+
+  function openIfClosed() {
+    if (popup.hidden) openSearch();
+  }
+
+  search.addEventListener("input", openSearch);
+  search.addEventListener("focus", openIfClosed);
+  search.addEventListener("click", openIfClosed);
+  picker.addEventListener("keydown", event => {
+    if (event.isComposing) return;
+    if (event.key === "ArrowDown" && event.target === search) openIfClosed();
+    if (popup.hidden) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      search.focus({ preventScroll: true });
+      closeMovieSearch();
+      return;
+    }
+    let next;
+    if (event.target === search) {
+      if (event.key === "Enter" && results.firstElementChild) {
+        event.preventDefault();
+        results.firstElementChild.click();
+        return;
+      }
+      if (event.key === "ArrowDown") next = results.firstElementChild;
+    } else if (event.target.matches("[data-magnet-key]")) {
+      if (event.key === "ArrowDown") next = event.target.nextElementSibling || event.target;
+      if (event.key === "ArrowUp") next = event.target.previousElementSibling || search;
+      if (event.key === "Home") next = results.firstElementChild;
+      if (event.key === "End") next = results.lastElementChild;
+    }
+    if (!next) return;
+    event.preventDefault();
+    next.focus({ preventScroll: true });
+    if (next !== search) next.scrollIntoView({ block: "nearest" });
+  });
+  results.addEventListener("click", event => {
+    const button = event.target.closest("[data-magnet-key]");
+    if (button) addMagnet(button.dataset.magnetKey, "title", document.querySelector("#movie-search-feedback"));
+  });
+  function dismissOutside(event) {
+    if (!picker.contains(event.target)) closeMovieSearch();
+  }
+  document.addEventListener("pointerdown", dismissOutside);
+  document.addEventListener("focusin", dismissOutside);
+  window.addEventListener("resize", positionPopup);
+  window.addEventListener("scroll", event => {
+    if (event.target !== results) positionPopup();
+  }, { capture: true, passive: true });
+  viewport?.addEventListener("resize", positionPopup);
+  viewport?.addEventListener("scroll", positionPopup);
+}
+
 function bindRecommendationControls() {
   bindDustControls();
-  const search = document.querySelector("#movie-search");
-  const results = document.querySelector("#movie-search-results");
-  search.addEventListener("input", renderMovieSearchResults);
-  search.addEventListener("keydown", event => {
-    const first = !results.hidden && results.querySelector("button");
-    if (first && ["ArrowDown", "Enter"].includes(event.key)) {
-      event.preventDefault();
-      if (event.key === "Enter") first.click();
-      else first.focus();
-    }
-    if (event.key === "Escape") results.hidden = true;
+  bindMovieSearch();
+  document.querySelector("#movie-suggestions").addEventListener("click", event => {
+    const button = event.target.closest("[data-magnet-key]");
+    if (button) addMagnet(button.dataset.magnetKey);
   });
-  results.addEventListener("keydown", event => {
-    if (event.key === "Escape") {
-      results.hidden = true;
-      search.focus();
-    }
-    if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
-    event.preventDefault();
-    const next = event.key === "ArrowDown" ? event.target.nextElementSibling : event.target.previousElementSibling;
-    (next || search).focus();
-  });
-  for (const selector of ["#movie-search-results", "#movie-suggestions"]) {
-    document.querySelector(selector).addEventListener("click", event => {
-      const button = event.target.closest("[data-magnet-key]");
-      if (button) addMagnet(button.dataset.magnetKey);
-    });
-  }
   document.querySelector("#magnet-type").addEventListener("change", updateMagnetPickerMode);
   const genreChoice = document.querySelector("#genre-magnet-choice");
   genreChoice.addEventListener("change", () => {
@@ -131,9 +206,8 @@ function updateMagnetPickerMode() {
   document.querySelector("#genre-magnet-picker").hidden = type !== "genre";
   document.querySelector("#title-magnet-search").hidden = type !== "title";
   document.querySelector("#movie-suggestions").hidden = type !== "title";
-  document.querySelector("#movie-search-results").hidden = true;
+  closeMovieSearch();
   document.querySelector("#recommendation-status").textContent = "";
-  if (type === "title") renderMovieSearchResults();
   if (type === "popularity" && AnivizMain.snapshot().popularity?.status === "idle") AnivizMain.loadPopularity();
   renderPopularityPicker();
 }
@@ -221,37 +295,33 @@ async function loadRecommendationScores() {
   }
 }
 
-function renderMovieSearchResults() {
-  if (!recommendationState.data) return;
+const titleBrowseOrder = new Intl.Collator("en", { numeric: true, sensitivity: "base", ignorePunctuation: true });
+
+function renderMovieSearchResults(query) {
   const { magnet, records, label } = pickerCatalogue();
-  const query = document.querySelector("#movie-search").value;
   const container = document.querySelector("#movie-search-results");
-  const status = document.querySelector("#recommendation-status");
-  if (!normalizeMovieSearch(query)) {
-    container.hidden = true;
-    status.textContent = "";
-    return;
-  }
-  const matches = searchRecommendationMovies(records, query);
-  container.hidden = false;
-  container.innerHTML = matches.slice(0, 30).map(record => {
+  const browsing = !normalizeMovieSearch(query);
+  const matches = browsing ? [...records].sort((a, b) => titleBrowseOrder.compare(a.title, b.title))
+    : searchRecommendationMovies(records, query);
+  const noun = label === "anime" ? "anime" : "movies";
+  document.querySelector("#movie-search-heading").textContent = browsing ? `All ${noun} · A–Z`
+    : matches.length ? "Search results" : `No ${noun} match`;
+  document.querySelector("#movie-search-count").textContent = matches.length
+    ? `${numberFormatter.format(matches.length)} ${matches.length === 1 ? "title" : "titles"}` : "";
+  document.querySelector("#movie-search-feedback").textContent = matches.length ? "" : "Try another title, alias, or year.";
+  container.innerHTML = matches.map(record => {
     const format = record.format;
     const hint = magnet === "tmdb" ? record.genres.join(" / ")
       : ["TV", "OVA", "ONA"].includes(format) ? format : humanize(format);
-    return `<button type="button" data-magnet-key="${escapeAttribute(AnivizDust.keyFor(magnet, record.id))}">
+    return `<button type="button" tabindex="-1" data-magnet-key="${escapeAttribute(AnivizDust.keyFor(magnet, record.id))}">
       <strong>${escapeHTML(record.title)}</strong><span>${record.year || "Year unknown"}${hint ? ` · ${escapeHTML(hint)}` : ""}</span>
     </button>`;
   }).join("");
-  if (!matches.length) container.hidden = true;
-  const noun = label === "anime" || matches.length === 1 ? label : "movies";
-  status.textContent = matches.length
-    ? `${matches.length} ${noun} found.${matches.length > 30 ? " Showing the first 30." : ""}`
-    : `No ${noun} match “${query}” in this sample.`;
+  container.scrollTop = 0;
 }
 
-function addMagnet(key, type = "title") {
+function addMagnet(key, type = "title", status = document.querySelector("#recommendation-status")) {
   const { magnetKeys, genreCohorts, popularity } = AnivizMain.snapshot();
-  const status = document.querySelector("#recommendation-status");
   const genre = type === "genre";
   if (genre && !genreCohorts.some(cohort => cohort.key === key)) {
     status.textContent = "That genre cohort is unavailable in this sample.";
@@ -269,8 +339,8 @@ function addMagnet(key, type = "title") {
   AnivizMain.setMagnets([...magnetKeys, key]);
   document.querySelector("#movie-search").value = "";
   focusMagnetPicker();
-  document.querySelector("#movie-search-results").hidden = true;
-  status.textContent = "";
+  closeMovieSearch();
+  document.querySelector("#recommendation-status").textContent = "";
 }
 
 function renderRecommendations() {

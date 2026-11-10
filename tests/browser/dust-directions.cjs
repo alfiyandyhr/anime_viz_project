@@ -1,7 +1,7 @@
 // Optional real-browser verification. See tests/journey-verification.md for setup.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
-const { movies } = require('../../data/movie_recommendations.json');
+const { movies, anime } = require('../../data/movie_recommendations.json');
 const { popularity, vote_average: ratings } = require('../../data/movie_popularity.json');
 const { movies: details } = require('../../data/movie_details.json');
 const popularityOrder = movies.map(movie => movie.id)
@@ -10,6 +10,54 @@ const popularityOrder = movies.map(movie => movie.id)
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 const url = path => new URL(path, base).href;
 const forward = 'movie-to-anime', reverse = 'anime-to-movies';
+
+async function assertTitleBrowse(page, noun, records, namespace, touch = false) {
+  const search = page.locator('#movie-search');
+  const popup = page.locator('#movie-search-popup');
+  const results = popup.locator('#movie-search-results');
+  const rows = results.locator('button');
+  const sidebar = page.locator('.recommendation-picker');
+  const filter = page.locator('[data-field-options]');
+  await filter.evaluate(node => { node.open = true; });
+  await search.scrollIntoViewIfNeeded();
+  const geometry = () => sidebar.evaluate(node => ({
+    height: node.offsetHeight, scrollHeight: node.scrollHeight,
+    filterTop: node.querySelector('[data-field-options]').offsetTop
+  }));
+  const before = await geometry();
+  if (touch) await search.tap();
+  else await search.click();
+  assert.equal(await rows.count(), records.length);
+  assert.match(await popup.innerText(), new RegExp(`All ${noun} · A–Z`));
+  assert.deepEqual(await geometry(), before);
+  assert.ok(await results.evaluate(node => node.scrollHeight > node.clientHeight));
+  assert.ok(await popup.evaluate(node => {
+    const rect = node.getBoundingClientRect();
+    return rect.top >= 0 && rect.bottom <= innerHeight && rect.right <= innerWidth
+      && node.contains(document.elementFromPoint(rect.left + 16, rect.bottom - 8));
+  }));
+  if (!touch) {
+    await search.fill('a');
+    assert.ok(await rows.count() > 30 && await rows.count() < records.length);
+    assert.deepEqual(await geometry(), before);
+    await search.fill('');
+    assert.equal(await rows.count(), records.length);
+    await search.press('ArrowDown');
+    await page.keyboard.press('End');
+    assert.equal(await rows.last().evaluate(node => node === document.activeElement), true);
+    assert.ok(await results.evaluate(node => node.scrollTop > 0));
+    assert.ok((await rows.last().getAttribute('data-magnet-key')).startsWith(`${namespace}:`));
+    await page.keyboard.press('Escape');
+    assert.equal(await search.evaluate(node => node === document.activeElement), true);
+    assert.equal(await popup.isVisible(), false);
+    await search.click();
+    await search.press('Tab');
+  } else {
+    await page.getByText('Direction', { exact: true }).tap();
+  }
+  assert.equal(await popup.isVisible(), false);
+  await filter.evaluate(node => { node.open = false; });
+}
 
 (async () => {
   const browser = await chromium.launch({ headless: true,
@@ -77,6 +125,7 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
     assert.match(await ranking.first().locator('img').getAttribute('src'), /^https:\/\/s4\.anilist\.co\//);
     assert.match(await page.locator('#movie-magnets').innerText(), /Inception.*Example/);
     const inception = await evidence();
+    await assertTitleBrowse(page, 'movies', movies, 'tmdb');
     await field.locator('.magnet-core').first().click();
     assert.equal(await page.locator('#dust-focus h3').innerText(), 'Inception');
     assert.equal(await page.locator('#dust-focus').getAttribute('aria-label'), 'Movie in focus');
@@ -148,18 +197,22 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
     assert.equal(await page.locator('#dust-focus h3').innerText(), 'Pacific Rim');
     assert.equal(await receptionChart.locator('.reception-selection-ring').count(), 1);
 
+    await assertTitleBrowse(page, 'anime', anime, 'anilist');
     await page.locator('#movie-search').fill('進撃の巨人 2013');
     await page.locator('#movie-search').press('ArrowDown');
     assert.match(await page.locator('#movie-search-results button:focus').innerText(), /Attack on Titan[\s\S]*2013 · TV/);
     await page.keyboard.press('Enter');
-    assert.match(await page.locator('#recommendation-status').innerText(), /already a magnet/);
+    assert.match(await page.locator('#movie-search-feedback').innerText(), /already a magnet/);
     await page.locator('#movie-search').fill('No matching show 1973');
-    assert.match(await page.locator('#recommendation-status').innerText(), /No anime match/);
-    for (const title of ['Steins;Gate', 'Death Note', 'Neon Genesis Evangelion']) {
+    assert.match(await page.locator('#movie-search-heading').innerText(), /No anime match/);
+    await page.locator('#movie-search').fill('Steins;Gate');
+    await page.locator('#movie-search-results button').first().click();
+    assert.equal(await page.locator('#movie-search-popup').isVisible(), false);
+    for (const title of ['Death Note', 'Neon Genesis Evangelion']) {
       await page.locator('#movie-search').fill(title);
       await page.locator('#movie-search').press('Enter');
     }
-    assert.match(await page.locator('#recommendation-status').innerText(), /Three magnets/);
+    assert.match(await page.locator('#movie-search-feedback').innerText(), /Three magnets/);
     assert.equal((await evidence()).magnetKeys.length, 3);
     assert.equal(await field.locator('.dust-magnet').count(), 3);
 
@@ -321,6 +374,7 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
     await mobile.selectOption('#dust-direction', reverse);
     const mobileDot = mobile.locator('#recommendation-chart .dust-node');
     await mobileDot.first().waitFor();
+    await assertTitleBrowse(mobile, 'anime', anime, 'anilist', true);
     await mobile.locator('#recommendation-chart .magnet-core').first().tap();
     assert.equal(await mobile.locator('#dust-focus h3').innerText(), 'Attack on Titan');
     await mobileDot.nth(0).tap();

@@ -91,10 +91,18 @@
           <div class="recommendation-controls" id="title-magnet-search">
             <label class="movie-search-label" for="movie-search">
               <span id="movie-search-label">Add a movie magnet · up to 3</span>
-              <input id="movie-search" type="search" placeholder="Add movie magnet… (up to 3)" autocomplete="off" aria-controls="movie-search-results" disabled>
+              <input id="movie-search" type="search" placeholder="Search movie titles or aliases" autocomplete="off" aria-controls="movie-search-results" aria-describedby="movie-search-help" disabled>
             </label>
+            <span id="movie-search-help" class="sr-only">Browse all titles or type to filter. Press Down Arrow to move into the results.</span>
+            <div id="movie-search-popup" class="movie-search-popup" role="region" aria-label="Title picker" hidden>
+              <div class="movie-search-heading" role="status">
+                <strong id="movie-search-heading"></strong>
+                <span id="movie-search-count"></span>
+              </div>
+              <p id="movie-search-feedback" role="status"></p>
+              <div id="movie-search-results" class="movie-search-results" tabindex="-1"></div>
+            </div>
           </div>
-          <div id="movie-search-results" class="movie-search-results" aria-label="Title search results" hidden></div>
           <div id="movie-suggestions" class="movie-suggestions" aria-label="Suggested magnets"></div>
           <div id="genre-magnet-picker" hidden>
             <label class="dust-direction-label" for="genre-magnet-choice">
