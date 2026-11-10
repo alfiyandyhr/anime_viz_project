@@ -12,11 +12,32 @@
   width: 100%; min-height: 46px; padding: 10px 13px;
   border: 1px solid var(--border-strong); border-radius: 10px; color: var(--text); background: var(--bg-soft);
 }
-.movie-search-results { margin-top: 16px; max-height: 300px; overflow-y: auto; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--bg-soft); }
-.movie-search-results button { display: flex; flex-direction: column; width: 100%; text-align: left; padding: 12px 16px; border: 0; border-bottom: 1px solid var(--border); color: var(--text); background: transparent; }
+#movie-search:focus { border-color: var(--cyan); }
+.movie-search-popup {
+  position: fixed; z-index: 50; display: flex; flex-direction: column;
+  max-height: min(340px, var(--movie-search-space)); overflow: hidden;
+  border: 1px solid var(--border-strong); border-radius: 10px;
+  background: var(--bg-soft); box-shadow: 0 12px 32px rgba(0, 0, 0, .55);
+}
+.movie-search-popup.opens-above { transform: translateY(-100%); }
+.movie-search-heading {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px;
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+  background: var(--surface-solid); font-size: .8rem;
+}
+#movie-search-count { color: var(--text-soft); font-size: .72rem; }
+#movie-search-feedback { margin: 0; padding: 8px 12px; color: var(--text-soft); font-size: .78rem; }
+#movie-search-feedback:empty { display: none; }
+.movie-search-results { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; color-scheme: dark; }
+.movie-search-results button {
+  display: grid; gap: 2px; width: 100%; min-height: 44px; padding: 8px 12px;
+  border: 0; border-bottom: 1px solid var(--border); color: var(--text); background: transparent;
+  font-size: .82rem; line-height: 1.35; text-align: left; overflow-wrap: anywhere;
+}
+.movie-search-results button:last-child { border-bottom: 0; }
 .movie-search-results button:hover, .movie-search-results button:focus-visible { background: var(--surface-light); }
-.movie-search-results button span { color: var(--text-soft); font-size: .76rem; }
-.movie-search-results p { margin: 16px; color: var(--text-soft); }
+.movie-search-results button:focus-visible { outline-offset: -2px; }
+.movie-search-results button span { color: var(--text-soft); font-size: .72rem; }
 .movie-suggestions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 17px; }
 .movie-suggestions > span { margin-right: 4px; font-size: .73rem; color: var(--text-muted); }
 .movie-suggestions button, .recommendation-chart-tabs button {
@@ -601,8 +622,6 @@ body[data-chapter="dust-magnet"] .movie-magnet-chip > span:nth-child(2) { flex: 
 body[data-chapter="dust-magnet"] .magnet-empty-slot { font-size: .7rem; }
 body[data-chapter="dust-magnet"] #recommendation-status { margin: 0; font-size: .72rem; }
 body[data-chapter="dust-magnet"] #recommendation-status:empty { display: none; }
-body[data-chapter="dust-magnet"] .movie-search-results { position: static; width: 100%; max-height: 320px; overflow-y: auto; margin: 0; }
-body[data-chapter="dust-magnet"] .movie-search-results button { padding: 8px; }
 .field-options { font-size: .76rem; }
 #dust-limit-control { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 #dust-limit-control > span { margin: 0; }
@@ -645,6 +664,7 @@ body[data-chapter="dust-magnet"] .dust-selection { margin: 0; padding-top: 4px; 
 @media (max-width: 760px) {
   .dust-playground { grid-template-columns: minmax(0, 1fr); --field-height: max(400px, calc(100svh - 160px)); }
   body[data-chapter="dust-magnet"] .recommendation-picker, body[data-chapter="dust-magnet"] .dust-focus { max-height: none; overflow: visible; }
+  #movie-search { font-size: 1rem; }
   body[data-chapter="dust-magnet"] .movie-magnets { flex-direction: row; flex-wrap: wrap; }
   .field-options-panel .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .field-options-panel .filter-grid > label:first-child { grid-column: 1 / -1; }
