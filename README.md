@@ -14,7 +14,7 @@ The compact dropdown contains exactly four destinations:
 
 | View | Data and interactions |
 | --- | --- |
-| Dust & Magnet | Choose either direction and a field of 30, 60, or 90 dots. Both directions include similarity connections, a field mirror, genres, release years, and a full ranking. Anime dust also shows reception and studio charts. |
+| Dust & Magnet | Choose either direction and a field of 30, 60, or 90 dots. Both directions include similarity connections, a field mirror, reception, genres, release years, and a full ranking. Select a dust dot or a title magnet to see it in the In Focus panel. Anime dust also shows studio charts. |
 | History | Six eras, annual Top 10 posters, sticky timeline and period rankings from an independent historical dataset. Popularity is current AniList list popularity, not historical audience figures. |
 | Network | Actor/character/work collaboration graph, defaulting to Current dust when a saved anime-dust context exists, otherwise Catalogue. A local selector switches scopes without changing other views. The 35-work display cap and sampled Japanese cast credits are disclosed. |
 | Full Catalogue | The loaded 1,000-title metadata sample, with its own search, filters, sorting, pagination, details and automatic shortlist comparison. Saved movies never narrow its scope. |

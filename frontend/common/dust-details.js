@@ -23,7 +23,7 @@
 
   function renderMovie({ record, match, magnets, color, helpers, heading = 'h3' }) {
     const { escapeHTML: escape, escapeAttribute: attr } = helpers;
-    return `<${heading}>${escape(record.title)}</${heading}>
+    return `<${heading}${heading === 'h3' ? ' aria-live="polite"' : ''}>${escape(record.title)}</${heading}>
       <p class="recommendation-detail-meta">${record.year || 'Year unknown'}</p>
       ${magnetScores(match, magnets, color, helpers, { exactEvidence: false })}
       <div class="genre-list">${(record.genres || []).map(genre => `<span class="tag">${escape(genre)}</span>`).join('')}</div>
@@ -52,7 +52,7 @@
     }).join('')}<small>${mixed ? `Right column: attraction percentile (0–1)<br>${root.AnivizDust.averageLabel(true)}: ${root.AnivizDust.formatPercentile(match.score)}` : 'Cosine similarity · higher means closer'}</small></div>`;
   }
 
-  function render({ snapshot, color, helpers }) {
+  function render({ snapshot, focusedMagnet, color, helpers }) {
     const { escapeHTML: escape, escapeAttribute: attr, humanize, formatNumber } = helpers;
     const { magnets, mixed } = snapshot;
     const reverse = snapshot.direction === 'anime-to-movies';
@@ -108,14 +108,15 @@
         <tbody>${rows.map(([label, cell], index) => `<tr${index >= metadataRows.length && index < metadataRows.length + magnets.length ? ` style="--magnet-color:${color(magnets[index - metadataRows.length].key)}" class="dust-movie-metric"` : ''}><th scope="row">${escape(label)}</th>${values.map((value, i) => `<td>${cell(value, i)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
         <p class="table-note">${reverse ? '' : 'Estimated runtime multiplies episodes by minutes per episode. '}${mixed ? 'Meters show attraction percentiles from 0 to 1.' : 'Cosine scores range from −1 to 1.'}</p>`;
     }
-    const focused = selected.at(-1);
-    const record = focused && recordFor(focused);
+    const focused = focusedMagnet ? null : selected.at(-1);
+    const record = focusedMagnet || (focused && recordFor(focused));
+    const movie = focusedMagnet ? !reverse : reverse;
     const cover = record?.cover?.extra_large || record?.cover?.large || '';
     const banner = record?.banner_image || cover;
     const tags = record?.tags || [];
-    const focusLabel = reverse ? 'Movie in focus' : 'Anime in focus';
-    const placeholder = `<div class="dust-detail-placeholder"><p class="chart-kicker">${focusLabel}</p><h3>Every dot has a story.</h3><p>Select a dot to explore its storyline, genres, and similarity to your magnets.</p></div>`;
-    const animeHtml = !reverse && record ? `<p class="chart-kicker">${focusLabel}</p>
+    const focusLabel = movie ? 'Movie in focus' : 'Anime in focus';
+    const placeholder = `<div class="dust-detail-placeholder"><p class="chart-kicker">${focusLabel}</p><h3>Every dot has a story.</h3><p>Select a dot or a title magnet to explore its storyline and genres.</p></div>`;
+    const animeHtml = !movie && record ? `<p class="chart-kicker">${focusLabel}</p>
       ${detailHero(banner, cover, `Cover for ${record.title}`, attr)}
       <h3 aria-live="polite">${escape(record.title)}</h3>
       <p class="recommendation-detail-meta">${escape(humanize(record.format || 'Unknown'))} · ${record.year || 'Year unknown'}</p>
@@ -127,11 +128,12 @@
       <div class="recommendation-context"><h4>Japanese sampled voice credits</h4><ul>${(record.voice_actors || []).map(actor => `<li>${escape(actor.name)}${actor.characters?.length ? ` — ${escape(actor.characters.join(', '))}` : ''}</li>`).join('') || '<li>Cast metadata unavailable.</li>'}</ul></div>
       <a class="button button-secondary" href="${attr(record.url || record.site_url || `https://anilist.co/anime/${record.id}`)}" target="_blank" rel="noopener noreferrer">Explore on AniList ↗</a>`
       : '';
-    const movieHtml = reverse && record ? `<p class="chart-kicker">${focusLabel}</p>
+    const movieHtml = movie && record ? `<p class="chart-kicker">${focusLabel}</p>
       ${detailHero(tmdbImage(record.backdrop_path, 'w780'), tmdbImage(record.poster_path, 'w185'), `Poster for ${record.title}`, attr)}
       ${renderMovie({ record, match: focused, magnets, color, helpers })}` : '';
     return {
       count: selected.length,
+      focusLabel,
       focusHtml: movieHtml || animeHtml || placeholder,
       html: selected.length ? `<section aria-label="Selected dust ${noun}"><div class="dust-details-heading"><h3>${selected.length > 1 ? `Comparing ${selected.length} ${noun}` : escape(recordFor(selected[0]).title)}</h3><button type="button" class="small-button ghost" data-dust-clear>Clear selection</button></div>${table(selected)}</section>` : ''
     };

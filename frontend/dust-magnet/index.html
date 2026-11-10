@@ -222,7 +222,7 @@
         </div>
 
         <aside id="dust-focus" class="recommendation-detail dust-focus" aria-label="Anime in focus">
-          <div class="dust-detail-placeholder"><p class="chart-kicker">Anime in focus</p><h3>Every dot has a story.</h3><p>Select a dot to explore its storyline, genres, tags, and similarity to your magnets.</p></div>
+          <div class="dust-detail-placeholder"><p class="chart-kicker">Anime in focus</p><h3>Every dot has a story.</h3><p>Select a dot or a title magnet to explore its storyline and genres.</p></div>
         </aside>
         </div>
         <div id="dust-selection" class="dust-selection" role="status" aria-live="polite" hidden></div>
@@ -237,10 +237,10 @@
             <p data-coverage="connections"></p><div class="dust-linked-chart" role="region" aria-label="Similarity connections" data-dust-chart="connections"></div></article>
           <div class="dust-analysis-wide dust-reception">
             <article class="chart-card" id="reception"><h3>Score vs. popularity</h3>
-              <p data-coverage="reception"></p><div class="dust-linked-chart" data-dust-chart="reception" data-anime-chart></div></article>
+              <p data-coverage="reception"></p><div class="dust-linked-chart" data-dust-chart="reception"></div></article>
             <article class="chart-card" aria-labelledby="dust-mirror-title">
               <h3 id="dust-mirror-title">Dust &amp; Magnet mirror</h3>
-              <p>Drag magnets or use arrow keys on a focused magnet. Select dots to compare titles, or click empty space to remove the latest selection.</p>
+              <p>Select a title magnet to show it in the In Focus panel. Drag magnets or use arrow keys to move them. Select dots to compare titles, or click empty space to remove the latest selection.</p>
               <div class="dust-linked-chart" id="dust-mirror"></div>
             </article>
           </div>
@@ -275,7 +275,7 @@
             <article><h3>High popularity</h3><p>One popularity magnet can use AniList list users for anime or the TMDB popularity metric for movies. The picker shows the snapshot date and sample coverage. With popularity active, each magnet’s raw scores become attraction percentiles from 0 to 1 over the same titles with known popularity. Ties share the average rank and a sample of one gets 0.5. Magnets contribute equally to the average attraction percentile. Dot count and filters leave the reference sample fixed. The full ranking retains titles with unavailable popularity and supports sorting by raw evidence.</p></article>
 
             <article><h3>Reading the magnets</h3><p>The field samples each magnet’s strongest matches, then fills remaining slots by average cosine or average attraction percentile. Distances express each dot’s preference order across magnets. Color identifies its highest-scoring magnet. If three magnets approach a straight line, some distances become approximate. Spread the magnets or reset positions to recover the full ordering. Hover or focus a dot to see its scores. Select up to three dots with a click, tap, Enter, or Space. Select again to remove a title, or click empty space to remove the latest selection.</p></article>
-            <article><h3>Reading the charts</h3><p>Charts use the displayed titles. The full ranking uses the entire dust catalogue. Genres can overlap. With anime dust, AniList popularity counts list users and reception marker size shows favourites. With movie dust, the TMDB sample supplies genres and release years for analysis.</p></article>
+            <article><h3>Reading the charts</h3><p>Charts use the displayed titles. The full ranking uses the entire dust catalogue. Genres can overlap. With anime dust, AniList popularity counts list users and reception marker size shows favourites. With movie dust, reception plots TMDB user scores and popularity ranks within the published movie sample. The High popularity magnet uses a separate archived TMDB snapshot.</p></article>
             <article><h3>A starting point</h3><p>These are text-based recommendations, not predictions of your enjoyment. Seasons, sequels, and the same animated film in both databases can appear separately. Genre labels are context, not an explanation of the model’s score.</p></article>
           </div>
         <div class="data-freshness"><span id="footer-generated">Data not loaded</span> · <span id="footer-cache"></span></div></details>

@@ -52,9 +52,10 @@ Missing values are excluded only from the relevant metric.
 
 `AnivizCharts.create(kind, {container, d3, helpers})` creates an instance for
 `genres`, `years`, `studios`, `heatmap` or `reception`. Call
-`update({anime, selectedIds, dustColor, metric, onSelect,
+`update({anime, selectedIds, dustColor, metric, movieRankLimit, onSelect,
 onCorrelation})`; `destroy()` removes its content. In the reception chart,
-`onSelect` returns a string anime ID. The renderer never reads a page's body, global state, or filter
+`onSelect` returns a string title ID. Pass the movie sample size as
+`movieRankLimit` to plot TMDB scores and ranks for movie records. The renderer never reads a page's body, global state, or filter
 controls. `chartHelpers()` supplies shared formatting, empty states and tooltips.
 
 `AnivizExplorer.create({body, pagination, note, d3, helpers})` owns an independent
@@ -70,11 +71,13 @@ for deferred charts, clears obsolete marks, and pauses inactive renderers.
 extents prevent deferred rendering from displacing restored scroll positions.
 
 `dust-main.js` connects the active context to the field, connections, charts,
-ranking, and details. Movie dust uses count-only genre and release-year charts.
+ranking, and details. Movie dust uses count-only genre and release-year charts
+alongside a reception chart colored by each movie's closest magnet.
 The shared chart composition clears inactive marks when the direction changes.
 The `#reception`, `#content`, and `#creators` anchors work with either catalogue.
 
-`dust-details.js` renders the latest selection and a comparison below the field.
+`dust-details.js` shows the active title magnet or latest selected dust in the
+In Focus panel. The comparison below the field uses the selected dust.
 Anime comparison shares Explorer’s metadata transforms. Movie comparison shows
 posters, year, genres, runtime, and TMDB user scores. Movie in focus also
 shows the TMDB poster and backdrop when available. Cosine meters span −1 to 1, with exact values available on

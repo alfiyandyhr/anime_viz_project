@@ -27,7 +27,7 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
     const positions = () => page.evaluate(() => dustChart.anchors.map(anchor =>
       [(anchor.x / dustChart.width).toFixed(6), (anchor.y / dustChart.height).toFixed(6)]));
     const assertScope = async () => {
-      for (const kind of ['connections', 'genres', 'years']) {
+      for (const kind of ['connections', 'reception', 'genres', 'years']) {
         const chart = page.locator(`[data-dust-chart="${kind}"]`);
         await chart.scrollIntoViewIfNeeded();
         await chart.locator('svg').first().waitFor();
@@ -38,11 +38,24 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
         const sort = keys => [...keys].sort();
         const sameKeys = keys => JSON.stringify(sort(keys)) === JSON.stringify(sort(snapshot.displayedKeys));
         const keysAt = selector => [...document.querySelectorAll(selector)].map(node => node.__data__.key);
+        const scored = displayed.filter(({ key }) => AnivizChartData.hasMovieReception(snapshot.lookup.get(key).record));
+        const points = [...document.querySelectorAll('.reception-dot')];
+        const plotted = points.map(node => `tmdb:${node.__data__.id}`);
         return sameKeys(keysAt('#recommendation-chart .dust-node'))
           && sameKeys(keysAt('#dust-mirror .dust-node'))
           && sameKeys(keysAt('.dust-connection-row'))
           && sameKeys(snapshot.ranking.filter(row => row.displayed).map(row => row.key))
           && snapshot.ranking.length === 1000
+          && JSON.stringify(sort(plotted)) === JSON.stringify(sort(scored.map(row => row.key)))
+          && points.every((node, index) => {
+            const key = plotted[index], { vote_average, popularity_rank } = snapshot.lookup.get(key).record;
+            const { closest } = scored.find(row => row.key === key);
+            const { width, height } = node.ownerSVGElement.viewBox.baseVal;
+            return node.getAttribute('r') === '5'
+              && node.getAttribute('fill') === AnivizMain.color(snapshot.activeMagnetKeys[closest])
+              && Math.abs(+node.getAttribute('cx') - (62 + (1000 - popularity_rank) / 999 * (width - 90))) < .001
+              && Math.abs(+node.getAttribute('cy') - (height - 58 - vote_average / 10 * (height - 86))) < .001;
+          })
           && ['genres', 'years'].every(kind => [...document.querySelectorAll(`[data-dust-chart="${kind}"] [role="img"]`)]
             .every(node => {
               const mark = node.__data__;
@@ -57,6 +70,11 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
     await ready();
     assert.match(await page.locator('#movie-magnets').innerText(), /Inception.*Example/);
     const inception = await evidence();
+    await field.locator('.magnet-core').first().click();
+    assert.equal(await page.locator('#dust-focus h3').innerText(), 'Inception');
+    assert.equal(await page.locator('#dust-focus').getAttribute('aria-label'), 'Movie in focus');
+    await page.getByRole('img', { name: 'Poster for Inception' }).waitFor();
+    assert.deepEqual(await evidence(), inception);
     const receptionChart = page.locator('[data-dust-chart="reception"]');
     await receptionChart.scrollIntoViewIfNeeded();
     await receptionChart.locator('svg').waitFor();
@@ -82,6 +100,30 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
     const focusPoster = page.getByRole('img', { name: 'Poster for Pacific Rim' });
     await focusPoster.waitFor();
     assert.equal(await focusPoster.getAttribute('src'), `https://image.tmdb.org/t/p/w185${movieDetails['68726'].poster_path}`);
+    const magnet = field.getByRole('button', { name: /^Attack on Titan magnet/ });
+    const core = await magnet.locator('.magnet-core').boundingBox();
+    const x = core.x + core.width / 2, y = core.y + core.height / 2;
+    const beforeDrag = await positions();
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 35, y, { steps: 5 });
+    await page.mouse.up();
+    assert.notDeepEqual(await positions(), beforeDrag);
+    assert.equal(await page.locator('#dust-focus h3').innerText(), 'Pacific Rim');
+    await magnet.press('Space');
+    assert.equal(await page.locator('#dust-focus h3').innerText(), 'Attack on Titan');
+    assert.equal(await page.locator('#dust-focus').getAttribute('aria-label'), 'Anime in focus');
+    assert.deepEqual((await evidence()).selectedKeys, ['tmdb:68726']);
+    await receptionChart.scrollIntoViewIfNeeded();
+    const moviePoint = receptionChart.getByRole('button', { name: /^Pacific Rim: TMDB score/ });
+    await moviePoint.waitFor();
+    assert.match(await moviePoint.getAttribute('aria-label'), new RegExp(`TMDB popularity rank #${movieDetails['68726'].popularity_rank}`));
+    assert.equal(await moviePoint.getAttribute('aria-pressed'), 'true');
+    await moviePoint.press('Enter');
+    assert.deepEqual((await evidence()).selectedKeys, []);
+    await moviePoint.press('Space');
+    assert.equal(await page.locator('#dust-focus h3').innerText(), 'Pacific Rim');
+    assert.equal(await receptionChart.locator('.reception-selection-ring').count(), 1);
 
     await page.locator('#movie-search').fill('進撃の巨人 2013');
     await page.locator('#movie-search').press('ArrowDown');
@@ -196,7 +238,7 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
         return top >= 48 && top < 180;
       }, anchor);
     }
-    assert.match(await page.locator('#reception').innerText(), /compare TMDB scores.*archived TMDB popularity snapshot/);
+    assert.match(await page.locator('#reception').innerText(), /Rank #1 is most popular in the movie sample/);
     assert.match(await page.locator('#creators').innerText(), /no production company or cast credits/);
     await page.evaluate(() => {
       sessionStorage.setItem('aniviz-dust-session-v1', JSON.stringify({ version: 1, state: {
@@ -239,6 +281,8 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
     await mobile.selectOption('#dust-direction', reverse);
     const mobileDot = mobile.locator('#recommendation-chart .dust-node');
     await mobileDot.first().waitFor();
+    await mobile.locator('#recommendation-chart .magnet-core').first().tap();
+    assert.equal(await mobile.locator('#dust-focus h3').innerText(), 'Attack on Titan');
     await mobileDot.nth(0).tap();
     await mobileDot.nth(1).press('Space');
     assert.match(await mobile.locator('#recommendation-detail').innerText(), /Comparing 2 movies/);

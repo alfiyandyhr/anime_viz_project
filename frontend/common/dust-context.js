@@ -33,17 +33,21 @@
   const ids = (values) => [...new Set((values || []).filter(v => typeof v === "string" || typeof v === "number").map(id))];
   const finite = (v) => Number.isFinite(v) ? v : null;
 
+  function joinAnimeRecord(record, meta) {
+    // Recommendation text can support filtering, but cannot invent ratings, cast or studios.
+    return { ...record, ...meta, id: id(record.id),
+      genres: meta?.genres || record.genres || [], studio_names: meta?.studio_names || [],
+      voice_actors: meta?.voice_actors || [], primary_genre: meta?.primary_genre || record.genres?.[0] || "Unknown",
+      average_score: finite(meta?.average_score), popularity: finite(meta?.popularity),
+      favourites: finite(meta?.favourites), episodes: finite(meta?.episodes), duration: finite(meta?.duration),
+      year: finite(meta?.year ?? record.year), metadataAvailable: Boolean(meta) };
+  }
+
   function joinRecords(recommendations, metadata = []) {
     const dashboard = new Map(metadata.map(row => [id(row.id), row]));
     return new Map(recommendations.map(record => {
       const meta = dashboard.get(id(record.id));
-      // Recommendation text can support filtering, but cannot invent ratings, cast or studios.
-      const anime = { ...record, ...meta, id: id(record.id),
-        genres: meta?.genres || record.genres || [], studio_names: meta?.studio_names || [],
-        voice_actors: meta?.voice_actors || [], primary_genre: meta?.primary_genre || record.genres?.[0] || "Unknown",
-        average_score: finite(meta?.average_score), popularity: finite(meta?.popularity),
-        favourites: finite(meta?.favourites), episodes: finite(meta?.episodes), duration: finite(meta?.duration),
-        year: finite(meta?.year ?? record.year), metadataAvailable: Boolean(meta) };
+      const anime = joinAnimeRecord(record, meta);
       return [anime.id, { recommendation: record, metadata: meta || null, anime }];
     }));
   }
@@ -380,6 +384,12 @@
         if (direction !== REVERSE) return snapshot();
         refreshLookup();
         return publish();
+      },
+      getMagnetRecord(key) {
+        const magnet = magnets.find(magnet => magnet.key === key && magnet.kind === undefined);
+        if (!magnet) return null;
+        return direction === FORWARD ? { ...movieDetails[magnet.id], ...magnet }
+          : joinAnimeRecord(magnet, metadata.find(row => id(row.id) === magnet.id));
       },
       setMoviePopularity(payload, status) {
         popularitySources[REVERSE] = { status, snapshotDate: payload?.snapshot_date,

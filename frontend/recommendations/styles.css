@@ -126,6 +126,7 @@
 .dust-magnet:hover .magnet-halo, .dust-magnet:focus-visible .magnet-halo { opacity: .8; stroke-width: 2; }
 .magnet-number { font-family: "Space Grotesk", sans-serif; font-size: 14px; font-weight: 700; pointer-events: none; }
 .magnet-title { fill: var(--text-soft); font-size: 10px; font-weight: 500; paint-order: stroke; stroke: var(--surface-solid); stroke-width: 5px; stroke-linejoin: round; pointer-events: none; }
+.dust-magnet[role="button"] .magnet-title { pointer-events: auto; }
 .dust-empty { min-height: 440px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 35px; color: var(--text-soft); }
 .dust-empty > span { font-size: 3rem; color: var(--cyan); }
 .dust-empty h4 { margin: 12px 0 0; color: var(--text); font-size: 1rem; }
