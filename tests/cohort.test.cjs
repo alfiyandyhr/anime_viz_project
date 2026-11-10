@@ -135,6 +135,7 @@ test('catalogue inline comparison retains filtered finalists and clears explicit
   vm.runInContext(source('frontend/explorer/app.js'), page.context);
   vm.runInContext(`
     renderAnimeTable = () => {};
+    renderCatalogueAnalysis = () => {};
     shortlist.add('1943'); shortlist.add('43'); renderComparison();
     elements.searchInput.value = 'no such anime'; applyFilters(); renderComparison();
   `, page.context);

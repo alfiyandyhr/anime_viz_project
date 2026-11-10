@@ -266,8 +266,12 @@
         lookup = new Map([...joinRecords(data?.anime || [], metadata)].map(([id, row]) =>
           [keyFor("anilist", id), { record: row.anime, metadata: row.metadata }]));
       } else {
-        lookup = new Map(catalogueFor(data, "tmdb").map(record =>
-          [keyFor("tmdb", record.id), { record: { ...record, ...movieDetails[record.id], ...movieReception[record.id] } }]));
+        lookup = new Map(catalogueFor(data, "tmdb").map(record => {
+          const reception = movieReception[record.id];
+          return [keyFor("tmdb", record.id), {
+            record: { ...record, ...movieDetails[record.id], ...reception, average_score: reception?.vote_average ?? null }
+          }];
+        }));
       }
     }
     function activate() {

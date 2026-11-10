@@ -433,6 +433,13 @@ input[type="range"] {
   font-weight: 700;
 }
 
+.reception-dot, .studio-dot { outline: none; paint-order: stroke fill; }
+.reception-dot { cursor: pointer; }
+.reception-dot:not([fill="transparent"]):is(:hover, :focus-visible, [aria-pressed="true"]) { stroke: white; stroke-width: 2; }
+.studio-dot:is(:hover, :focus-visible) { fill-opacity: 1; }
+.reception-dot:focus-visible, .studio-dot:focus-visible { filter: drop-shadow(0 0 2px white); }
+.reception-selection-ring { fill: none; pointer-events: none; }
+
 .empty-state {
   min-height: 370px;
   display: grid;

@@ -141,9 +141,9 @@
     const dustColors = new Map(snapshot.displayedDust.map(match => [
       String(match.record.id), color(snapshot.activeMagnetKeys[match.closest])
     ]));
-    const metric = reverse ? 'count' : $('[data-dust-genre-metric]').value;
+    const metric = $('[data-dust-genre-metric]').value;
     const selectedIds = snapshot.selectedKeys.map(key => snapshot.lookup.get(key)?.record.id).filter(id => id != null).map(String);
-    composition.update({ anime: records, selectedIds, countOnly: reverse,
+    composition.update({ anime: records, selectedIds,
       metric, movieRankLimit: reverse ? Math.max(2, snapshot.lookup.size) : null,
       onSelect: id => {
         const key = AnivizDust.keyFor(AnivizDust.DIRECTIONS[snapshot.direction].dust, id);
@@ -160,8 +160,9 @@
     $('#dust-connection-method').textContent = `Select a magnet to rank the displayed titles by ${snapshot.mixed ? 'attraction percentile' : 'cosine similarity'}. Thicker curves show higher scores within that magnet’s range. Color shows each title’s closest magnet. Dust members lists the titles closest to the selected magnet. Scroll either list to see more titles.`;
     const notes = {
       genres: [metric === 'count' ? 'Genres' : 'Genre ' + metric,
-        row => row.genres.length && (metric === 'score' ? Number.isFinite(row.average_score) : metric !== 'popularity' || Number.isFinite(row.popularity)), 'Counts overlap.'],
-      years: ['Release years', row => Number.isFinite(row.year), reverse ? 'Bars show displayed movies by release year.' : 'Bars: titles · line: score.']
+        row => row.genres.length && (metric === 'score' ? Number.isFinite(row.average_score) : metric !== 'popularity' || Number.isFinite(row.popularity)),
+        reverse && metric === 'popularity' ? 'Sum of TMDB popularity scores. Titles can belong to multiple genres.' : 'Titles can belong to multiple genres.'],
+      years: ['Release years', row => Number.isFinite(row.year), reverse ? 'Bars: movies · line: average TMDB score.' : 'Bars: titles · line: average score.']
     };
     if (reverse) {
       notes.reception = ['Movies with TMDB score and rank', AnivizChartData.hasMovieReception,
@@ -291,7 +292,7 @@
           onCoverage: text => { $('[data-coverage="connections"]').textContent = text; }, renderEmpty })
         : AnivizCharts.create(kind, { container, d3, helpers: chartHelpers() }), {
           preserveHeight: kind === 'connections',
-          enabled: value => !value.countOnly || !container.matches('[data-anime-chart]')
+          enabled: value => !value.movieRankLimit || !container.matches('[data-anime-chart]')
         });
     });
     context.subscribe(publish);
@@ -337,6 +338,7 @@
     elements.searchInput.placeholder = reverse ? 'e.g. Pacific Rim' : 'e.g. Attack on Titan';
     $('#dust-ranking-title').textContent = `Full ${reverse ? 'movie' : 'anime'} ranking`;
     $('#reception h3').textContent = reverse ? 'Score vs. popularity rank' : 'Score vs. popularity';
+    $('[data-dust-genre-metric] option[value="popularity"]').textContent = reverse ? 'Popularity score' : 'Popularity';
     $('#creators h3').textContent = reverse ? 'Creators' : 'Studios';
     document.querySelectorAll('[data-anime-only], [data-anime-chart]').forEach(node => { node.hidden = reverse; });
     populateFilterChoices();

@@ -37,6 +37,7 @@
   <script src="../common/data-loader.js" defer></script>
   <script src="../common/chart-data.js" defer></script>
   <script src="../common/charts.js" defer></script>
+  <script src="../common/chart-composition.js" defer></script>
   <script src="../common/title-artwork.js" defer></script>
   <script src="../common/explorer-table.js" defer></script>
   <script src="../common/app.js" defer></script>
@@ -200,6 +201,53 @@
         </section>
 
         <section id="comparison-footer" class="comparison-footer" aria-label="Catalogue shortlist comparison" hidden></section>
+
+        <div id="catalogue-analysis" hidden>
+          <section id="catalogue-kpis" class="kpi-grid" aria-label="Catalogue metrics"></section>
+          <section class="insight-strip" aria-labelledby="catalogue-facts-heading">
+            <p class="eyebrow">Automatically generated</p>
+            <h2 id="catalogue-facts-heading">Key facts at a glance</h2>
+            <div id="insight-cards" class="insight-grid"></div>
+          </section>
+
+          <section class="catalogue-charts" aria-label="Catalogue charts">
+            <article class="chart-card catalogue-reception">
+              <h2 data-catalogue-only="anime">Score vs. popularity</h2>
+              <h2 data-catalogue-only="movie">Score vs. popularity rank</h2>
+              <p data-catalogue-only="anime">Circle area represents favourites. Select a title to open its details.</p>
+              <p data-catalogue-only="movie">Rank #1 is the most popular movie in the full sample. Select a title to open its details.</p>
+              <div class="catalogue-chart" data-catalogue-chart="reception"></div>
+            </article>
+            <article class="chart-card">
+              <h2>Genres</h2>
+              <label class="catalogue-chart-control">Metric
+                <select id="catalogue-genre-metric">
+                  <option value="count">Titles</option>
+                  <option value="score">Average score</option>
+                  <option value="popularity">Popularity</option>
+                </select>
+              </label>
+              <p data-catalogue-only="anime">Titles can belong to multiple genres.</p>
+              <p data-catalogue-only="movie">Titles can belong to multiple genres. Popularity uses the sum of TMDB popularity scores.</p>
+              <div class="catalogue-chart" data-catalogue-chart="genres"></div>
+            </article>
+            <article class="chart-card">
+              <h2>Release years</h2>
+              <p>Bars show title counts. The line shows average scores.</p>
+              <div class="catalogue-chart" data-catalogue-chart="years" role="region" tabindex="0" aria-label="Release years chart, scroll horizontally if needed"></div>
+            </article>
+            <article class="chart-card" data-catalogue-only="anime">
+              <h2>Studios</h2>
+              <p>Circle area represents matching titles. Studio credits can overlap.</p>
+              <div class="catalogue-chart" data-catalogue-chart="studios"></div>
+            </article>
+            <article class="chart-card" data-catalogue-only="anime">
+              <h2>Studio × genre</h2>
+              <p>Up to 15 studios and 10 genres, ranked by title count. Titles can appear in multiple cells.</p>
+              <div class="catalogue-chart" data-catalogue-chart="heatmap" role="region" tabindex="0" aria-label="Studio genre chart, scroll horizontally if needed"></div>
+            </article>
+          </section>
+        </div>
 
         <details class="methodology">
           <summary>About / Data</summary>
