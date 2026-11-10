@@ -63,8 +63,13 @@
     <main class="stage">
       <!-- View controls -->
       <div class="catalogue-tools">
+      <div class="catalogue-switch" role="group" aria-label="Catalogue type">
+        <button class="small-button" type="button" data-catalogue-target="anime" aria-pressed="true" disabled>Anime</button>
+        <button class="small-button" type="button" data-catalogue-target="movie" aria-pressed="false" disabled>Movie</button>
+      </div>
       <label class="catalogue-search">
-        <span>Search titles, studios, or actors</span>
+        <span data-catalogue-only="anime">Search titles, studios, or actors</span>
+        <span data-catalogue-only="movie">Search movie titles or genres</span>
         <input
           id="search-input"
           type="search"
@@ -85,14 +90,14 @@
             </select>
           </label>
 
-          <label>
+          <label data-catalogue-only="anime">
             <span>Studio</span>
             <select id="studio-filter">
               <option value="All">All studios</option>
             </select>
           </label>
 
-          <label>
+          <label data-catalogue-only="anime">
             <span>Format</span>
             <select id="format-filter">
               <option value="All">All formats</option>
@@ -141,16 +146,16 @@
         data-chapter="explorer"
         aria-label="Full Catalogue"
       >
-        <section class="explorer-panel" aria-label="Anime explorer">
+        <section class="explorer-panel" aria-labelledby="catalogue-heading">
           <div class="explorer-head">
-            <h1>Full Catalogue</h1>
+            <h1 id="catalogue-heading">Full Catalogue</h1>
             <div class="explorer-controls">
               <label class="table-sort">
                 <span>Sort</span>
                 <select id="table-sort">
                   <option value="popularity">Popularity</option>
                   <option value="score">Average score</option>
-                  <option value="favourites">Favourites</option>
+                  <option value="favourites" data-catalogue-only="anime">Favourites</option>
                   <option value="year-desc">Newest release</option>
                   <option value="year-asc">Oldest release</option>
                   <option value="title">Title</option>
@@ -173,13 +178,13 @@
               <thead>
                 <tr>
                   <th scope="col">Shortlist</th>
-                  <th scope="col">Rank</th>
-                  <th>Anime</th>
-                  <th>Year</th>
-                  <th>Format</th>
-                                    <th>Score</th>
-                  <th>Popularity</th>
-                                  </tr>
+                  <th scope="col"><span data-catalogue-only="anime">Rank</span><span data-catalogue-only="movie">Popularity rank</span></th>
+                  <th scope="col"><span data-catalogue-only="anime">Anime</span><span data-catalogue-only="movie">Movie</span></th>
+                  <th scope="col">Year</th>
+                  <th scope="col"><span data-catalogue-only="anime">Format</span><span data-catalogue-only="movie">Genres</span></th>
+                  <th scope="col"><span data-catalogue-only="anime">Score</span><span data-catalogue-only="movie">TMDB score / 10</span></th>
+                  <th scope="col"><span data-catalogue-only="anime">Popularity</span><span data-catalogue-only="movie">TMDB popularity</span></th>
+                </tr>
               </thead>
 
               <tbody id="anime-table-body"></tbody>
@@ -197,15 +202,18 @@
 
         <details class="methodology">
           <summary>About / Data</summary>
-          <div class="about-content"><p>The Full Catalogue is the loaded popularity-sorted AniList sample, not every anime. Seasons and films are separate entries. Popularity counts AniList list users; scores use a 0–100 scale. Missing values remain unknown.</p><p>Filters and shortlist are independent of Dust &amp; Magnet. Select a row for secondary metadata and credits.</p><p><a href="https://anilist.co/" target="_blank" rel="noopener noreferrer">Source: AniList</a></p></div>
-        <div class="data-freshness"><span id="footer-generated">Data not loaded</span> · <span id="footer-cache"></span></div></details>
+          <div class="about-content" data-catalogue-only="anime"><p>The Full Catalogue is the loaded popularity-sorted AniList sample, not every anime. Seasons and films are separate entries. Popularity counts AniList list users; scores use a 0–100 scale. Missing values remain unknown.</p><p>Filters and shortlist are independent of Dust &amp; Magnet. Select a row for secondary metadata and credits.</p><p><a href="https://anilist.co/" target="_blank" rel="noopener noreferrer">Source: AniList</a></p></div>
+          <div class="about-content" data-catalogue-only="movie"><p>Movie uses the same archived TMDB sample, ratings, and popularity values as Dust &amp; Magnet. Scores use a 0–10 scale. Popularity rank sorts the full sample by the archived popularity values and stays fixed when you sort or filter the table.</p><p>Search titles, alternate titles, or genres. Select a row to see the synopsis and other details.</p><p><a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">Source: TMDB</a></p></div>
+        <div class="data-freshness" data-catalogue-only="anime"><span id="footer-generated">Data not loaded</span> · <span id="footer-cache"></span></div></details>
       </section>
     <footer class="data-footer">
-        <div class="data-status" role="status" aria-live="polite">
+        <div class="data-status" role="status" aria-live="polite" data-catalogue-only="anime">
           <span id="status-dot" class="status-dot loading"></span>
           <span id="data-status">Loading anime data…</span>
         </div>
-        <span class="source-credit">AniList × Python × D3.js</span>
+        <div class="data-status" id="movie-catalogue-status" role="status" data-catalogue-only="movie"></div>
+        <span class="source-credit" data-catalogue-only="anime">AniList × Python × D3.js</span>
+        <span class="source-credit" data-catalogue-only="movie">TMDB × Python × D3.js</span>
       </footer>
     </main>
   </div>

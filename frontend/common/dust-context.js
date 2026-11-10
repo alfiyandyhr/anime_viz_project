@@ -379,22 +379,19 @@
         refreshLookup();
         return derive({ rescore: true });
       },
-      setMovieDetails(details) {
-        movieDetails = details;
-        if (direction !== REVERSE) return snapshot();
-        refreshLookup();
-        return publish();
-      },
       getMagnetRecord(key) {
         const magnet = magnets.find(magnet => magnet.key === key && magnet.kind === undefined);
         if (!magnet) return null;
-        return direction === FORWARD ? { ...movieDetails[magnet.id], ...magnet }
+        return direction === FORWARD ? magnet
           : joinAnimeRecord(magnet, metadata.find(row => id(row.id) === magnet.id));
       },
       setMoviePopularity(payload, status) {
+        movieDetails = payload?.movies || {};
         popularitySources[REVERSE] = { status, snapshotDate: payload?.snapshot_date,
           values: new Map(Object.entries(payload?.popularity || {})) };
-        return direction === REVERSE ? derive({ rescore: true }) : snapshot();
+        if (direction !== REVERSE) return snapshot();
+        refreshLookup();
+        return derive({ rescore: true });
       },
       setMagnets(values) {
         const keys = validMagnets(values);

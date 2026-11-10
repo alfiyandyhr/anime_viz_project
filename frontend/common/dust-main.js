@@ -3,7 +3,7 @@
 (function (root) {
   let context, composition, latest, rankingPage = 0, rankingSignature = "";
   let scrollRestored = false, pendingNotice = "", metadataLoading = false;
-  let movieDetailsLoading = false, movieDetailsLoaded = false, focusedMagnetKey = null;
+  let focusedMagnetKey = null;
   const $ = selector => document.querySelector(selector);
   const magnetColors = new Map();
   const isReverse = () => latest.direction === AnivizDust.REVERSE;
@@ -99,7 +99,6 @@
     if (!context.getMagnetRecord(key)) return;
     focusedMagnetKey = key;
     renderFocus();
-    if (!isReverse()) void loadMovieDetails();
   }
   function renderFocus(result = detailResult()) {
     const focus = $('#dust-focus');
@@ -158,7 +157,10 @@
     };
     if (reverse) {
       notes.reception = ['Movies with TMDB score and rank', AnivizChartData.hasMovieReception,
-        'Rank #1 is most popular in the movie sample. Color: closest magnet.'];
+        snapshot.popularity.snapshotDate
+          ? `TMDB snapshot ${snapshot.popularity.snapshotDate} UTC · Rank #1 is most popular in the movie sample. Color: closest magnet.`
+          : snapshot.popularity.status === 'unavailable' ? 'Archived TMDB reception data unavailable.'
+            : 'Loading archived TMDB reception data…'];
       $('[data-coverage="studios"]').textContent = 'The published TMDB sample has no production company or cast credits.';
       $('[data-coverage="heatmap"]').textContent = '';
     } else {
@@ -247,20 +249,6 @@
     context.setMoviePopularity(payload, payload ? 'ready' : 'unavailable');
     if (isReverse()) renderRecommendations();
     restoreScroll();
-  }
-  async function loadMovieDetails() {
-    if (movieDetailsLoading || movieDetailsLoaded) return;
-    movieDetailsLoading = true;
-    const details = await AnivizData.movieDetails(recommendationState.data).catch(() => null);
-    movieDetailsLoading = false;
-    if (details) {
-      movieDetailsLoaded = true;
-      context.setMovieDetails(details);
-      if (!isReverse() && focusedMagnetKey) renderFocus();
-    }
-  }
-  function loadSavedPopularity() {
-    if (latest.popularity.status === 'idle' && latest.magnetKeys.includes(latest.popularity.key)) void loadPopularity();
   }
   function bind() {
     let storage;
@@ -351,8 +339,7 @@
       loadLayout();
       context.setSources(data, null, { seedExample: true });
       updateDirectionControls();
-      if (isReverse()) void loadMovieDetails();
-      loadSavedPopularity();
+      if (isReverse()) void loadPopularity();
       restoreScroll();
     },
     setScores(scores) { context.setSources(recommendationState.data, scores); restoreScroll(); },
@@ -363,8 +350,7 @@
       closeDrawer();
       if (!pendingNotice.startsWith('Session storage')) notice('');
       context.setDirection(direction);
-      if (isReverse()) void loadMovieDetails();
-      loadSavedPopularity();
+      if (isReverse()) void loadPopularity();
       renderRecommendations();
       scrollRestored = true;
       window.scrollTo(0, context.getLayout().scrollY || 0);
