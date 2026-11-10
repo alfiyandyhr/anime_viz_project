@@ -3,6 +3,7 @@
 (function (root) {
   let context, composition, latest, rankingPage = 0, rankingSignature = "";
   let scrollRestored = false, pendingNotice = "", metadataLoading = false;
+  let movieDetailsLoading = false, movieDetailsLoaded = false, focusedMagnetKey = null;
   const $ = selector => document.querySelector(selector);
   const magnetColors = new Map();
   const isReverse = () => latest.direction === AnivizDust.REVERSE;
@@ -89,14 +90,30 @@
   function select(key, { showDrawer = false } = {}) {
     if (!latest.displayedKeys.includes(key)) return;
     const wasSelected = latest.selectedKeys.includes(key);
+    if (wasSelected || latest.selectedKeys.length < 3) focusedMagnetKey = null;
     if (pendingNotice.startsWith('Compare up to 3')) notice('');
     context.toggleSelection(key);
     if (showDrawer && !wasSelected) inspectTitle(key);
   }
-  function renderDetails() {
-    const result = AnivizDustDetails.render({ snapshot: latest, color, helpers: detailHelpers() });
-    const detail = $('#recommendation-detail'), cue = $('#dust-selection'), focus = $('#dust-focus');
+  function focusMagnet(key) {
+    if (!context.getMagnetRecord(key)) return;
+    focusedMagnetKey = key;
+    renderFocus();
+    if (!isReverse()) void loadMovieDetails();
+  }
+  function renderFocus(result = detailResult()) {
+    const focus = $('#dust-focus');
+    focus.setAttribute('aria-label', result.focusLabel);
     if (focus.innerHTML !== result.focusHtml) { focus.innerHTML = result.focusHtml; focus.scrollTop = 0; }
+  }
+  function detailResult() {
+    return AnivizDustDetails.render({ snapshot: latest, focusedMagnet: context.getMagnetRecord(focusedMagnetKey),
+      color, helpers: detailHelpers() });
+  }
+  function renderDetails() {
+    const result = detailResult();
+    const detail = $('#recommendation-detail'), cue = $('#dust-selection');
+    renderFocus(result);
     detail.hidden = !result.html;
     detail.innerHTML = result.html;
     cue.hidden = !result.html;
@@ -106,6 +123,7 @@
   function publish(snapshot) {
     const switched = latest.direction !== snapshot.direction;
     latest = snapshot;
+    if (switched || !snapshot.activeMagnetKeys.includes(focusedMagnetKey)) focusedMagnetKey = null;
     if (switched) loadLayout();
     const reverse = isReverse();
     const used = new Set();
@@ -123,8 +141,8 @@
     const metric = reverse ? 'count' : $('[data-dust-genre-metric]').value;
     const selectedIds = snapshot.selectedKeys.map(key => snapshot.lookup.get(key)?.record.id).filter(id => id != null).map(String);
     composition.update({ anime: records, selectedIds, countOnly: reverse,
-      metric,
-      onSelect: id => select(AnivizDust.keyFor('anilist', id)),
+      metric, movieRankLimit: reverse ? Math.max(2, snapshot.lookup.size) : null,
+      onSelect: id => select(AnivizDust.keyFor(AnivizDust.DIRECTIONS[snapshot.direction].dust, id)),
       dustColor: id => dustColors.get(id), snapshot });
     const count = records.length, candidates = snapshot.candidateKeys.length;
     $('[data-dust-scope]').textContent = elements.filterSummary.textContent = `${count} / ${candidates} ${dustNoun()}`;
@@ -139,7 +157,8 @@
       years: ['Release years', row => Number.isFinite(row.year), reverse ? 'Bars show displayed movies by release year.' : 'Bars: titles · line: score.']
     };
     if (reverse) {
-      $('[data-coverage="reception"]').textContent = 'The published TMDB sample has no ratings. The High popularity magnet uses the separate TMDB popularity snapshot.';
+      notes.reception = ['Movies with TMDB score and rank', AnivizChartData.hasMovieReception,
+        'Rank #1 is most popular in the movie sample. Color: closest magnet.'];
       $('[data-coverage="studios"]').textContent = 'The published TMDB sample has no production company or cast credits.';
       $('[data-coverage="heatmap"]').textContent = '';
     } else {
@@ -152,7 +171,7 @@
     }
     Object.entries(notes).forEach(([kind, [label, predicate, suffix]]) => {
       const available = records.filter(predicate).length;
-      $(`[data-coverage="${kind}"]`).textContent = snapshot.metadataStatus === 'unavailable' && ['studios', 'heatmap', 'reception'].includes(kind)
+      $(`[data-coverage="${kind}"]`).textContent = !reverse && snapshot.metadataStatus === 'unavailable' && ['studios', 'heatmap', 'reception'].includes(kind)
         ? `${label} unavailable: metadata failed to load.` : (available < count ? `${label}: ${available} of ${count} · ` : '') + suffix;
     });
     $('[data-dust-chips]').replaceChildren();
@@ -216,6 +235,7 @@
     metadataLoading = false;
     latest = context.setMetadata(metadata?.anime || [], metadata ? 'ready' : 'unavailable', metadata?.meta.generated_at);
     if (!isReverse()) { populateFilterChoices(); renderRecommendations(); }
+    else if (focusedMagnetKey) renderFocus();
     restoreScroll();
   }
   async function loadPopularity() {
@@ -227,6 +247,17 @@
     context.setMoviePopularity(payload, payload ? 'ready' : 'unavailable');
     if (isReverse()) renderRecommendations();
     restoreScroll();
+  }
+  async function loadMovieDetails() {
+    if (movieDetailsLoading || movieDetailsLoaded) return;
+    movieDetailsLoading = true;
+    const details = await AnivizData.movieDetails(recommendationState.data).catch(() => null);
+    movieDetailsLoading = false;
+    if (details) {
+      movieDetailsLoaded = true;
+      context.setMovieDetails(details);
+      if (!isReverse() && focusedMagnetKey) renderFocus();
+    }
   }
   function loadSavedPopularity() {
     if (latest.popularity.status === 'idle' && latest.magnetKeys.includes(latest.popularity.key)) void loadPopularity();
@@ -285,10 +316,9 @@
     $('#dust-limit-control span').textContent = reverse ? 'Movie dots' : 'Anime dots';
     $('#filter-title').textContent = `Filter ${dustNoun()}`;
     $('#dust-filter-search-label').textContent = reverse ? 'Search titles or aliases' : 'Search titles, studios, or actors';
-    elements.searchInput.placeholder = reverse ? 'e.g. Treasure Planet' : 'e.g. Attack on Titan';
-    $('#dust-focus').setAttribute('aria-label', reverse ? 'Movie in focus' : 'Anime in focus');
+    elements.searchInput.placeholder = reverse ? 'e.g. Pacific Rim' : 'e.g. Attack on Titan';
     $('#dust-ranking-title').textContent = `Full ${reverse ? 'movie' : 'anime'} ranking`;
-    $('#reception h3').textContent = reverse ? 'Reception' : 'Score vs. popularity';
+    $('#reception h3').textContent = reverse ? 'Score vs. popularity rank' : 'Score vs. popularity';
     $('#creators h3').textContent = reverse ? 'Creators' : 'Studios';
     document.querySelectorAll('[data-anime-only], [data-anime-chart]').forEach(node => { node.hidden = reverse; });
     populateFilterChoices();
@@ -321,6 +351,7 @@
       loadLayout();
       context.setSources(data, null, { seedExample: true });
       updateDirectionControls();
+      if (isReverse()) void loadMovieDetails();
       loadSavedPopularity();
       restoreScroll();
     },
@@ -332,6 +363,7 @@
       closeDrawer();
       if (!pendingNotice.startsWith('Session storage')) notice('');
       context.setDirection(direction);
+      if (isReverse()) void loadMovieDetails();
       loadSavedPopularity();
       renderRecommendations();
       scrollRestored = true;
@@ -339,9 +371,12 @@
     },
     setMagnets(keys) { context.setMagnets(keys); renderRecommendations(); },
     setDustLimit(value) { context.setDustLimit(value); renderRecommendations(); },
-    select, color, saveLayout, loadPopularity,
+    select, focusMagnet, color, saveLayout, loadPopularity,
     deselectLast() {
-      if (latest.selectedKeys.length) context.setSelection(latest.selectedKeys.slice(0, -1));
+      if (latest.selectedKeys.length) {
+        focusedMagnetKey = null;
+        context.setSelection(latest.selectedKeys.slice(0, -1));
+      }
     },
     resetPositions() {
       stopDustChart();

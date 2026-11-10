@@ -9,12 +9,12 @@ A visual story discovery tool built with Python/Flask, AniList GraphQL API, and 
 ## Four views
 
 The root URL opens **Dust & Magnet** with an **Example** Inception magnet.
-Switch Direction to **Anime → Movies** for the **Example** Cowboy Bebop magnet. Use **Title** to search by title, alias, or year. Use **Genre cohort** to add a group of titles by genre. Fill up to three slots with any mix of distinct titles and cohorts. Remove any magnet with ×.
+Switch Direction to **Anime → Movies** for the **Example** Attack on Titan magnet. Use **Title** to search by title, alias, or year. Use **Genre cohort** to add a group of titles by genre. Fill up to three slots with any mix of distinct titles and cohorts. Remove any magnet with ×.
 The compact dropdown contains exactly four destinations:
 
 | View | Data and interactions |
 | --- | --- |
-| Dust & Magnet | Choose either direction and a field of 30, 60, or 90 dots. Both directions include similarity connections, a field mirror, genres, release years, and a full ranking. Anime dust also shows reception and studio charts. |
+| Dust & Magnet | Choose either direction and a field of 30, 60, or 90 dots. Both directions include similarity connections, a field mirror, reception, genres, release years, and a full ranking. Select a dust dot or a title magnet to see it in the In Focus panel. Anime dust also shows studio charts. |
 | History | Scroll a pair of release timelines to see each year’s most popular anime and its closest movie match. Both titles have synopses and the connection shows cosine similarity. |
 | Network | Actor/character/work collaboration graph, defaulting to Current dust when a saved anime-dust context exists, otherwise Catalogue. A local selector switches scopes without changing other views. The 35-work display cap and sampled Japanese cast credits are disclosed. |
 | Full Catalogue | The loaded 1,000-title metadata sample, with its own search, filters, sorting, pagination, details and automatic shortlist comparison. Saved movies never narrow its scope. |
@@ -22,7 +22,9 @@ The compact dropdown contains exactly four destinations:
 Direction, the magnet picker, removable magnets, dot count, and **Reset positions** sit in the left panel.
 The right panel follows the latest selected title. Anime details include AniList
 images, synopsis, tags, and sampled Japanese cast. Movie details use published
-TMDB text, genres, keywords, and a TMDB link. Open **Filter** for dust filters.
+TMDB posters, backdrops, text, genres, keywords, and a TMDB link. The movie
+comparison includes posters, runtimes in minutes, and TMDB scores out of 10.
+Open **Filter** for dust filters.
 Movie dust supports title and alias search,
 genre, and release year.
 
@@ -278,6 +280,13 @@ published TMDB IDs. It records the collection date, source, input hash, and
 eligible count in `data/movie_popularity.json`. Flask and static hosting serve
 the same file. The browser loads and validates it separately when movie popularity
 is requested, with a Retry control if the fetch or validation fails.
+
+Run `python3 data/export_movie_details.py` to refresh `data/movie_details.json`
+for the published movie IDs. The exporter reads TMDB credentials from
+`data/semantic_similarity/.env.local` or the environment. It stores poster and
+backdrop paths, runtimes, user scores, and a rank within the movie sample by
+descending TMDB popularity, breaking ties by TMDB ID. The movie details snapshot
+is separate from the archived popularity snapshot used by the magnet.
 
 Run recommendation, story, network, and collector checks:
 

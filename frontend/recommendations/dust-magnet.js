@@ -345,15 +345,24 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
   dots.append("circle").attr("class", "dust-hit-area").attr("r", 9);
   dots.append("circle").attr("class", "dust-grain").attr("r", 4.5).attr("fill", (match) => anchors[match.closest].color);
   const magnets = svg.append("g").selectAll("g").data(anchors, anchor => anchor.magnet.key).join("g").attr("class", "dust-magnet")
-    .attr("role", "group").attr("tabindex", 0)
-    .attr("aria-label", (anchor) => `${anchor.magnet.title} magnet. Drag or use arrow keys to move.`)
+    .attr("role", ({ magnet }) => magnet.kind === undefined ? "button" : "group").attr("tabindex", 0)
+    .attr("aria-controls", ({ magnet }) => magnet.kind === undefined ? "dust-focus" : null)
+    .attr("aria-label", ({ magnet }) => `${magnet.title} magnet.${magnet.kind === undefined ? " Activate to view details." : ""} Drag or use arrow keys to move.`)
+    .on("click", (event, { magnet }) => {
+      if (magnet.kind === undefined) AnivizMain.focusMagnet(magnet.key);
+    })
     .on("keydown", (event, anchor) => {
+      if (anchor.magnet.kind === undefined && ["Enter", " "].includes(event.key)) {
+        event.preventDefault();
+        AnivizMain.focusMagnet(anchor.magnet.key);
+        return;
+      }
       const delta = { ArrowLeft: [-12, 0], ArrowRight: [12, 0], ArrowUp: [0, -12], ArrowDown: [0, 12] }[event.key];
       if (!delta) return;
       event.preventDefault();
       onMove(anchor, anchor.x + delta[0], anchor.y + delta[1]);
     })
-    .call(d3.drag().on("start", hideTooltip)
+    .call(d3.drag().clickDistance(4).on("start", hideTooltip)
       .on("drag", (event, anchor) => onMove(anchor, event.x, event.y)));
   magnets.append("circle").attr("class", "magnet-halo").attr("r", 34).attr("stroke", (anchor) => anchor.color);
   magnets.append("circle").attr("class", "magnet-core").attr("r", 25).attr("stroke", (anchor) => anchor.color);

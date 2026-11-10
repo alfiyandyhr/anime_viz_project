@@ -477,7 +477,7 @@
         .call((group) => group.select(".domain").remove());
     }
 
-    function drawPopularityAxes(data, { popularity, score, label, popularityLabel }) {
+    function drawPopularityAxes(data, { popularity, score, label, popularityLabel, rankLimit }) {
       const width = Math.max(container.clientWidth, 320);
       const height = Math.max(container.clientHeight, 473);
       const margin = { top: 28, right: 28, bottom: 58, left: 62 };
@@ -490,30 +490,32 @@
       const xExtent = d3.extent(data, popularity);
       const yExtent = d3.extent(data, score);
 
-      const x = d3.scaleLog()
+      const x = (rankLimit ? d3.scaleLinear().domain([rankLimit, 1]) : d3.scaleLog()
         .domain([
           Math.max(1, xExtent[0] * 0.75),
           xExtent[1] * 1.25
-        ])
+        ]))
         .range([margin.left, width - margin.right]);
 
       const y = d3.scaleLinear()
-        .domain([
+        .domain(rankLimit ? [0, 10] : [
           Math.max(0, Math.floor((yExtent[0] - 5) / 5) * 5),
           Math.min(100, Math.ceil((yExtent[1] + 4) / 5) * 5)
         ])
         .nice()
         .range([height - margin.bottom, margin.top]);
 
+      const xAxis = d3.axisBottom(x).ticks(width < 450 ? 5 : 7, "~s");
+      if (rankLimit) {
+        const ticks = x.ticks(width < 450 ? 4 : 6).filter(value => Number.isInteger(value) && value > 1);
+        xAxis.tickValues([...ticks, 1]).tickFormat(d3.format("d"));
+      }
+
       svg.append("g")
         .attr("class", "grid")
         .attr("transform", `translate(0,${height - margin.bottom})`)
-        .call(
-          d3.axisBottom(x)
-            .ticks(7)
-            .tickSize(-(height - margin.top - margin.bottom))
-            .tickFormat("")
-        );
+        .call(d3.axisBottom(x).ticks(7).tickValues(xAxis.tickValues())
+          .tickSize(-(height - margin.top - margin.bottom)).tickFormat(""));
 
       svg.append("g")
         .attr("class", "grid")
@@ -528,10 +530,7 @@
       svg.append("g")
         .attr("class", "axis")
         .attr("transform", `translate(0,${height - margin.bottom})`)
-        .call(
-          d3.axisBottom(x)
-            .ticks(width < 450 ? 5 : 7, "~s")
-        );
+        .call(xAxis);
 
       svg.append("g")
         .attr("class", "axis")
@@ -551,7 +550,9 @@
         .attr("x", -(margin.top + height - margin.bottom) / 2)
         .attr("y", 16)
         .attr("text-anchor", "middle")
-        .text("Average score / 100");
+        .text(rankLimit ? "TMDB score / 10" : "Average score / 100");
+
+      if (rankLimit) return { svg, x, y, correlation: null };
 
       const { correlation, regression } = metricData("popularityTrend", () => {
         const points = data.map(item => [Math.log10(popularity(item)), score(item)]);
@@ -585,24 +586,26 @@
     }
 
     function renderScatterplot() {
-      const data = metricData("scored", () => context.anime.filter((item) => (
-        item.popularity > 0
-        && Number.isFinite(item.average_score)
-      )).sort((a, b) => (b.favourites || 0) - (a.favourites || 0)));
+      const rankLimit = context.movieRankLimit;
+      const popularity = item => rankLimit ? item.popularity_rank : item.popularity;
+      const score = item => rankLimit ? item.vote_average : item.average_score;
+      const data = metricData("scored", () => rankLimit ? context.anime.filter(transforms.hasMovieReception)
+        : context.anime.filter(item => item.popularity > 0 && Number.isFinite(item.average_score))
+          .sort((a, b) => (b.favourites || 0) - (a.favourites || 0)));
 
       clearChart(container);
 
       if (!data.length) {
         context.onCorrelation?.(null, 0);
-        renderEmpty(container, "No scored anime match the current filters.");
+        renderEmpty(container, rankLimit ? "No displayed movies have a TMDB score and popularity rank."
+          : "No scored anime match the current filters.");
         return;
       }
 
       const { svg, x, y, correlation } = drawPopularityAxes(data, {
-        popularity: (item) => item.popularity,
-        score: (item) => item.average_score,
-        label: "Score versus popularity scatterplot",
-        popularityLabel: "Popularity — AniList list users (log scale)"
+        popularity, score, rankLimit,
+        label: rankLimit ? "TMDB score versus popularity rank scatterplot" : "Score versus popularity scatterplot",
+        popularityLabel: rankLimit ? "TMDB popularity rank" : "Popularity — AniList list users (log scale)"
       });
       context.onCorrelation?.(correlation, data.length);
 
@@ -610,29 +613,34 @@
         .domain([0, d3.max(data, (item) => item.favourites || 0) || 1])
         .range([0, 20]);
       // A hollow marker keeps titles with zero or unknown favourites available for selection.
-      const pointRadius = item => item.favourites > 0 ? radius(item.favourites) : 4;
+      const pointRadius = item => rankLimit ? 5 : item.favourites > 0 ? radius(item.favourites) : 4;
+      const filled = item => rankLimit || item.favourites > 0;
 
       svg.append("g")
         .selectAll("circle")
         .data(data, (item) => item.id)
         .join("circle")
         .attr("class", "reception-dot")
-        .attr("cx", (item) => x(item.popularity))
-        .attr("cy", (item) => y(item.average_score))
+        .attr("cx", item => x(popularity(item)))
+        .attr("cy", item => y(score(item)))
         .attr("r", pointRadius)
-        .attr("fill", item => item.favourites > 0 ? context.dustColor(String(item.id)) : "transparent")
-        .attr("stroke", item => item.favourites > 0 ? "var(--surface-solid)" : context.dustColor(String(item.id)))
+        .attr("fill", item => filled(item) ? context.dustColor(String(item.id)) : "transparent")
+        .attr("stroke", item => filled(item) ? "var(--surface-solid)" : context.dustColor(String(item.id)))
         .attr("stroke-width", 1.5)
         .on("mouseenter", (event, item) => {
           showTooltip(event, `
             <strong>${escapeHTML(item.title)}</strong>
-            <span>
+            <span>${rankLimit ? `
+              TMDB score: ${item.vote_average}/10<br>
+              TMDB popularity rank: #${formatNumber(item.popularity_rank)}<br>
+              Genres: ${escapeHTML(item.genres.join(", ") || "Unknown")}
+            ` : `
               Score: ${item.average_score}/100<br>
               Popularity: ${formatNumber(item.popularity)}<br>
               Favourites: ${formatNumber(item.favourites)}<br>
               Genres: ${escapeHTML(item.genres.join(", ") || "Unknown")}<br>
               Studio: ${escapeHTML(item.studio_names.join(", "))}
-            </span>
+            `}</span>
           `);
         })
         .on("mousemove", moveTooltip)
@@ -647,8 +655,8 @@
         .data(data.filter(item => context.selectedIds.includes(String(item.id))))
         .join("circle")
         .attr("class", "reception-selection-ring")
-        .attr("cx", item => x(item.popularity))
-        .attr("cy", item => y(item.average_score))
+        .attr("cx", item => x(popularity(item)))
+        .attr("cy", item => y(score(item)))
         .attr("r", item => pointRadius(item) + 3);
     }
 
@@ -688,7 +696,9 @@
         return Boolean(d3.select(this).on("mouseenter"));
       }).attr("tabindex", 0).attr("role", selectable ? "button" : "img")
         .attr("aria-pressed", item => selectable ? context.selectedIds.includes(String(item.id)) : null)
-        .attr("aria-label", item => item.title && `${item.title}: score ${item.average_score} / 100; popularity ${formatNumber(item.popularity)}; favourites ${Number.isFinite(item.favourites) ? formatNumber(item.favourites) : 'Unknown'}; genres ${item.genres.join(", ") || "Unknown"}` || item.genre && item.studio && `${item.studio} × ${item.genre}: ${item.count}`
+        .attr("aria-label", item => item.title && (context.movieRankLimit
+          ? `${item.title}: TMDB score ${item.vote_average} / 10; TMDB popularity rank #${formatNumber(item.popularity_rank)}; genres ${item.genres.join(", ") || "Unknown"}`
+          : `${item.title}: score ${item.average_score} / 100; popularity ${formatNumber(item.popularity)}; favourites ${Number.isFinite(item.favourites) ? formatNumber(item.favourites) : 'Unknown'}; genres ${item.genres.join(", ") || "Unknown"}`) || item.genre && item.studio && `${item.studio} × ${item.genre}: ${item.count}`
           || item.genre && `${item.genre}: ${item.count} titles` || item.studio && `${item.studio}: total popularity ${formatNumber(item.totalPopularity)}; average score ${item.averageScore.toFixed(1)} / 100; ${item.count} matching titles`
           || `${item.year}: ${item.count} titles`)
         .on("keydown", selectable ? function (event, item) {

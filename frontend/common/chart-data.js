@@ -53,6 +53,9 @@
       episodes, duration, runtime: episodes && duration ? episodes * duration : null,
       score: Number.isFinite(anime.average_score) ? anime.average_score : null, status: anime.status || null };
   }
+  const hasMovieReception = movie => Number.isInteger(movie.popularity_rank) && movie.popularity_rank >= 1
+    && Number.isFinite(movie.vote_average) && movie.vote_average >= 0 && movie.vote_average <= 10;
   return { genres: (anime, selected) => aggregate(anime, "genres", "genre", selected),
-    studios: (anime, selected) => aggregate(anime, "studio_names", "studio", selected), timeline, correlation, comparisonValues };
+    studios: (anime, selected) => aggregate(anime, "studio_names", "studio", selected),
+    timeline, correlation, comparisonValues, hasMovieReception };
 });

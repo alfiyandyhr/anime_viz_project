@@ -39,6 +39,7 @@ def static_dashboard_data():
 @app.get("/data/movie_recommendations.json")
 @app.get("/data/movie_anime_scores.bin")
 @app.get("/data/movie_popularity.json")
+@app.get("/data/movie_details.json")
 @app.get("/data/story_movie_recommendations.json")
 @app.get("/data/history_movie_matches.json")
 def recommendation_data():

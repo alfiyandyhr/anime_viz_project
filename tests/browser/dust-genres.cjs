@@ -98,7 +98,7 @@ const snapshot = page => page.evaluate(() => {
     assert.equal(await sort.inputValue(), movies);
     assert.equal(await anchor.getAttribute('transform'), dragged);
     await page.selectOption('#dust-direction', reverse);
-    await remove(page, 'anilist:1');
+    await remove(page, 'anilist:16498');
     await selectGenre(page, anime);
     assert.match(await page.locator('#movie-magnets').innerText(), /Sci-Fi anime\s+AniList · 165 anime/);
     const reverseCohort = await snapshot(page);
@@ -151,9 +151,9 @@ const snapshot = page => page.evaluate(() => {
     assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth), 390);
     await mobile.reload();
     await dots(mobile).first().waitFor();
-    assert.deepEqual((await snapshot(mobile)).magnetKeys, ['anilist:1', anime]);
+    assert.deepEqual((await snapshot(mobile)).magnetKeys, ['anilist:16498', anime]);
     await remove(mobile, anime);
-    assert.deepEqual((await snapshot(mobile)).magnetKeys, ['anilist:1']);
+    assert.deepEqual((await snapshot(mobile)).magnetKeys, ['anilist:16498']);
     assert.deepEqual(errors, []);
     console.log('Verified mixed and three-cohort fields, the shared slot limit, rankings and filters, drag, keyboard use, and desktop/mobile session restoration.');
   } finally { await browser.close(); }

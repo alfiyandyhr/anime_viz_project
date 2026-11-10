@@ -311,7 +311,7 @@ test('forward sampling, cosine vectors, ranks and filters match the alfi 3342eb3
 test('a 2 × 3 movie-major fixture reads the correct row and column, including signed and tied scores', () => {
   const fixture = {
     movies: [{ id: 1, title: 'Movie One', aliases: ['Alternate One'], genres: ['Action'], year: 1999 }, { id: 2, title: 'Movie Two' }],
-    anime: [{ id: 1, title: 'Cowboy Bebop' }, { id: 2, title: 'Anime Two' }, { id: 3, title: 'Anime Three' }]
+    anime: [{ id: 1, title: 'Attack on Titan' }, { id: 2, title: 'Anime Two' }, { id: 3, title: 'Anime Three' }]
   };
   const matrix = Float32Array.from([-.5, .25, -.5, -.5, .75, .125]);
   const pair = createScoreAccessor(fixture, matrix);
@@ -338,19 +338,19 @@ test('a 2 × 3 movie-major fixture reads the correct row and column, including s
   context.resetFilters();
   context.toggleSelection('tmdb:1');
   assert.deepEqual(context.setDirection(FORWARD).selectedKeys, ['anilist:1']);
-  assert.equal(context.snapshot().lookup.get('anilist:1').record.title, 'Cowboy Bebop');
+  assert.equal(context.snapshot().lookup.get('anilist:1').record.title, 'Attack on Titan');
 });
 
-test('published Cowboy Bebop column and Inception row agree, and Treasure Planet leads the reverse ranking', () => {
+test('published Attack on Titan column and Inception row agree, and Pacific Rim leads the reverse ranking', () => {
   const { context } = setup();
   const forward = context.setMagnets(['tmdb:27205']);
-  assert.equal(forward.ranking.find(row => row.key === 'anilist:1').score, 0.5034430027008057);
+  assert.equal(forward.ranking.find(row => row.key === 'anilist:16498').score, 0.36754152178764343);
   const reverse = context.setDirection(REVERSE);
   assert.equal(reverse.example, true);
-  assert.deepEqual(reverse.magnetKeys, ['anilist:1']);
-  assert.equal(reverse.ranking.find(row => row.key === 'tmdb:27205').score, 0.5034430027008057);
-  assert.equal(reverse.ranking[0].record.title, 'Treasure Planet');
-  assert.equal(reverse.ranking[0].score, 0.6052206158638);
+  assert.deepEqual(reverse.magnetKeys, ['anilist:16498']);
+  assert.equal(reverse.ranking.find(row => row.key === 'tmdb:27205').score, 0.36754152178764343);
+  assert.equal(reverse.ranking[0].record.title, 'Pacific Rim');
+  assert.equal(reverse.ranking[0].score, 0.549102246761322);
 });
 
 test('genre cohorts average signed movie rows and anime columns, preserving ties and one vote per magnet', () => {
@@ -485,15 +485,15 @@ test('v1 imports typed selections, sorts and layouts and keeps both directions i
   assert.equal(context.getLayout().particles.positions[0].key, anilist(selected));
   assert.equal(context.getLayout().scrollY, 450);
   context.setDirection(REVERSE);
-  context.setSources(data, scores);
-  context.toggleSelection('tmdb:9016');
-  context.setRankingSort('anilist:1');
+  const { displayedKeys: [selectedMovie], magnetKeys: [animeMagnet] } = context.setSources(data, scores);
+  context.toggleSelection(selectedMovie);
+  context.setRankingSort(animeMagnet);
   context.setRankingOrder('descending');
   context.saveLayout({ scrollY: 125 });
   const reverse = context.snapshot();
   context.setMetadata(dashboard.anime);
   assert.deepEqual(context.snapshot().displayedKeys, reverse.displayedKeys);
-  assert.deepEqual(context.snapshot().selectedKeys, ['tmdb:9016']);
+  assert.deepEqual(context.snapshot().selectedKeys, [selectedMovie]);
   const forward = context.setDirection(FORWARD);
   assert.deepEqual(forward.selectedKeys, [anilist(selected)]);
   assert.equal(forward.rankingSortKey, movieKeys[0]);
@@ -505,7 +505,7 @@ test('v1 imports typed selections, sorts and layouts and keeps both directions i
   assert.equal(restored.restore(), true);
   const saved = restored.setSources(data, scores);
   assert.equal(saved.direction, REVERSE);
-  assert.deepEqual(saved.selectedKeys, ['tmdb:9016']);
+  assert.deepEqual(saved.selectedKeys, [selectedMovie]);
   assert.equal(saved.rankingOrder, 'descending');
   assert.equal(restored.getLayout().scrollY, 125);
   assert.deepEqual(restored.setDirection(FORWARD).magnetKeys, []);
@@ -522,7 +522,7 @@ test('an explicitly empty v1 session takes priority over the legacy seed and exa
   const snapshot = context.setSources(data, scores, { seedExample: true });
   assert.deepEqual(snapshot.magnetKeys, []);
   assert.equal(snapshot.example, false);
-  assert.deepEqual(context.setDirection(REVERSE).magnetKeys, ['anilist:1']);
+  assert.deepEqual(context.setDirection(REVERSE).magnetKeys, ['anilist:16498']);
   assert.deepEqual(context.setMagnets([]).magnetKeys, []);
   context.setDirection(FORWARD);
   assert.deepEqual(context.setDirection(REVERSE).magnetKeys, []);
