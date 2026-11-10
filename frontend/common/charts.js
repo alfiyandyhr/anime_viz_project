@@ -625,6 +625,7 @@
         .attr("cy", item => y(score(item)))
         .attr("r", pointRadius)
         .attr("fill", item => filled(item) ? context.dustColor(String(item.id)) : "transparent")
+        .attr("fill-opacity", 0.65)
         .attr("stroke", item => filled(item) ? "var(--surface-solid)" : context.dustColor(String(item.id)))
         .attr("stroke-width", 1.5)
         .on("mouseenter", (event, item) => {

@@ -8,11 +8,6 @@
     ['195604', 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/small/bx195604-tSZcfKbVqSEG.jpg']
   ]);
 
-  function tmdbImage(path, size) {
-    return typeof path === 'string' && /^\/[\w-]+\.jpg$/.test(path)
-      ? `https://image.tmdb.org/t/p/${size}${path}` : '';
-  }
-
   function detailHero(banner, cover, description, attr) {
     if (!banner && !cover) return '';
     return `<div class="dust-focus-hero">
@@ -69,7 +64,6 @@
       const metadataRows = reverse ? [
         ['Release year', value => value.year ?? 'Unknown'],
         ['Genres', value => escape(value.genres?.join(', ') || 'Unknown')],
-        ['Runtime', value => score(value.runtime, 0, runtimeMax, `${number(value.runtime)} min`)],
         ['TMDB score', value => score(value.vote_average, 0, 10, `${number(value.vote_average)} / 10`)]
       ] : [
         ['Format / year', value => `${value.format ? escape(humanize(value.format)) : 'Unknown'} / ${value.year ?? 'Unknown'}`],
@@ -97,8 +91,8 @@
       return `<div class="dust-comparison-scroll" role="region" tabindex="0" aria-label="Selected ${noun} comparison, scroll horizontally">
         <table class="dust-comparison-table"><caption class="sr-only">Selected ${noun} comparison</caption>
         <thead><tr><th scope="col">Compare ${noun}</th>${records.map((item, i) => {
-          const cover = reverse ? tmdbImage(item.poster_path, 'w92')
-            : item.cover?.medium || item.cover?.large || item.cover?.extra_large || coverFallbacks.get(String(item.id));
+          const cover = !reverse && (item.cover?.medium || item.cover?.large || item.cover?.extra_large
+            || coverFallbacks.get(String(item.id)));
           return `<th scope="col">
             ${cover ? `<img class="dust-comparison-cover" src="${attr(cover)}" alt="" width="40" height="56">` : ''}
             ${escape(item.title)}
@@ -129,7 +123,6 @@
       <a class="button button-secondary" href="${attr(record.url || record.site_url || `https://anilist.co/anime/${record.id}`)}" target="_blank" rel="noopener noreferrer">Explore on AniList ↗</a>`
       : '';
     const movieHtml = movie && record ? `<p class="chart-kicker">${focusLabel}</p>
-      ${detailHero(tmdbImage(record.backdrop_path, 'w780'), tmdbImage(record.poster_path, 'w185'), `Poster for ${record.title}`, attr)}
       ${renderMovie({ record, match: focused, magnets, color, helpers })}` : '';
     return {
       count: selected.length,

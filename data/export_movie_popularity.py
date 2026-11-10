@@ -1,4 +1,4 @@
-"""Publish TMDB popularity for the existing recommendation catalogue."""
+"""Publish TMDB popularity and ratings from the archived recommendation sample."""
 
 import csv
 from datetime import datetime, timezone
@@ -33,6 +33,7 @@ def build_sidecar(archive, recommendations):
         raise ValueError("Invalid TMDB collection provenance")
 
     values = {}
+    ratings = {}
     with csv_path.open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
             movie_id = row["source_id"]
@@ -40,9 +41,14 @@ def build_sidecar(archive, recommendations):
                 raise ValueError(f"Invalid or duplicate TMDB ID: {movie_id}")
             raw = row["popularity"].strip()
             value = float(raw) if raw else None
-            if value is not None and not math.isfinite(value):
-                raise ValueError(f"Non-finite popularity for TMDB ID {movie_id}")
+            if value is not None and (not math.isfinite(value) or value < 0):
+                raise ValueError(f"Invalid popularity for TMDB ID {movie_id}")
             values[movie_id] = value
+            raw_score = row["average_score"].strip()
+            score = float(raw_score) if raw_score else None
+            if score is not None and not 0 <= score <= 10:
+                raise ValueError(f"Invalid rating for TMDB ID {movie_id}")
+            ratings[movie_id] = score
 
     if (set(values) != set(published_ids)
             or len(values) != input_meta["rows"] or len(values) != provenance["record_count"]):
@@ -57,6 +63,7 @@ def build_sidecar(archive, recommendations):
         "record_count": len(values),
         "eligible_count": sum(value is not None for value in values.values()),
         "popularity": values,
+        "vote_average": ratings,
     }
 
 

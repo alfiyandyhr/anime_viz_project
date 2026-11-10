@@ -215,6 +215,11 @@ body[data-chapter="explorer"] .range-control { grid-column: span 2; }
 @media(max-width:680px) { body[data-chapter="explorer"] .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.table-sort { width: 150px; } }
 
 .catalogue-tools { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; }
+.catalogue-switch { display: flex; gap: 6px; flex: 1 1 100%; }
+.catalogue-switch button[aria-pressed="false"] { border: 1px solid var(--border-strong); background: transparent; }
+body:not([data-catalogue-view="movie"]) [data-catalogue-only="movie"],
+body[data-catalogue-view="movie"] [data-catalogue-only="anime"] { display: none !important; }
 .catalogue-search { flex: 1 1 240px; max-width: 480px; }
+.movie-detail { margin-top: 0; padding-inline: 0; }
 body[data-chapter="explorer"] .catalogue-tools .filterbar { margin: 0; flex: 1 1 100%; min-width: 0; }
 @media(max-width:680px) { .catalogue-search { flex-basis: 100%; }.catalogue-tools { gap: 4px; } }

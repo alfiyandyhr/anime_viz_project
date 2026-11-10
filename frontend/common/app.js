@@ -187,18 +187,29 @@ function showPersistenceNotice() {
   if (notice) { notice.hidden = false; notice.textContent = "Session storage unavailable; filters work here but may not survive navigation."; }
 }
 
+const filterControlKeys = ["searchInput", "genreFilter", "studioFilter", "formatFilter",
+  "yearFrom", "yearTo", "scoreFilter"];
+
+function readFilterControls() {
+  return Object.fromEntries(filterControlKeys.map(key => [key, elements[key].value]));
+}
+
+function restoreFilterControls(saved) {
+  if (!saved || typeof saved !== "object") return;
+  for (const key of filterControlKeys) {
+    if (typeof saved[key] !== "string") continue;
+    const element = elements[key];
+    if (element.tagName === "SELECT"
+      && !Array.from(element.options).some((option) => option.value === saved[key])) continue;
+    element.value = saved[key];
+  }
+}
+
 function saveFilters() {
   if (document.body?.dataset.chapter === "network") return;
   try {
-    sessionStorage.setItem(state.browseMode === "matches" ? FILTER_STORAGE_KEY : CATALOGUE_FILTER_STORAGE_KEY, JSON.stringify({
-      searchInput: elements.searchInput.value,
-      genreFilter: elements.genreFilter.value,
-      studioFilter: elements.studioFilter.value,
-      formatFilter: elements.formatFilter.value,
-      yearFrom: elements.yearFrom.value,
-      yearTo: elements.yearTo.value,
-      scoreFilter: elements.scoreFilter.value
-    }));
+    sessionStorage.setItem(state.browseMode === "matches" ? FILTER_STORAGE_KEY : CATALOGUE_FILTER_STORAGE_KEY,
+      JSON.stringify(readFilterControls()));
   } catch (error) {
     showPersistenceNotice();
   }
@@ -208,15 +219,7 @@ function restoreFilters() {
   if (document.body?.dataset.chapter === "network") return;
   try {
     const saved = JSON.parse(sessionStorage.getItem(state.browseMode === "matches" ? FILTER_STORAGE_KEY : CATALOGUE_FILTER_STORAGE_KEY) || "null");
-    if (!saved || typeof saved !== "object") return;
-    for (const key of ["searchInput", "genreFilter", "studioFilter", "formatFilter",
-      "yearFrom", "yearTo", "scoreFilter"]) {
-      if (typeof saved[key] !== "string") continue;
-      const element = elements[key];
-      if (element.tagName === "SELECT"
-        && !Array.from(element.options).some((option) => option.value === saved[key])) continue;
-      element.value = saved[key];
-    }
+    restoreFilterControls(saved);
   } catch (error) {
     showPersistenceNotice();
   }
@@ -282,9 +285,7 @@ async function loadDashboard() {
   }
 }
 
-function populateControls() {
-  const { meta } = state.data;
-
+function populateControls(meta = state.data.meta) {
   populateSelect(
     elements.genreFilter,
     meta.genres,
@@ -331,15 +332,20 @@ function populateSelect(select, values, allLabel, formatter = (value) => value) 
   ].join("");
 }
 
-function resetFilters() {
+function resetFilterControls(meta) {
   elements.searchInput.value = "";
   elements.genreFilter.value = "All";
   elements.studioFilter.value = "All";
   elements.formatFilter.value = "All";
-  elements.yearFrom.value = state.data.meta.year_min;
-  elements.yearTo.value = state.data.meta.year_max;
+  elements.yearFrom.value = meta.year_min;
+  elements.yearTo.value = meta.year_max;
   elements.scoreFilter.value = 0;
   elements.scoreOutput.value = 0;
+}
+
+function resetFilters() {
+  if (!state.data) return;
+  resetFilterControls(state.data.meta);
   pageControls.resetControls?.();
 
   applyFilters();
@@ -350,6 +356,15 @@ function applyFilters() {
     return;
   }
 
+  state.filteredAnime = filterTitles(state.data.anime, state.data.meta);
+  state.tablePage = 0;
+
+  saveFilters();
+  renderFilterSummary();
+  renderPage();
+}
+
+function filterTitles(titles, meta) {
   let yearFrom = Number(elements.yearFrom.value);
   let yearTo = Number(elements.yearTo.value);
 
@@ -365,48 +380,43 @@ function applyFilters() {
   const selectedFormat = elements.formatFilter.value;
   const minimumScore = Number(elements.scoreFilter.value);
 
-  state.filteredAnime = state.data.anime.filter((anime) => {
+  return titles.filter((title) => {
     const haystack = [
-      anime.title,
-      anime.titles?.english,
-      anime.titles?.romaji,
-      anime.titles?.native,
-      ...(anime.genres || []),
-      ...(anime.studio_names || []),
-      ...(anime.voice_actors || []).map((actor) => actor.name)
+      title.title,
+      title.titles?.english,
+      title.titles?.romaji,
+      title.titles?.native,
+      ...(title.aliases || []),
+      ...(title.genres || []),
+      ...(title.studio_names || []),
+      ...(title.voice_actors || []).map((actor) => actor.name)
     ]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
 
-    const yearMatches = Number.isFinite(anime.year)
-      ? anime.year >= yearFrom && anime.year <= yearTo
-      : yearFrom <= state.data.meta.year_min && yearTo >= state.data.meta.year_max;
+    const yearMatches = Number.isFinite(title.year)
+      ? title.year >= yearFrom && title.year <= yearTo
+      : yearFrom <= meta.year_min && yearTo >= meta.year_max;
 
     const scoreMatches = minimumScore === 0
       || (
-        Number.isFinite(anime.average_score)
-        && anime.average_score >= minimumScore
+        Number.isFinite(title.average_score)
+        && title.average_score >= minimumScore
       );
 
     return (
       (!search || haystack.includes(search))
-      && (selectedGenre === "All" || anime.genres.includes(selectedGenre))
+      && (selectedGenre === "All" || title.genres.includes(selectedGenre))
       && (
         selectedStudio === "All"
-        || anime.studio_names.includes(selectedStudio)
+        || title.studio_names.includes(selectedStudio)
       )
-      && (selectedFormat === "All" || anime.format === selectedFormat)
+      && (selectedFormat === "All" || title.format === selectedFormat)
       && yearMatches
       && scoreMatches
     );
   });
-
-  state.tablePage = 0;
-
-  saveFilters();
-  renderFilterSummary();
-  renderPage();
 }
 
 function filterScopeSummary() {

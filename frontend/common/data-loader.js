@@ -22,37 +22,35 @@
       return payload;
     }),
     recommendations: () => once("recommendations", () => json("data/movie_recommendations.json")),
-    movieDetails: data => {
-      const movieIds = data.movies.map(movie => String(movie.id)).sort();
-      return once(`movie-details:${movieIds.join(",")}`, async () => {
-        const payload = await json("data/movie_details.json");
-        const movies = payload?.movies;
-        if (payload?.schema_version !== 1 || payload.source !== "TMDB"
-          || payload.record_count !== movieIds.length || !movies || Object.keys(movies).length !== movieIds.length
-          || movieIds.some(id => !Object.hasOwn(movies, id) || !movies[id] || typeof movies[id] !== "object")) {
-          throw new Error("Invalid TMDB details for this movie sample");
-        }
-        return movies;
-      });
-    },
     moviePopularity: data => {
-      const movieIds = data.movies.map(movie => String(movie.id)).sort();
+      const movieIds = data.movies.map(movie => String(movie.id));
       return once(`movie-popularity:${movieIds.join(",")}`, async () => {
         const ids = new Set(movieIds);
         const payload = await json("data/movie_popularity.json", "no-cache");
-        const { popularity, snapshot_date: date } = payload || {};
+        const { popularity, vote_average: ratings, snapshot_date: date } = payload || {};
         const entries = Object.entries(popularity || {});
+        const validValues = (values, valid) => values && typeof values === "object" && !Array.isArray(values)
+          && Object.keys(values).length === ids.size
+          && movieIds.every(id => Object.hasOwn(values, id) && (values[id] === null || valid(values[id])));
         const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(date) : null;
         if (payload?.schema_version !== 1 || payload.source !== "TMDB" || payload.metric !== "popularity"
           || !parsedDate || !Number.isFinite(+parsedDate) || parsedDate.toISOString().slice(0, 10) !== date
           || !/^[a-f0-9]{64}$/.test(payload.input_sha256)
-          || !popularity || typeof popularity !== "object" || Array.isArray(popularity)
-          || ids.size !== movieIds.length || entries.length !== ids.size || payload.record_count !== ids.size
-          || entries.some(([id, value]) => !ids.has(id) || (value !== null && !Number.isFinite(value)))
+          || ids.size !== movieIds.length || payload.record_count !== ids.size
+          || !validValues(popularity, value => Number.isFinite(value) && value >= 0)
+          || (ratings !== undefined && !validValues(ratings, value => Number.isFinite(value) && value >= 0 && value <= 10))
           || payload.eligible_count !== entries.filter(([, value]) => Number.isFinite(value)).length) {
-          throw new Error("Invalid TMDB popularity data for this movie sample");
+          throw new Error("Invalid archived TMDB data for this movie sample");
         }
-        return payload;
+        const rankedIds = movieIds.filter(id => Number.isFinite(popularity[id]))
+          .sort((a, b) => popularity[b] - popularity[a]);
+        const ranks = new Map(rankedIds.map((id, index) => [id, index + 1]));
+        const movies = Object.fromEntries(movieIds.map(id => [id, {
+          popularity: popularity[id],
+          popularity_rank: ranks.get(id) ?? null,
+          vote_average: ratings?.[id] ?? null
+        }]));
+        return { ...payload, movies };
       });
     },
     history: () => once("history", () => json("story.json")),

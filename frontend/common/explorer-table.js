@@ -5,7 +5,8 @@
     let context;
     function render() {
       const sortMode = context.sortMode || "popularity";
-      const sorted = [...context.anime];
+      const sorted = [...(context.titles ?? context.anime)];
+      const movie = context.movie;
 
       sorted.sort((a, b) => {
         switch (sortMode) {
@@ -29,7 +30,7 @@
 
           case "popularity":
           default:
-            return d3.descending(a.popularity || 0, b.popularity || 0);
+            return d3.descending(a.popularity ?? -1, b.popularity ?? -1);
         }
       });
 
@@ -45,53 +46,55 @@
       const cohortRanks = new Map(Boolean(context.cohort)
         ? context.cohort.ids.map((id, index) => [String(id), index + 1]) : []);
 
-      body.innerHTML = displayed.map((anime, index) => `
-        <tr data-anime-id="${anime.id}" tabindex="0">
-          <td><input type="checkbox" class="shortlist-checkbox" data-shortlist-id="${anime.id}"
-            aria-label="Shortlist ${escapeAttribute(anime.title)}"${context.selectedIds.includes(String(anime.id)) ? " checked" : ""}${context.selectedIds.length >= 3 && !context.selectedIds.includes(String(anime.id)) ? " disabled" : ""}></td>
-          <td title="${Boolean(context.cohort) ? "Original movie similarity rank" : "Position in the current sort order"}">${cohortRanks.get(String(anime.id)) ?? pageStart + index + 1}</td>
+      body.innerHTML = displayed.map((title, index) => {
+        const id = String(title.id);
+        const selected = context.selectedIds.includes(id);
+        const cover = title.cover?.medium || title.cover?.large || "";
+        const rank = movie ? title.popularity_rank ?? "N/A" : cohortRanks.get(id) ?? pageStart + index + 1;
+        const rankLabel = movie ? "Popularity rank in the archived movie sample"
+          : context.cohort ? "Original movie similarity rank" : "Position in the current sort order";
+        return `
+        <tr data-${movie ? "movie" : "anime"}-id="${escapeAttribute(id)}" tabindex="0">
+          <td><input type="checkbox" class="shortlist-checkbox" data-shortlist-id="${escapeAttribute(id)}"
+            aria-label="Shortlist ${escapeAttribute(title.title)}"${selected ? " checked" : ""}${context.selectedIds.length >= 3 && !selected ? " disabled" : ""}></td>
+          <td title="${rankLabel}">${rank}</td>
           <td>
             <div class="anime-cell">
-              <img
-                src="${escapeAttribute(anime.cover.medium || anime.cover.large || "")}"
+              ${movie ? "" : `<img
+                src="${escapeAttribute(cover)}"
                 alt=""
                 loading="lazy"
-              >
+              >`}
               <div>
-                <strong>${escapeHTML(anime.title)}</strong>
-                ${context.compact ? "" : `<small>${escapeHTML(anime.titles.romaji || "")}</small>`}
+                <strong>${escapeHTML(title.title)}</strong>
+                ${context.compact ? "" : `<small>${escapeHTML(title.titles.romaji || "")}</small>`}
               </div>
             </div>
           </td>
-          <td>${anime.year || "—"}</td>
-          <td>${escapeHTML(humanize(anime.format))}</td>
-          ${context.compact ? "" : `<td>${escapeHTML(anime.studio_names.join(", "))}</td>`}
+          <td>${title.year || "—"}</td>
+          <td>${escapeHTML(movie ? title.genres.join(", ") || "Unknown" : humanize(title.format))}</td>
+          ${context.compact ? "" : `<td>${escapeHTML(title.studio_names.join(", "))}</td>`}
           <td>
             <span class="score-pill">
-              ${Number.isFinite(anime.average_score)
-                ? anime.average_score
+              ${Number.isFinite(title.average_score)
+                ? title.average_score
                 : "N/A"}
             </span>
           </td>
-          <td>${formatNumber(anime.popularity)}</td>
+          <td>${movie ? title.popularity ?? "N/A" : formatNumber(title.popularity)}</td>
           ${context.compact ? "" : `<td>
             <div class="genre-list">
-              ${anime.genres.slice(0, 3).map((genre) => (
+              ${title.genres.slice(0, 3).map((genre) => (
                 `<span class="tag">${escapeHTML(genre)}</span>`
               )).join("")}
             </div>
           </td>`}
         </tr>
-      `).join("");
+      `;
+      }).join("");
 
-      body.querySelectorAll("tr").forEach((row) => {
-        const openRow = () => {
-          const anime = context.anime.find(item => String(item.id) === row.dataset.animeId);
-
-          if (anime) {
-            context.onSelect(String(anime.id));
-          }
-        };
+      body.querySelectorAll("tr").forEach((row, index) => {
+        const openRow = () => context.onSelect(String(displayed[index].id));
 
         row.addEventListener("click", (event) => {
           if (!event.target.closest("input")) openRow();

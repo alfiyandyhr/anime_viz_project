@@ -1,6 +1,7 @@
 // Optional real-browser verification. See tests/journey-verification.md for setup.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
+const archive = require('../../data/movie_popularity.json');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 const forward = 'movie-to-anime', reverse = 'anime-to-movies';
 const anime = 'anilist:popularity', movies = 'tmdb:popularity';
@@ -111,11 +112,11 @@ const state = page => page.evaluate(() => {
     await dot(page).first().press('Enter');
     const selectedAnime = (await state(page)).selectedKeys;
 
+    assert.equal(movieRequests, 0, 'anime reception uses AniList data');
+    movieResponse = 'missing';
     await switchTo(page, reverse);
     await ready(page);
-    assert.equal(movieRequests, 0, 'the sidecar loads only for the picker or a saved magnet');
     const reverseExample = await state(page);
-    movieResponse = 'missing';
     await choosePopularity(page);
     await page.locator('#retry-popularity').waitFor();
     assert.ok(await add(page).isDisabled());
@@ -129,6 +130,23 @@ const state = page => page.evaluate(() => {
     await dot(page).first().press('Enter');
     const movieBlend = await state(page);
     assert.deepEqual(movieBlend.magnetKeys, ['anilist:16498', movies]);
+    const interstellarId = '157336';
+    const interstellarKey = `tmdb:${interstellarId}`;
+    const interstellar = movieBlend.ranking.find(row => row[0] === interstellarKey);
+    const rawPopularity = interstellar[2][1];
+    assert.equal(rawPopularity, archive.popularity[interstellarId]);
+    const reception = await page.evaluate(key => AnivizMain.snapshot().lookup.get(key).record, interstellarKey);
+    assert.equal(reception.vote_average, archive.vote_average[interstellarId]);
+    const catalogue = await browser.newPage();
+    await catalogue.goto(new URL('frontend/explorer/index.html', base).href);
+    await catalogue.getByRole('button', { name: 'Movie', exact: true }).click();
+    await catalogue.locator('#movie-table-body tr').first().waitFor();
+    await catalogue.fill('#search-input', 'Interstellar');
+    const cells = await catalogue.locator(`[data-movie-id="${interstellarId}"] td`).allTextContents();
+    assert.equal(Number(cells[1]), reception.popularity_rank);
+    assert.equal(Number(cells[5]), reception.vote_average);
+    assert.equal(Number(cells[6]), rawPopularity);
+    await catalogue.close();
     await switchTo(page, forward);
     assert.deepEqual((await state(page)).selectedKeys, selectedAnime);
     await switchTo(page, reverse);
