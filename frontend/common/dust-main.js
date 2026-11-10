@@ -285,7 +285,7 @@
     $('#dust-limit-control span').textContent = reverse ? 'Movie dots' : 'Anime dots';
     $('#filter-title').textContent = `Filter ${dustNoun()}`;
     $('#dust-filter-search-label').textContent = reverse ? 'Search titles or aliases' : 'Search titles, studios, or actors';
-    elements.searchInput.placeholder = reverse ? 'e.g. Treasure Planet' : 'e.g. Attack on Titan';
+    elements.searchInput.placeholder = reverse ? 'e.g. Pacific Rim' : 'e.g. Attack on Titan';
     $('#dust-focus').setAttribute('aria-label', reverse ? 'Movie in focus' : 'Anime in focus');
     $('#dust-ranking-title').textContent = `Full ${reverse ? 'movie' : 'anime'} ranking`;
     $('#reception h3').textContent = reverse ? 'Reception' : 'Score vs. popularity';

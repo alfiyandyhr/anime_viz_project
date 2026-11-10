@@ -39,7 +39,7 @@ by catalogue, for example `tmdb:27205`, `anilist:1`, and `tmdb:genre:Science Fic
 The v2 session stores separate state and layout for both directions and remembers
 which is active. A compatible v1 session imports into Movie → Anime. If no saved
 session exists, a resolvable legacy seed takes priority over the Inception
-example. Only the legacy title ID is imported. Cowboy Bebop seeds the reverse
+example. Only the legacy title ID is imported. Attack on Titan seeds the reverse
 direction on first entry. Restoring any direction revalidates magnet and
 selection IDs and recomputes the dust membership. Storage failure leaves the
 context usable in memory and emits a notice.

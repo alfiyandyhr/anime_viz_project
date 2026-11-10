@@ -1,4 +1,11 @@
 "use strict";
+
+// Native form controls can match :focus-visible even after a pointer click.
+document.addEventListener('pointerdown', () => document.documentElement.classList.add('pointer-input'), true);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Tab') document.documentElement.classList.remove('pointer-input');
+}, true);
+
 // Native disclosure and links retain browser navigation, modified clicks and Back/Forward.
 // Add roving focus shortcuts without replacing standard Tab or link semantics.
 for (const menu of document.querySelectorAll('[data-view-menu], [data-field-options]')) {

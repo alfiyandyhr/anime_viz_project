@@ -12,7 +12,7 @@
    all 1,000 titles have a raw similarity rank. Remove popularity to restore
    cosine scores.
 4. Switch to **Anime → Movies** and add **High movie popularity** alongside
-   Cowboy Bebop. The separate TMDB snapshot covers 1,000 movies and is dated
+   Attack on Titan. The separate TMDB snapshot covers 1,000 movies and is dated
    2026-10-11 UTC. Switch directions and reload to check saved magnets, sorts,
    and selections.
 5. Block the dashboard or movie popularity request and reload a saved
@@ -60,9 +60,9 @@ rank order for each sort basis. It also records displayed membership before and
 after filtering for Action and release year 2000 or later.
 
 1. Open Dust & Magnet on a fresh session and confirm the Inception example.
-   Choose **Anime → Movies**. Cowboy Bebop opens as the example and Treasure
-   Planet ranks first at `0.6052206158638`. Inception and Cowboy Bebop share
-   the exact score `0.5034430027008057` in either direction.
+   Choose **Anime → Movies**. Attack on Titan opens as the example and Pacific
+   Rim ranks first at `0.549102246761322`. Inception and Attack on Titan share
+   the exact score `0.36754152178764343` in either direction.
 2. Search with an alias or year, add a second and third anime magnet, and
    exercise 30, 60, and 90 dots. Move a magnet with arrow keys. Reset positions
    and check that selection and strongest-magnet colors remain intact.

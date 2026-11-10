@@ -9,7 +9,7 @@ A visual story discovery tool built with Python/Flask, AniList GraphQL API, and 
 ## Four views
 
 The root URL opens **Dust & Magnet** with an **Example** Inception magnet.
-Switch Direction to **Anime → Movies** for the **Example** Cowboy Bebop magnet. Use **Title** to search by title, alias, or year. Use **Genre cohort** to add a group of titles by genre. Fill up to three slots with any mix of distinct titles and cohorts. Remove any magnet with ×.
+Switch Direction to **Anime → Movies** for the **Example** Attack on Titan magnet. Use **Title** to search by title, alias, or year. Use **Genre cohort** to add a group of titles by genre. Fill up to three slots with any mix of distinct titles and cohorts. Remove any magnet with ×.
 The compact dropdown contains exactly four destinations:
 
 | View | Data and interactions |

@@ -12,7 +12,7 @@
   const FORWARD = "movie-to-anime", REVERSE = "anime-to-movies";
   const DIRECTIONS = {
     [FORWARD]: { magnet: "tmdb", dust: "anilist", example: "Inception" },
-    [REVERSE]: { magnet: "anilist", dust: "tmdb", example: "Cowboy Bebop" }
+    [REVERSE]: { magnet: "anilist", dust: "tmdb", example: "Attack on Titan" }
   };
   const keyFor = (catalogue, id) => `${catalogue}:${id}`;
   const catalogueFor = (data, catalogue) => (catalogue === "tmdb" ? data?.movies : data?.anime) || [];
