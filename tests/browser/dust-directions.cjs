@@ -1,6 +1,7 @@
 // Optional real-browser verification. See tests/journey-verification.md for setup.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
+const { movies: movieDetails } = require('../../data/movie_details.json');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 const url = path => new URL(path, base).href;
 const forward = 'movie-to-anime', reverse = 'anime-to-movies';
@@ -78,7 +79,9 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
     assert.equal(await focusScore.getAttribute('title'), 'Cosine 0.549');
     assert.equal(await focusScore.getAttribute('aria-label'), 'Cosine 0.549');
     assert.equal(await page.locator('#dust-focus a').getAttribute('href'), 'https://www.themoviedb.org/movie/68726');
-    assert.equal(await page.locator('#dust-focus img').count(), 0);
+    const focusPoster = page.getByRole('img', { name: 'Poster for Pacific Rim' });
+    await focusPoster.waitFor();
+    assert.equal(await focusPoster.getAttribute('src'), `https://image.tmdb.org/t/p/w185${movieDetails['68726'].poster_path}`);
 
     await page.locator('#movie-search').fill('進撃の巨人 2013');
     await page.locator('#movie-search').press('ArrowDown');
@@ -111,6 +114,14 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
     assert.equal(selected.length, 3);
     assert.match(await page.locator('[data-dust-notice]').innerText(), /Compare up to 3 movies/);
     assert.match(await page.locator('#recommendation-detail').innerText(), /Comparing 3 movies[\s\S]*Release year[\s\S]*Genres/i);
+    const comparedMovies = selected.map(key => movieDetails[key.split(':')[1]]);
+    const comparison = page.locator('.dust-comparison-table');
+    assert.deepEqual(await comparison.locator('thead img').evaluateAll(images => images.map(img => img.src)),
+      comparedMovies.map(movie => `https://image.tmdb.org/t/p/w92${movie.poster_path}`));
+    assert.deepEqual(await comparison.getByRole('row', { name: /^Runtime/ }).locator('meter').evaluateAll(meters => meters.map(meter => meter.value)),
+      comparedMovies.map(movie => movie.runtime));
+    assert.deepEqual(await comparison.getByRole('row', { name: /^TMDB score/ }).locator('meter').evaluateAll(meters => meters.map(meter => [meter.value, meter.max])),
+      comparedMovies.map(movie => [movie.vote_average, 10]));
     const colors = () => field.locator('.dust-grain').evaluateAll(nodes => nodes.map(node => node.getAttribute('fill')));
     const beforeResetColors = await colors();
     await page.locator('#reset-magnets').click();
@@ -185,7 +196,7 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
         return top >= 48 && top < 180;
       }, anchor);
     }
-    assert.match(await page.locator('#reception').innerText(), /no ratings.*separate TMDB popularity snapshot/);
+    assert.match(await page.locator('#reception').innerText(), /compare TMDB scores.*archived TMDB popularity snapshot/);
     assert.match(await page.locator('#creators').innerText(), /no production company or cast credits/);
     await page.evaluate(() => {
       sessionStorage.setItem('aniviz-dust-session-v1', JSON.stringify({ version: 1, state: {

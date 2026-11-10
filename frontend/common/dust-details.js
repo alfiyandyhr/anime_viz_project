@@ -8,6 +8,19 @@
     ['195604', 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/small/bx195604-tSZcfKbVqSEG.jpg']
   ]);
 
+  function tmdbImage(path, size) {
+    return typeof path === 'string' && /^\/[\w-]+\.jpg$/.test(path)
+      ? `https://image.tmdb.org/t/p/${size}${path}` : '';
+  }
+
+  function detailHero(banner, cover, description, attr) {
+    if (!banner && !cover) return '';
+    return `<div class="dust-focus-hero">
+      ${banner ? `<img class="detail-banner" src="${attr(banner)}" alt="">` : ''}
+      ${cover ? `<img class="detail-cover" src="${attr(cover)}" alt="${attr(description)}">` : ''}
+    </div>`;
+  }
+
   function renderMovie({ record, match, magnets, color, helpers, heading = 'h3' }) {
     const { escapeHTML: escape, escapeAttribute: attr } = helpers;
     return `<${heading}>${escape(record.title)}</${heading}>
@@ -52,10 +65,12 @@
     function table(matches) {
       const records = matches.map(recordFor);
       const values = reverse ? records : records.map(root.AnivizChartData.comparisonValues);
-      const runtimeMax = Math.max(1, ...values.map(row => row.runtime || 0));
+      const runtimeMax = Math.max(1, ...values.map(row => Number.isFinite(row.runtime) ? row.runtime : 0));
       const metadataRows = reverse ? [
         ['Release year', value => value.year ?? 'Unknown'],
-        ['Genres', value => escape(value.genres?.join(', ') || 'Unknown')]
+        ['Genres', value => escape(value.genres?.join(', ') || 'Unknown')],
+        ['Runtime', value => score(value.runtime, 0, runtimeMax, `${number(value.runtime)} min`)],
+        ['TMDB score', value => score(value.vote_average, 0, 10, `${number(value.vote_average)} / 10`)]
       ] : [
         ['Format / year', value => `${value.format ? escape(humanize(value.format)) : 'Unknown'} / ${value.year ?? 'Unknown'}`],
         ['Episodes', value => value.episodes ? `${number(value.episodes)}${value.duration ? ` × ${number(value.duration)} min` : ''}` : 'Unknown'],
@@ -82,7 +97,8 @@
       return `<div class="dust-comparison-scroll" role="region" tabindex="0" aria-label="Selected ${noun} comparison, scroll horizontally">
         <table class="dust-comparison-table"><caption class="sr-only">Selected ${noun} comparison</caption>
         <thead><tr><th scope="col">Compare ${noun}</th>${records.map((item, i) => {
-          const cover = !reverse && (item.cover?.medium || item.cover?.large || item.cover?.extra_large || coverFallbacks.get(String(item.id)));
+          const cover = reverse ? tmdbImage(item.poster_path, 'w92')
+            : item.cover?.medium || item.cover?.large || item.cover?.extra_large || coverFallbacks.get(String(item.id));
           return `<th scope="col">
             ${cover ? `<img class="dust-comparison-cover" src="${attr(cover)}" alt="" width="40" height="56">` : ''}
             ${escape(item.title)}
@@ -100,10 +116,7 @@
     const focusLabel = reverse ? 'Movie in focus' : 'Anime in focus';
     const placeholder = `<div class="dust-detail-placeholder"><p class="chart-kicker">${focusLabel}</p><h3>Every dot has a story.</h3><p>Select a dot to explore its storyline, genres, and similarity to your magnets.</p></div>`;
     const animeHtml = !reverse && record ? `<p class="chart-kicker">${focusLabel}</p>
-      <div class="dust-focus-hero">
-        ${banner ? `<img class="detail-banner" src="${attr(banner)}" alt="">` : ''}
-        ${cover ? `<img class="detail-cover" src="${attr(cover)}" alt="Cover for ${attr(record.title)}">` : ''}
-      </div>
+      ${detailHero(banner, cover, `Cover for ${record.title}`, attr)}
       <h3 aria-live="polite">${escape(record.title)}</h3>
       <p class="recommendation-detail-meta">${escape(humanize(record.format || 'Unknown'))} · ${record.year || 'Year unknown'}</p>
       ${magnetScores(focused, magnets, color, helpers)}
@@ -114,9 +127,9 @@
       <div class="recommendation-context"><h4>Japanese sampled voice credits</h4><ul>${(record.voice_actors || []).map(actor => `<li>${escape(actor.name)}${actor.characters?.length ? ` — ${escape(actor.characters.join(', '))}` : ''}</li>`).join('') || '<li>Cast metadata unavailable.</li>'}</ul></div>
       <a class="button button-secondary" href="${attr(record.url || record.site_url || `https://anilist.co/anime/${record.id}`)}" target="_blank" rel="noopener noreferrer">Explore on AniList ↗</a>`
       : '';
-    const movieHtml = reverse && record ? `<p class="chart-kicker">${focusLabel}</p>${renderMovie({
-      record, match: focused, magnets, color, helpers
-    })}` : '';
+    const movieHtml = reverse && record ? `<p class="chart-kicker">${focusLabel}</p>
+      ${detailHero(tmdbImage(record.backdrop_path, 'w780'), tmdbImage(record.poster_path, 'w185'), `Poster for ${record.title}`, attr)}
+      ${renderMovie({ record, match: focused, magnets, color, helpers })}` : '';
     return {
       count: selected.length,
       focusHtml: movieHtml || animeHtml || placeholder,

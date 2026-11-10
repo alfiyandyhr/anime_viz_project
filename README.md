@@ -22,7 +22,9 @@ The compact dropdown contains exactly four destinations:
 Direction, the magnet picker, removable magnets, dot count, and **Reset positions** sit in the left panel.
 The right panel follows the latest selected title. Anime details include AniList
 images, synopsis, tags, and sampled Japanese cast. Movie details use published
-TMDB text, genres, keywords, and a TMDB link. Open **Filter** for dust filters.
+TMDB posters, backdrops, text, genres, keywords, and a TMDB link. The movie
+comparison includes posters, runtimes in minutes, and TMDB scores out of 10.
+Open **Filter** for dust filters.
 Movie dust supports title and alias search,
 genre, and release year.
 
@@ -320,6 +322,13 @@ published TMDB IDs. It records the collection date, source, input hash, and
 eligible count in `data/movie_popularity.json`. Flask and static hosting serve
 the same file. The browser loads and validates it separately when movie popularity
 is requested, with a Retry control if the fetch or validation fails.
+
+Run `python3 data/export_movie_details.py` to refresh `data/movie_details.json`
+for the published movie IDs. The exporter reads TMDB credentials from
+`data/semantic_similarity/.env.local` or the environment. It stores poster and
+backdrop paths, runtimes, user scores, and a rank within the movie sample by
+descending TMDB popularity, breaking ties by TMDB ID. The movie details snapshot
+is separate from the archived popularity snapshot used by the magnet.
 
 Run recommendation, story, network, and collector checks:
 

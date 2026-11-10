@@ -3,6 +3,7 @@
 (function (root) {
   let context, composition, latest, rankingPage = 0, rankingSignature = "";
   let scrollRestored = false, pendingNotice = "", metadataLoading = false;
+  let movieDetailsLoading = false, movieDetailsLoaded = false;
   const $ = selector => document.querySelector(selector);
   const magnetColors = new Map();
   const isReverse = () => latest.direction === AnivizDust.REVERSE;
@@ -139,7 +140,7 @@
       years: ['Release years', row => Number.isFinite(row.year), reverse ? 'Bars show displayed movies by release year.' : 'Bars: titles · line: score.']
     };
     if (reverse) {
-      $('[data-coverage="reception"]').textContent = 'The published TMDB sample has no ratings. The High popularity magnet uses the separate TMDB popularity snapshot.';
+      $('[data-coverage="reception"]').textContent = 'Select movies to compare TMDB scores below the field. The High popularity magnet uses the archived TMDB popularity snapshot.';
       $('[data-coverage="studios"]').textContent = 'The published TMDB sample has no production company or cast credits.';
       $('[data-coverage="heatmap"]').textContent = '';
     } else {
@@ -227,6 +228,16 @@
     context.setMoviePopularity(payload, payload ? 'ready' : 'unavailable');
     if (isReverse()) renderRecommendations();
     restoreScroll();
+  }
+  async function loadMovieDetails() {
+    if (!isReverse() || movieDetailsLoading || movieDetailsLoaded) return;
+    movieDetailsLoading = true;
+    const details = await AnivizData.movieDetails(recommendationState.data).catch(() => null);
+    movieDetailsLoading = false;
+    if (details) {
+      movieDetailsLoaded = true;
+      context.setMovieDetails(details);
+    }
   }
   function loadSavedPopularity() {
     if (latest.popularity.status === 'idle' && latest.magnetKeys.includes(latest.popularity.key)) void loadPopularity();
@@ -321,6 +332,7 @@
       loadLayout();
       context.setSources(data, null, { seedExample: true });
       updateDirectionControls();
+      void loadMovieDetails();
       loadSavedPopularity();
       restoreScroll();
     },
@@ -332,6 +344,7 @@
       closeDrawer();
       if (!pendingNotice.startsWith('Session storage')) notice('');
       context.setDirection(direction);
+      void loadMovieDetails();
       loadSavedPopularity();
       renderRecommendations();
       scrollRestored = true;

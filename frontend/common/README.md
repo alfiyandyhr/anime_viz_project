@@ -76,7 +76,8 @@ The `#reception`, `#content`, and `#creators` anchors work with either catalogue
 
 `dust-details.js` renders the latest selection and a comparison below the field.
 Anime comparison shares Explorer’s metadata transforms. Movie comparison shows
-year and genres. Cosine meters span −1 to 1, with exact values available on
+posters, year, genres, runtime, and TMDB user scores. Movie in focus also
+shows the TMDB poster and backdrop when available. Cosine meters span −1 to 1, with exact values available on
 hover or focus. Field tooltips, Movie in focus, and the movie details drawer show
 scores to three decimals. Any ranking row can open the appropriate details drawer
 independently of the comparison.

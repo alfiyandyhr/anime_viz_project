@@ -630,7 +630,7 @@ body[data-chapter="dust-magnet"] .recommendation-detail { position: static; padd
 body[data-chapter="dust-magnet"] .dust-focus { max-height: var(--field-height); overflow-y: auto; overscroll-behavior: contain; min-width: 0; padding: 16px; border-radius: 10px; }
 .dust-focus-hero .detail-banner { height: 120px; border-radius: 8px; }
 .dust-focus-hero .detail-cover { display: block; position: relative; width: 80px; height: 112px; margin: -42px 0 12px 10px; border-width: 3px; border-radius: 8px; }
-.dust-focus-hero:empty { display: none; }
+.dust-focus-hero .detail-cover:first-child { margin: 0 0 12px; }
 .dust-focus .dust-detail-scores > div > span { min-width: 0; overflow-wrap: anywhere; }
 .dust-focus .dust-story p, .dust-focus .recommendation-context { font-size: .8rem; color: var(--text-soft); }
 .dust-focus .dust-story h4 { margin-bottom: 8px; }

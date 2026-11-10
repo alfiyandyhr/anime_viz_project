@@ -112,3 +112,24 @@ test('focus uses the latest selected anime with catalogue images, and falls back
   assert.match(result.focusHtml,/Every dot has a story/);
   assert.equal(result.html,'');
 });
+
+test('movie details can arrive after selection and leave missing metadata unknown', () => {
+  const { context, data } = fixture();
+  context.setDirection('anime-to-movies');
+  context.setSelection(['tmdb:b', 'tmdb:a']);
+  const before = context.snapshot();
+  assert.doesNotMatch(renderDetails(context, data).focusHtml, /<img/);
+
+  context.setMovieDetails({
+    a: { poster_path: '/first.jpg', runtime: 120, vote_average: 0 },
+    b: { poster_path: null, runtime: null, vote_average: null }
+  });
+
+  const { focusHtml, html } = renderDetails(context, data);
+  assert.match(focusHtml, /w185\/first.jpg" alt="Poster for First"/);
+  assert.match(html, /w92\/first.jpg/);
+  assert.match(html, /<th scope="row">Runtime<\/th><td>Unknown<\/td><td>.*120 min/);
+  assert.match(html, /<th scope="row">TMDB score<\/th><td>Unknown<\/td><td>.*0 \/ 10/);
+  assert.deepEqual(context.snapshot().selectedKeys, before.selectedKeys);
+  assert.deepEqual(context.snapshot().ranking, before.ranking);
+});

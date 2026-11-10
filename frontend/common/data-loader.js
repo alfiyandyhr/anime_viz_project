@@ -22,6 +22,19 @@
       return payload;
     }),
     recommendations: () => once("recommendations", () => json("data/movie_recommendations.json")),
+    movieDetails: data => {
+      const movieIds = data.movies.map(movie => String(movie.id)).sort();
+      return once(`movie-details:${movieIds.join(",")}`, async () => {
+        const payload = await json("data/movie_details.json");
+        const movies = payload?.movies;
+        if (payload?.schema_version !== 1 || payload.source !== "TMDB"
+          || payload.record_count !== movieIds.length || !movies || Object.keys(movies).length !== movieIds.length
+          || movieIds.some(id => !Object.hasOwn(movies, id) || !movies[id] || typeof movies[id] !== "object")) {
+          throw new Error("Invalid TMDB details for this movie sample");
+        }
+        return movies;
+      });
+    },
     moviePopularity: data => {
       const movieIds = data.movies.map(movie => String(movie.id)).sort();
       return once(`movie-popularity:${movieIds.join(",")}`, async () => {
