@@ -34,7 +34,7 @@ geometry refresh after a score change.
    new titles compared with Inception alone.
 2. Focus a dot in the field or mirror, compare two dots, select the cohort in
    Similarity connections, and inspect the full ranking. Each labels the score
-   **Mean cosine to Science Fiction movies**. Sort by the cohort and remove it.
+   **Science Fiction movies**. Sort by the cohort and remove it.
    The ranking returns to average similarity with the remaining magnets.
 3. Switch to **Anime → Movies** and add **Sci-Fi anime** (165 AniList anime).
    Try it on its own. The **Science Fiction** dust genre filter narrows the movie

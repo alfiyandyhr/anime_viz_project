@@ -59,11 +59,11 @@ const snapshot = page => page.evaluate(() => {
     await remove(page, actionMovies);
     assert.deepEqual(await snapshot(page), combined);
 
-    const label = 'Mean cosine to Science Fiction movies';
+    const label = 'Science Fiction movies';
     const firstDot = dots(page).first();
     await firstDot.focus();
     assert.match(await firstDot.getAttribute('aria-label'), new RegExp(label));
-    assert.match(await page.locator('#tooltip').innerText(), new RegExp(label));
+    assert.match(await page.locator('#tooltip .dust-tooltip-score').nth(1).innerText(), /^Science Fiction movies\s/);
     await firstDot.press('Enter');
     await dots(page).nth(1).press('Space');
     assert.match(await page.locator('#dust-focus .dust-detail-scores').innerText(), new RegExp(label));
@@ -76,10 +76,13 @@ const snapshot = page => page.evaluate(() => {
     assert.match(await page.locator('.dust-connection-row').first().getAttribute('aria-label'), new RegExp(label));
     const sort = page.locator('[data-dust-ranking-sort]');
     await sort.selectOption(movies);
-    assert.match(await page.locator('[data-dust-ranking-head]').textContent(), new RegExp(label));
+    assert.equal(await page.getByRole('columnheader', { name: `M2 · ${label}`, exact: true }).count(), 1);
     await page.locator('[data-dust-rank-id]').first().press('Enter');
     assert.match(await page.locator('#detail-drawer .dust-detail-scores').innerText(), new RegExp(label));
     await page.keyboard.press('Escape');
+    assert.doesNotMatch(await page.locator('body').innerText(), /mean cosine to/i);
+    await page.getByText('About / Data', { exact: true }).click();
+    assert.ok(await page.getByText('Genre magnets use mean cosine similarity.', { exact: false }).isVisible());
 
     const anchor = field(page).getByRole('group', { name: /Science Fiction movies magnet/ });
     const core = anchor.locator('.magnet-core');
@@ -101,6 +104,7 @@ const snapshot = page => page.evaluate(() => {
     await remove(page, 'anilist:16498');
     await selectGenre(page, anime);
     assert.match(await page.locator('#movie-magnets').innerText(), /Sci-Fi anime\s+AniList · 165 anime/);
+    assert.equal(await page.getByRole('columnheader', { name: 'M1 · Sci-Fi anime', exact: true }).count(), 1);
     const reverseCohort = await snapshot(page);
     assert.deepEqual(reverseCohort.magnetKeys, [anime]);
     assert.equal(reverseCohort.ranking.length, 1000);
@@ -147,7 +151,9 @@ const snapshot = page => page.evaluate(() => {
     await mobileAnchor.press('ArrowDown');
     assert.notEqual(await mobileAnchor.getAttribute('transform'), mobileDragged);
     await dots(mobile).first().press('Enter');
-    assert.match(await mobile.locator('#dust-focus').innerText(), /Mean cosine to Sci-Fi anime/);
+    const mobileFocus = await mobile.locator('#dust-focus').innerText();
+    assert.match(mobileFocus, /Sci-Fi anime/);
+    assert.doesNotMatch(mobileFocus, /mean cosine to/i);
     assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth), 390);
     await mobile.reload();
     await dots(mobile).first().waitFor();

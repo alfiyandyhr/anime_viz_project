@@ -17,7 +17,7 @@
   const keyFor = (catalogue, id) => `${catalogue}:${id}`;
   const catalogueFor = (data, catalogue) => (catalogue === "tmdb" ? data?.movies : data?.anime) || [];
   const magnetScoreLabel = magnet => magnet.kind === "popularity" ? magnet.metric
-    : magnet.kind === "genre" ? `Mean cosine to ${magnet.title}` : `Cosine to ${magnet.title}`;
+    : magnet.kind === "genre" ? magnet.title : `Cosine to ${magnet.title}`;
   const cohortDescription = magnet => `${magnet.source} · ${magnet.memberIds.length} ${magnet.noun}`;
   const popularityKey = direction => keyFor(DIRECTIONS[direction].dust, "popularity");
   const averageLabel = mixed => mixed ? "Average attraction percentile" : "Average similarity";

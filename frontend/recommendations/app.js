@@ -130,7 +130,7 @@ function bindMovieSearch() {
   });
   results.addEventListener("click", event => {
     const button = event.target.closest("[data-magnet-key]");
-    if (button) addMagnet(button.dataset.magnetKey, "title", document.querySelector("#movie-search-feedback"));
+    if (button) addMagnet(button.dataset.magnetKey, "title", { status: document.querySelector("#movie-search-feedback") });
   });
   function dismissOutside(event) {
     if (!picker.contains(event.target)) closeMovieSearch();
@@ -150,7 +150,7 @@ function bindRecommendationControls() {
   bindMovieSearch();
   document.querySelector("#movie-suggestions").addEventListener("click", event => {
     const button = event.target.closest("[data-magnet-key]");
-    if (button) addMagnet(button.dataset.magnetKey);
+    if (button) addMagnet(button.dataset.magnetKey, "title", { restoreFocus: false });
   });
   document.querySelector("#magnet-type").addEventListener("change", updateMagnetPickerMode);
   const genreChoice = document.querySelector("#genre-magnet-choice");
@@ -320,7 +320,7 @@ function renderMovieSearchResults(query) {
   container.scrollTop = 0;
 }
 
-function addMagnet(key, type = "title", status = document.querySelector("#recommendation-status")) {
+function addMagnet(key, type, { status = document.querySelector("#recommendation-status"), restoreFocus = true } = {}) {
   const { magnetKeys, genreCohorts, popularity } = AnivizMain.snapshot();
   const genre = type === "genre";
   if (genre && !genreCohorts.some(cohort => cohort.key === key)) {
@@ -338,7 +338,7 @@ function addMagnet(key, type = "title", status = document.querySelector("#recomm
   }
   AnivizMain.setMagnets([...magnetKeys, key]);
   document.querySelector("#movie-search").value = "";
-  focusMagnetPicker();
+  if (restoreFocus) focusMagnetPicker();
   closeMovieSearch();
   document.querySelector("#recommendation-status").textContent = "";
 }

@@ -11,6 +11,35 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 const url = path => new URL(path, base).href;
 const forward = 'movie-to-anime', reverse = 'anime-to-movies';
 
+async function assertMagnetSearchFocus(page) {
+  const search = page.locator('#movie-search');
+  const popup = page.locator('#movie-search-popup');
+  const favorite = page.locator('#movie-suggestions button').nth(1);
+  const removals = page.locator('#movie-magnets [data-remove-magnet]');
+  const assertSearchInactive = async () => {
+    assert.equal(await page.locator('#movie-search:focus').count(), 0);
+    assert.equal(await popup.isVisible(), false);
+  };
+
+  for (const direction of [forward, reverse]) {
+    await page.selectOption('#dust-direction', direction);
+    await search.click();
+    assert.equal(await popup.isVisible(), true);
+    await search.press('Escape');
+    await favorite.click();
+    assert.equal(await favorite.getAttribute('aria-pressed'), 'true');
+    await assertSearchInactive();
+
+    await removals.last().press('Enter');
+    assert.equal(await favorite.getAttribute('aria-pressed'), 'false');
+    await assertSearchInactive();
+    assert.equal(await removals.first().evaluate(node => node === document.activeElement), true);
+    await removals.first().click();
+    assert.equal(await removals.count(), 0);
+    await assertSearchInactive();
+  }
+}
+
 async function assertTitleBrowse(page, noun, records, namespace, touch = false) {
   const search = page.locator('#movie-search');
   const popup = page.locator('#movie-search-popup');
@@ -63,6 +92,12 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
   try {
+    const pickerPage = await browser.newPage({ reducedMotion: 'reduce' });
+    await pickerPage.goto(url('frontend/dust-magnet/'));
+    await assertMagnetSearchFocus(pickerPage);
+    await pickerPage.close();
+    console.log('Verified favorite and removal focus in both directions.');
+
     const errors = [];
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     const page = await context.newPage();
@@ -191,6 +226,8 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     assert.deepEqual((await evidence()).selectedKeys, []);
     await assertDrawerPoster('tmdb:68726');
     await page.keyboard.press('Escape');
+    assert.equal(await moviePoint.evaluate(node => node === document.activeElement), true);
+    assert.equal(await page.locator('#tooltip.visible').count(), 0, 'restoring movie point focus leaves its tooltip hidden');
     await moviePoint.press('Space');
     await assertDrawerPoster('tmdb:68726');
     await page.keyboard.press('Escape');

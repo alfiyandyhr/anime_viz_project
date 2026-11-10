@@ -251,12 +251,17 @@ function bindDustControls() {
     document.querySelector(selector).addEventListener("click", deselectOnBackground);
   }
   document.querySelector("#dust-limit").addEventListener("change", event => AnivizMain.setDustLimit(event.target.value));
-  document.querySelector("#movie-magnets").addEventListener("click", event => {
+  const magnetList = document.querySelector("#movie-magnets");
+  magnetList.addEventListener("click", event => {
     const button = event.target.closest("[data-remove-magnet]");
     if (!button) return;
+    const hadFocus = document.activeElement === button;
     AnivizMain.setMagnets(AnivizMain.snapshot().magnetKeys.filter(key => key !== button.dataset.removeMagnet));
     document.querySelector("#recommendation-status").textContent = "";
-    focusMagnetPicker();
+    if (hadFocus) {
+      const next = magnetList.querySelector("[data-remove-magnet]") || document.querySelector('#magnet-type input:checked');
+      next.focus({ preventScroll: true });
+    }
   });
   document.querySelector("#reset-magnets").addEventListener("click", AnivizMain.resetPositions);
 }

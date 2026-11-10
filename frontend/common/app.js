@@ -582,6 +582,8 @@ function closeDrawer() {
   document.body.style.overflow = "";
   drawerTrigger?.focus({ preventScroll: true });
   drawerTrigger = null;
+  // Restoring focus to a chart point can show its tooltip again.
+  hideTooltip();
 }
 function computeGenreStats(anime) {
   return d3.rollups(
