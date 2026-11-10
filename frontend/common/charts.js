@@ -617,7 +617,8 @@
         .attr("fill-opacity", 0.65)
         .attr("stroke", item => filled(item) ? "var(--surface-solid)" : context.dustColor(String(item.id)))
         .attr("stroke-width", 1.5)
-        .on("mouseenter", (event, item) => {
+        // Closing the details overlay can fire mouseenter under a stationary pointer.
+        .on("mousemove", (event, item) => {
           showTooltip(event, `
             <strong>${escapeHTML(item.title)}</strong>
             <span>${rankLimit ? `
@@ -633,7 +634,6 @@
             `}</span>
           `);
         })
-        .on("mousemove", moveTooltip)
         .on("mouseleave", hideTooltip)
         .on("click", (_, item) => {
           hideTooltip();
@@ -682,8 +682,9 @@
     if (!renderers[kind]) throw new Error(`Unknown chart: ${kind}`);
     function keyboardMarks(hasSelection) {
       const selectable = kind === "reception";
+      const tooltipEvent = selectable ? "mousemove" : "mouseenter";
       d3.select(container).selectAll("rect, circle").filter(function () {
-        return Boolean(d3.select(this).on("mouseenter"));
+        return Boolean(d3.select(this).on(tooltipEvent));
       }).attr("tabindex", 0).attr("role", selectable ? "button" : "img")
         .attr("aria-pressed", item => selectable && hasSelection ? context.selectedIds.includes(String(item.id)) : null)
         .attr("aria-label", item => item.title && (context.movieRankLimit
@@ -698,7 +699,7 @@
         } : null)
         .on('focus', function (event, item) {
           const rect = this.getBoundingClientRect();
-          d3.select(this).on('mouseenter').call(this, { clientX: rect.x + rect.width / 2, clientY: rect.y }, item);
+          d3.select(this).on(tooltipEvent).call(this, { clientX: rect.x + rect.width / 2, clientY: rect.y }, item);
         })
         .on('blur', hideTooltip);
     }

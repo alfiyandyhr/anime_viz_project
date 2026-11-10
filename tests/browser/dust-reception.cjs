@@ -37,6 +37,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       await assertDrawerCover(firstTitle);
       await drawer.locator('#close-drawer').click();
       assert.ok(Math.abs(await chartTop() - restingTop) < 2, 'point clicks keep the chart in place');
+      assert.equal(await page.locator('#tooltip.visible').count(), 0, 'closing details hides the point tooltip');
       assert.deepEqual(await firstPoint.evaluate(el => {
         const style = getComputedStyle(el);
         return [style.outlineStyle, style.filter];
@@ -46,10 +47,13 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     const keyboardPoint = scatter.locator('.reception-dot:focus-visible');
     assert.notEqual(await keyboardPoint.evaluate(el => getComputedStyle(el).filter), 'none');
 
+    const search = page.locator('#movie-search');
+    await search.scrollIntoViewIfNeeded();
     for (const movie of ['Interstellar', 'The Matrix']) {
-      await page.locator('#movie-search').fill(movie);
-      await page.locator('#movie-search').press('Enter');
+      await search.fill(movie);
+      await search.press('Enter');
     }
+    assert.equal(await page.locator('#movie-magnets [data-remove-magnet]').count(), 3);
 
     const geometry = view => view.evaluate(container => [...container.querySelectorAll(
       '.dust-node, .dust-magnet, .dust-selected-link'
@@ -115,6 +119,8 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       await point(target).click();
       await assertDrawerCover(title);
       await page.keyboard.press('Escape');
+      await chartTop();
+      assert.equal(await page.locator('#tooltip.visible').count(), 0, 'Escape hides the tooltip with the pointer on the chart');
     }
     const selected = [firstId, ...targets.map(target => target.id)];
     assert.deepEqual(await selection(), selected);
