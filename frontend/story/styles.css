@@ -24,9 +24,10 @@ body[data-chapter="story"] { overflow-x: clip; }
 .history-panel {
   position: sticky;
   top: 64px;
-  min-height: calc(100svh - 64px);
+  height: calc(100svh - 64px);
   padding: clamp(16px, 4vh, 44px) 0 16px;
   overflow-anchor: none;
+  overflow-y: auto;
 }
 
 .history-header {
@@ -38,7 +39,7 @@ body[data-chapter="story"] { overflow-x: clip; }
   padding-bottom: clamp(12px, 3vh, 30px);
 }
 
-.history-kicker, .history-card-label, .history-year-control > label {
+.history-kicker, .history-card-label, .history-controls label[for] {
   margin: 0;
   color: var(--text-soft);
   font-size: .69rem;
@@ -62,9 +63,12 @@ body[data-chapter="story"] { overflow-x: clip; }
 .history-intro { margin: 0; font-size: clamp(.81rem, 1.4vw, .97rem); color: var(--text-soft); }
 .history-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 14px; }
 .history-year-buttons { display: flex; gap: 5px; margin-top: 4px; }
+.history-match-control { display: grid; gap: 4px; }
 
 .history-perspective {
-  display: flex;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 2px;
   min-width: 0;
   margin: 0;
@@ -73,6 +77,18 @@ body[data-chapter="story"] { overflow-x: clip; }
   border-radius: 7px;
   background: var(--surface-solid);
 }
+.history-perspective::before {
+  position: absolute;
+  inset: 3px auto 3px 3px;
+  width: calc(50% - 4px);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface-light);
+  content: "";
+  pointer-events: none;
+  transition: transform .28s ease;
+}
+.history-perspective:has([value="movie"]:checked)::before { transform: translateX(calc(100% + 2px)); }
 .history-perspective label { position: relative; cursor: pointer; }
 .history-perspective input {
   position: absolute;
@@ -91,12 +107,11 @@ body[data-chapter="story"] { overflow-x: clip; }
   border-radius: 4px;
   color: var(--text-soft);
   font-size: .76rem;
+  text-align: center;
   white-space: nowrap;
 }
 .history-perspective input:checked + span {
   color: var(--text);
-  border-color: var(--border-strong);
-  background: var(--surface-light);
 }
 .history-perspective input:focus-visible + span { outline: 2px solid var(--cyan); outline-offset: -2px; }
 .history-perspective label:hover span { color: var(--text); }
@@ -127,6 +142,10 @@ body[data-chapter="story"] { overflow-x: clip; }
 }
 
 .history-pair {
+  --left-track-color: var(--anime-color);
+  --right-track-color: var(--movie-color);
+  --left-track-glow: #1c1736;
+  --right-track-glow: #102a36;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(180px, .78fr) minmax(0, 1fr);
   grid-template-areas: "anime timelines movie";
@@ -137,8 +156,15 @@ body[data-chapter="story"] { overflow-x: clip; }
   padding: clamp(12px, 2vw, 24px);
   border: 1px solid var(--border-strong);
   border-radius: 14px;
-  background: radial-gradient(ellipse at 0 50%, #1c1736 0%, transparent 54%),
-    radial-gradient(ellipse at 100% 50%, #102a36 0%, transparent 54%), #0d1221;
+  background: radial-gradient(ellipse at 0 50%, var(--left-track-glow) 0%, transparent 54%),
+    radial-gradient(ellipse at 100% 50%, var(--right-track-glow) 0%, transparent 54%), #0d1221;
+}
+.history-pair[data-perspective="movie"] {
+  --left-track-color: var(--movie-color);
+  --right-track-color: var(--anime-color);
+  --left-track-glow: #102a36;
+  --right-track-glow: #1c1736;
+  grid-template-areas: "movie timelines anime";
 }
 
 .history-card {
@@ -153,6 +179,9 @@ body[data-chapter="story"] { overflow-x: clip; }
 
 .history-anime { grid-area: anime; --track-color: var(--anime-color); }
 .history-movie { grid-area: movie; --track-color: var(--movie-color); }
+.history-card-pages { position: relative; perspective: 900px; }
+.history-card-face { transform-origin: left center; backface-visibility: hidden; }
+.history-card-face-outgoing { position: absolute; inset: 0; pointer-events: none; }
 .history-card-label { display: flex; justify-content: space-between; align-items: baseline; gap: 5px; color: var(--track-color); }
 .history-card-year { font: 600 .9rem/1 var(--history-display); white-space: nowrap; }
 .history-card h2 {
@@ -194,14 +223,55 @@ body[data-chapter="story"] { overflow-x: clip; }
 }
 .synopsis-button:hover, .history-dialog a:hover { text-decoration: underline; }
 
+.history-extra-matches {
+  margin: 10px 0 0;
+  padding: 8px 0 0 1.4em;
+  border-top: 1px solid var(--border-strong);
+  color: var(--track-color);
+  font-size: .76rem;
+}
+.history-extra-matches li + li { margin-top: 5px; }
+.history-extra-matches li > span { margin-left: .6em; color: var(--text-soft); }
+.history-extra-matches button {
+  padding: 1px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+.history-card [data-match-rank] { transition: color .15s ease, text-shadow .15s ease; }
+.history-card .is-highlighted {
+  color: var(--track-color);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--track-color) 45%, transparent);
+}
+
 .history-visual { grid-area: timelines; display: grid; justify-items: center; gap: 2px; min-width: 0; margin: 0; }
 #history-timeline { display: block; width: 100%; max-width: 320px; height: clamp(208px, 37vh, 345px); }
 #history-timeline text { font: 600 11px var(--history-display); letter-spacing: .06em; }
 #history-timeline .anime-track { fill: var(--anime-color); }
 #history-timeline .movie-track { fill: var(--movie-color); }
+.history-track { transition: transform .44s cubic-bezier(.22, 1, .36, 1); }
+.anime-track { transform: translateX(66px); }
+.movie-track { transform: translateX(198px); }
+[data-perspective="movie"] .anime-track { transform: translateX(198px); }
+[data-perspective="movie"] .movie-track { transform: translateX(66px); }
 .history-axis, .history-tick { stroke: #63708d; stroke-width: 1; }
 .history-tick-label { fill: var(--text-soft); }
-.history-connection { fill: none; stroke: url(#history-link-gradient); stroke-width: 2.5; }
+.history-connection, .history-highlight-line { fill: none; stroke: url(#history-link-gradient); }
+.history-connection { stroke-width: 2.5; opacity: .56; transition: opacity .15s ease; }
+.history-connection.is-selected { opacity: 1; stroke-width: 3; }
+.has-highlight .history-connection { opacity: .16; }
+.has-highlight .is-highlighted .history-connection { opacity: 1; }
+.history-highlight-line {
+  stroke-width: 4;
+  filter: drop-shadow(0 0 3px #e3efff80);
+  pointer-events: none;
+}
+.history-connection-target { cursor: pointer; }
+.history-connection-hit { fill: none; stroke: transparent; stroke-width: 10; }
 .history-point { stroke: #0d1221; stroke-width: 2; }
 #history-timeline .history-point-label {
   font-size: 13px;
@@ -226,6 +296,10 @@ body[data-chapter="story"] { overflow-x: clip; }
   color: var(--text);
 }
 .history-dialog::backdrop { background: rgb(6 9 19 / .8); }
+.history-dialog[open] { animation: history-dialog-enter .2s ease-out; }
+@keyframes history-dialog-enter {
+  from { opacity: 0; transform: translateY(8px) scale(.98); }
+}
 .history-dialog form { float: right; margin-left: 12px; }
 .history-dialog h2 { margin: 6px 0; font-family: "Space Grotesk", sans-serif; }
 .history-dialog #synopsis-text { color: var(--text-soft); white-space: pre-line; }
@@ -242,7 +316,7 @@ body[data-chapter="story"] { overflow-x: clip; }
   .history-header { gap: 7px 14px; padding-bottom: 12px; }
   .history-header h1 { margin-top: 4px; }
   .history-controls { align-items: center; gap: 6px 12px; }
-  .history-year-control { display: flex; align-items: center; gap: 10px; }
+  .history-match-control, .history-year-control { display: flex; align-items: center; gap: 6px; }
   .history-year-buttons { margin: 0; }
   .history-pair {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -252,6 +326,7 @@ body[data-chapter="story"] { overflow-x: clip; }
     min-height: 0;
     padding: 8px;
   }
+  .history-pair[data-perspective="movie"] { grid-template-areas: "timelines timelines" "movie anime"; }
   #history-timeline { height: clamp(130px, 21svh, 200px); }
   #history-timeline text { font-size: 13px; }
   #history-timeline .history-point-label { font-size: 15px; }
@@ -272,7 +347,6 @@ body[data-chapter="story"] { overflow-x: clip; }
   .history-header h1 { font-size: clamp(1.65rem, 7vw, 2rem); }
   .history-controls { gap: 6px; }
   .history-year-control > label { position: absolute; clip-path: inset(50%); }
-  .history-perspective { padding: 2px; gap: 1px; }
   .history-perspective span { padding: 3px 5px; font-size: .67rem; }
   .history-year-buttons { gap: 3px; }
   .history-controls button, .history-controls select { min-height: 32px; padding-inline: 5px; font-size: .78rem; }
@@ -287,6 +361,8 @@ body[data-chapter="story"] { overflow-x: clip; }
   .history-note p:last-child { display: none; }
 }
 
-@media (min-width: 711px) and (max-height: 520px) {
-  .history-panel { max-height: calc(100svh - 64px); overflow-y: auto; }
+@media (prefers-reduced-motion: reduce) {
+  .history-perspective::before, .history-track { transition: none; }
+  .history-card [data-match-rank], .history-connection { transition: none; }
+  .history-dialog[open] { animation: none; }
 }

@@ -78,25 +78,40 @@ const StoryData = (() => {
   }
 
   function yearPairs(archive, bundle) {
-    if (bundle?.schema_version !== 1 || !Array.isArray(bundle.years) || !Array.isArray(bundle.movies)
-      || !Number.isInteger(bundle.meta?.movie_count) || bundle.meta.movie_count < bundle.movies.length) {
+    if (bundle?.schema_version !== 2 || !Array.isArray(bundle.years) || !Array.isArray(bundle.movies)
+      || !Array.isArray(bundle.live_action_movie_ids)) {
+      throw new Error("Invalid annual movie matches");
+    }
+    const movieIds = new Set(bundle.live_action_movie_ids);
+    if (bundle.live_action_movie_ids.some(id => typeof id !== "string")
+      || movieIds.size !== bundle.meta?.movie_count || movieIds.size < 1
+      || movieIds.size !== bundle.live_action_movie_ids.length) {
       throw new Error("Invalid annual movie matches");
     }
     const movies = new Map();
     for (const movie of bundle.movies) {
-      if (typeof movie.id !== "string" || movies.has(movie.id)
+      if (!movieIds.has(movie.id) || movies.has(movie.id)
         || typeof movie.title !== "string" || !Number.isInteger(movie.year)) {
         throw new Error("Invalid movie record");
       }
       movies.set(movie.id, movie);
     }
     const matches = new Map();
-    for (const match of bundle.years) {
-      if (!Number.isInteger(match.year) || matches.has(match.year) || !Number.isInteger(match.anime_id)
-        || !movies.has(match.movie_id) || !Number.isFinite(match.score) || Math.abs(match.score) > 1) {
+    for (const row of bundle.years) {
+      if (!Number.isInteger(row.year) || matches.has(row.year) || !Number.isInteger(row.anime_id)
+        || !Array.isArray(row.matches) || row.matches.length !== Math.min(5, movieIds.size)) {
         throw new Error("Invalid annual movie match");
       }
-      matches.set(match.year, match);
+      const seen = new Set();
+      const ranked = row.matches.map(({ movie_id, score }, index) => {
+        if (!movies.has(movie_id) || seen.has(movie_id) || !Number.isFinite(score)
+          || Math.abs(score) > 1 || (index && score > row.matches[index - 1].score)) {
+          throw new Error("Invalid ranked movie match");
+        }
+        seen.add(movie_id);
+        return { work: movies.get(movie_id), score };
+      });
+      matches.set(row.year, { animeId: row.anime_id, ranked });
     }
     const rows = new Map(archive.years.map(row => [row.year, row]));
     const { start_year: start, end_year: end } = archive.meta;
@@ -105,36 +120,38 @@ const StoryData = (() => {
       const row = rows.get(year);
       const anime = row && row.status !== "unavailable" ? [...row.anime].sort(byPopularity)[0] || null : null;
       const match = matches.get(year);
-      if (anime && anime.id === match?.anime_id) {
-        return { year, anime, movie: movies.get(match.movie_id), score: match.score };
-      }
-      return { year, anime, movie: null, score: null };
+      return { year, anchor: anime, matches: anime && anime.id === match?.animeId ? match.ranked : [] };
     });
   }
 
-  function movieYearPairs(catalogue, { popularity }) {
+  function movieYearPairs(catalogue, { popularity }, liveActionMovieIds) {
+    const eligible = new Set(liveActionMovieIds);
     const winners = new Map();
     for (const movie of catalogue.movies) {
       const value = popularity[movie.id];
-      if (!Number.isInteger(movie.year) || !Number.isFinite(value)) continue;
+      if (!eligible.has(movie.id) || !Number.isInteger(movie.year) || !Number.isFinite(value)) continue;
       const current = winners.get(movie.year);
       if (!current || value > popularity[current.id]) winners.set(movie.year, movie);
     }
-    if (!winners.size) throw new Error("No movies with a release year and popularity score");
+    if (!winners.size) throw new Error("No live-action movies with a release year and popularity score");
 
     return [...winners.values()].sort((a, b) => a.year - b.year).map(movie => {
       // The exporter ranks each movie against the entire anime catalogue.
-      const [index, score] = movie.matches?.[0] || [];
-      const anime = catalogue.anime[index];
-      if (!Number.isInteger(index) || !Number.isInteger(anime?.year)
-        || !Number.isFinite(score) || Math.abs(score) > 1) {
-        throw new Error(`Invalid best match for movie ${movie.id}`);
+      if (!Array.isArray(movie.matches) || movie.matches.length < Math.min(5, catalogue.anime.length)) {
+        throw new Error(`Incomplete anime matches for movie ${movie.id}`);
       }
+      const matches = movie.matches.slice(0, 5).map(([index, score], rank) => {
+        const anime = catalogue.anime[index];
+        if (!Number.isInteger(index) || !Number.isInteger(anime?.year) || !Number.isFinite(score)
+          || Math.abs(score) > 1 || (rank && score > movie.matches[rank - 1][1])) {
+          throw new Error(`Invalid anime match for movie ${movie.id}`);
+        }
+        return { work: { ...anime, description: anime.synopsis, site_url: anime.url }, score };
+      });
       return {
         year: movie.year,
-        movie: { ...movie, popularity: popularity[movie.id] },
-        anime: { ...anime, description: anime.synopsis, site_url: anime.url },
-        score
+        anchor: { ...movie, popularity: popularity[movie.id] },
+        matches
       };
     });
   }

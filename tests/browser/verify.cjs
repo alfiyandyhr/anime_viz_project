@@ -250,8 +250,98 @@ const url = route => new URL(route, base).href;
     assert.ok(await page.locator('#history-dialog').isVisible());
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('#history-dialog').isVisible(), false);
+    const connectionCount = () => page.locator('.history-connection').count();
+    const checkConnectionEndpoints = async () => {
+      const errors = await page.evaluate(() => {
+        const chart = document.querySelector('#history-timeline');
+        const movieFirst = document.querySelector('#history-pair').dataset.perspective === 'movie';
+        const [anchor, match] = movieFirst ? ['movie', 'anime'] : ['anime', 'movie'];
+        const project = (element, x, y) => new DOMPoint(x, y).matrixTransform(element.getScreenCTM());
+        const points = track => Array.from(
+          chart.querySelectorAll(`#${track}-axis circle:not([hidden])`),
+          point => project(point, point.cx.baseVal.value, point.cy.baseVal.value)
+        );
+        const [anchorPoint] = points(anchor);
+        const matchPoints = points(match);
+        const near = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) < .05;
+        return [...chart.querySelectorAll('.history-connection-target')].flatMap(target => {
+          const path = target.querySelector('.history-connection');
+          const start = path.getPointAtLength(0).matrixTransform(path.getScreenCTM());
+          const end = path.getPointAtLength(path.getTotalLength()).matrixTransform(path.getScreenCTM());
+          const hit = target.querySelector('.history-connection-hit');
+          return near(start, anchorPoint) && matchPoints.some(point => near(end, point))
+            && hit.getAttribute('d') === path.getAttribute('d') ? [] : [target.dataset.matchRank];
+        });
+      });
+      assert.deepEqual(errors, [], 'Each curve and hit area align with their release-year markers');
+    };
+    for (const count of [2, 3, 4, 5]) {
+      await page.selectOption('#match-count', String(count));
+      assert.equal(await connectionCount(), count);
+      assert.equal(await page.locator('#history-movie .history-extra-matches li').count(), count - 1);
+      assert.equal(await page.inputValue('#year-picker'), '1995');
+      await checkConnectionEndpoints();
+    }
+    const firstMovie = await page.locator('#history-movie h2').textContent();
+    const checkAxisYears = async () => {
+      const animeTicks = (await page.locator('#anime-axis .history-tick-label').allTextContents()).map(Number);
+      const movieTicks = (await page.locator('#movie-axis .history-tick-label').allTextContents()).map(Number);
+      assert.equal(animeTicks[0], 1963);
+      assert.ok(animeTicks.every(year => year >= 1963));
+      assert.ok(movieTicks[0] < 1963);
+      assert.notEqual(await page.locator('#anime-axis .history-axis').getAttribute('d'),
+        await page.locator('#movie-axis .history-axis').getAttribute('d'));
+    };
+    await checkAxisYears();
+    const highlightedLine = page.locator('#history-highlight-line');
+    const firstAlternate = page.locator('#history-movie .history-extra-matches button').first();
+    await firstAlternate.hover();
+    assert.ok(await firstAlternate.evaluate(button => button.classList.contains('is-highlighted')));
+    assert.equal(await highlightedLine.getAttribute('d'),
+      await page.locator('.history-connection-target[data-match-rank="1"] .history-connection').getAttribute('d'));
+    assert.equal(await page.locator('.history-connection.is-selected').evaluate(line => getComputedStyle(line).opacity), '0.16');
+    await page.locator('#match-count').hover();
+    assert.equal(await highlightedLine.isVisible(), false);
+    const linkHit = page.locator('.history-connection-target[data-match-rank="1"] .history-connection-hit');
+    const linkMidpoint = await linkHit.evaluate(path => {
+      const { x, y } = path.getPointAtLength(path.getTotalLength() / 2).matrixTransform(path.getScreenCTM());
+      return { x, y };
+    });
+    await page.mouse.move(linkMidpoint.x, linkMidpoint.y);
+    assert.ok(await firstAlternate.evaluate(button => button.classList.contains('is-highlighted')));
+    await page.locator('#match-count').hover();
+    assert.equal(await highlightedLine.isVisible(), false);
+    const secondMovie = await page.locator('#history-movie .history-extra-matches button').first().textContent();
+    await page.locator('#history-movie .history-extra-matches button').first().focus();
+    await page.keyboard.press('Enter');
+    assert.equal(await page.locator('#history-movie h2').textContent(), secondMovie.replace(/ \(\d{4}\)$/, ''));
+    assert.equal(await page.locator('#history-movie h2').evaluate(el => el === document.activeElement), true);
+    assert.match(await page.locator('#history-score').textContent(), /^Match 2/);
+    assert.equal((await page.locator('#history-movie .history-extra-matches button').first().textContent())
+      .replace(/ \(\d{4}\)$/, ''), firstMovie);
+    assert.equal(await page.locator('#history-dialog').isVisible(), false);
+    await page.locator('#history-connection .history-connection-target').first().dispatchEvent('click');
+    assert.equal(await page.locator('#history-movie h2').textContent(), firstMovie);
+    const horizontalOrder = (left, right) => page.evaluate(([left, right]) =>
+      document.querySelector(left).getBoundingClientRect().left < document.querySelector(right).getBoundingClientRect().left,
+    [left, right]);
+    assert.ok(await horizontalOrder('#history-anime', '#history-movie'));
+    assert.ok(await horizontalOrder('#anime-axis', '#movie-axis'));
     await page.getByText('Movie Timeline', {exact:true}).click();
     await page.waitForFunction(() => document.querySelector('#year-label').textContent === 'Movie release year');
+    assert.ok(await horizontalOrder('#history-movie', '#history-anime'));
+    assert.ok(await horizontalOrder('#movie-axis', '#anime-axis'));
+    await checkAxisYears();
+    assert.equal(await page.inputValue('#match-count'), '5');
+    assert.equal(await connectionCount(), 5);
+    await checkConnectionEndpoints();
+    assert.equal(await page.locator('#history-anime .history-extra-matches li').count(), 4);
+    await page.locator('#history-anime .history-extra-matches button').last().click();
+    assert.match(await page.locator('#history-score').textContent(), /^Match 5/);
+    await checkConnectionEndpoints();
+    await page.selectOption('#match-count', '1');
+    assert.equal(await connectionCount(), 1);
+    await checkConnectionEndpoints();
     assert.equal(await page.inputValue('#year-picker'), '1995');
     assert.equal(await page.locator('#history-movie h2').textContent(), 'Se7en');
     assert.equal(await page.locator('#history-anime h2').textContent(), 'B: The Beginning');
@@ -261,6 +351,7 @@ const url = route => new URL(route, base).href;
     await page.mouse.wheel(0, 80);
     await page.waitForFunction(() => document.querySelector('#year-picker').value === '1996');
     await page.selectOption('#year-picker', '1933');
+    await checkConnectionEndpoints();
     await page.getByText('Anime Timeline', {exact:true}).click();
     assert.equal(await page.inputValue('#year-picker'), '1963');
     assert.equal(await page.locator('#history-anime h2').textContent(), 'Astro Boy');

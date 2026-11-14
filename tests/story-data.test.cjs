@@ -88,51 +88,52 @@ test('validation rejects dashboard data, duplicate years and cross-year records'
   assert.throws(() => model.validate({ ...payload, years: [{ year: 1963, anime: [{ id: 1, title: 'Wrong year', year: 1964 }] }] }));
 });
 
-test('the annual timeline pairs every published winner with its highest-scoring movie', () => {
+test('the anime timeline ranks the five highest-scoring live-action movies for every annual winner', () => {
   const archive = model.validate(require('../story.json'));
   const bundle = require('../data/history_movie_matches.json');
   const catalogue = require('../data/movie_recommendations.json');
   const matrix = readFileSync(require.resolve('../data/movie_anime_scores.bin'));
   const animeIndices = new Map(catalogue.anime.map((anime, index) => [Number(anime.id), index]));
+  const excluded = movie => !movie.genres.length || movie.genres.includes('Animation')
+    || movie.tags.includes('cartoon characters');
+  const eligible = new Set(bundle.live_action_movie_ids);
+  assert.deepEqual([...eligible], catalogue.movies.filter(movie => !excluded(movie)).map(movie => movie.id));
+  for (const id of ['8392', '1311031']) assert.ok(!eligible.has(id));
   const pairs = model.yearPairs(archive, bundle);
   assert.equal(pairs.length, archive.years.length);
-  for (const { year, anime, movie, score } of pairs) {
+  for (const { year, anchor: anime, matches } of pairs) {
     assert.equal(anime.id, model.topAnime(archive, { start: year, end: year }, 1)[0].id);
-    assert.ok(movie.synopsis, `Movie synopsis for ${year}`);
-    assert.ok(Number.isFinite(score));
+    assert.equal(matches.length, 5);
+    assert.ok(matches.every(({ work, score }, rank) => work.synopsis && !excluded(work)
+      && (rank === 0 || score <= matches[rank - 1].score)));
     const index = animeIndices.get(anime.id);
     if (index === undefined) continue;
-    let best = 0;
-    let highest = -Infinity;
-    catalogue.movies.forEach((_, movieIndex) => {
-      const value = matrix.readFloatLE((movieIndex * catalogue.anime.length + index) * 4);
-      if (value > highest) {
-        highest = value;
-        best = movieIndex;
-      }
-    });
-    assert.equal(movie.id, catalogue.movies[best].id);
-    assert.equal(score, highest);
+    const ranked = catalogue.movies.flatMap((movie, movieIndex) => eligible.has(movie.id)
+      ? [[movie.id, matrix.readFloatLE((movieIndex * catalogue.anime.length + index) * 4)]] : []);
+    ranked.sort((a, b) => b[1] - a[1]);
+    assert.deepEqual(matches.map(({ work, score }) => [work.id, score]), ranked.slice(0, 5));
   }
 });
 
-test('the movie timeline ranks by TMDB popularity and matches against the full anime catalogue', () => {
+test('the movie timeline chooses live-action winners and links to the five highest-scoring anime', () => {
   const catalogue = require('../data/movie_recommendations.json');
   const popularity = require('../data/movie_popularity.json');
   const matrix = readFileSync(require.resolve('../data/movie_anime_scores.bin'));
-  const pairs = model.movieYearPairs(catalogue, popularity);
-  const years = [...new Set(catalogue.movies.map(movie => movie.year))].sort((a, b) => a - b);
+  const { live_action_movie_ids: ids } = require('../data/history_movie_matches.json');
+  const eligible = new Set(ids);
+  const movies = catalogue.movies.filter(movie => eligible.has(movie.id));
+  const pairs = model.movieYearPairs(catalogue, popularity, ids);
+  const years = [...new Set(movies.map(movie => movie.year))].sort((a, b) => a - b);
   assert.deepEqual(pairs.map(pair => pair.year), years);
-  for (const { year, movie, anime, score } of pairs) {
-    const ranked = catalogue.movies.filter(movie => movie.year === year)
+  for (const { year, anchor: movie, matches } of pairs) {
+    const ranked = movies.filter(movie => movie.year === year)
       .sort((a, b) => popularity.popularity[b.id] - popularity.popularity[a.id]);
     assert.equal(movie.id, ranked[0].id);
     const row = catalogue.movies.findIndex(record => record.id === movie.id);
-    const scores = catalogue.anime.map((_, index) =>
-      matrix.readFloatLE((row * catalogue.anime.length + index) * 4));
-    const highest = Math.max(...scores);
-    assert.equal(anime.id, catalogue.anime[scores.indexOf(highest)].id);
-    assert.equal(anime.description, anime.synopsis);
-    assert.equal(Math.fround(score), highest);
+    const scores = catalogue.anime.map((anime, index) =>
+      [anime.id, matrix.readFloatLE((row * catalogue.anime.length + index) * 4)]);
+    scores.sort((a, b) => b[1] - a[1]);
+    assert.ok(matches.every(({ work }) => work.description === work.synopsis));
+    assert.deepEqual(matches.map(({ work, score }) => [work.id, Math.fround(score)]), scores.slice(0, 5));
   }
 });
