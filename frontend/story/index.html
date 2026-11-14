@@ -10,7 +10,7 @@
 
   <meta
     name="description"
-    content="Scroll through anime history and discover the closest movie match for each year’s most popular anime."
+    content="Explore each year’s most popular anime and live-action movies and their highest-scoring matches."
   >
 
   <title>AnIViz — History</title>
@@ -64,7 +64,7 @@
             <div>
               <p class="history-kicker">The AnIViz archive <span id="history-range"></span></p>
               <h1>Anime through time</h1>
-              <p class="history-intro" id="history-intro">Scroll to pair each year’s most popular anime with its closest movie match.</p>
+              <p class="history-intro" id="history-intro">Scroll to explore each year’s most popular anime and its closest live-action movie matches.</p>
             </div>
             <div class="history-controls" id="history-controls" hidden>
               <fieldset class="history-perspective" aria-label="Timeline perspective">
@@ -79,6 +79,16 @@
                   <button type="button" id="next-year" aria-label="Next year">→</button>
                 </div>
               </div>
+              <div class="history-match-control">
+                <label for="match-count">Connections</label>
+                <select id="match-count">
+                  <option value="1" selected>1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                </select>
+              </div>
             </div>
           </header>
 
@@ -88,26 +98,35 @@
           </div>
           <noscript><p>Enable JavaScript to explore the anime and movie timelines.</p></noscript>
 
-          <section class="history-pair" id="history-pair" aria-label="Anime and movie pair" hidden>
+          <section class="history-pair" id="history-pair" aria-label="Anime and movie matches" hidden>
             <article class="history-card history-anime" id="history-anime"></article>
             <figure class="history-visual">
               <svg id="history-timeline" role="img" aria-labelledby="timeline-title" viewBox="0 0 264 286">
                 <title id="timeline-title">Anime and movie release timelines</title>
                 <defs>
                   <linearGradient id="history-link-gradient" gradientUnits="userSpaceOnUse" x1="66" y1="0" x2="198" y2="0">
-                    <stop stop-color="var(--anime-color)"></stop>
-                    <stop offset="1" stop-color="var(--movie-color)"></stop>
+                    <stop stop-color="var(--left-track-color)"></stop>
+                    <stop offset="1" stop-color="var(--right-track-color)"></stop>
                   </linearGradient>
                 </defs>
-                <text class="anime-track" x="66" y="15" text-anchor="middle">ANIME</text>
-                <text class="movie-track" x="198" y="15" text-anchor="middle">MOVIES</text>
-                <path class="history-axis" d="M66 34 V268 M198 34 V268"></path>
-                <g id="history-ticks" aria-hidden="true"></g>
-                <path id="history-connection" class="history-connection"></path>
-                <circle id="anime-point" class="anime-track history-point" cx="66" r="5"></circle>
-                <circle id="movie-point" class="movie-track history-point" cx="198" r="5"></circle>
-                <text id="anime-point-year" class="anime-track history-point-label" x="82" text-anchor="start"></text>
-                <text id="movie-point-year" class="movie-track history-point-label" x="182" text-anchor="end"></text>
+                <g id="history-connection"></g>
+                <path id="history-highlight-line" class="history-highlight-line" aria-hidden="true" hidden></path>
+                <g id="anime-axis" class="history-track anime-track">
+                  <text y="15" text-anchor="middle">ANIME</text>
+                  <path class="history-axis"></path>
+                  <g class="history-ticks" aria-hidden="true"></g>
+                  <g id="anime-match-points"></g>
+                  <circle id="anime-point" class="history-point" r="5"></circle>
+                  <text id="anime-point-year" class="history-point-label"></text>
+                </g>
+                <g id="movie-axis" class="history-track movie-track">
+                  <text y="15" text-anchor="middle">MOVIES</text>
+                  <path class="history-axis"></path>
+                  <g class="history-ticks" aria-hidden="true"></g>
+                  <g id="movie-match-points"></g>
+                  <circle id="movie-point" class="history-point" r="5"></circle>
+                  <text id="movie-point-year" class="history-point-label"></text>
+                </g>
               </svg>
               <figcaption class="history-score" id="history-score"></figcaption>
             </figure>
@@ -133,14 +152,19 @@
   </dialog>
 
   <template id="history-card-template">
-    <p class="history-card-label"><span class="history-card-kind"></span><span class="history-card-year"></span></p>
-    <h2></h2>
-    <p class="history-card-meta"></p>
-    <div class="history-card-summary">
-      <img class="history-cover" alt="" hidden>
-      <p></p>
+    <div class="history-card-pages">
+      <div class="history-card-face">
+        <p class="history-card-label"><span class="history-card-kind"></span><span class="history-card-year"></span></p>
+        <h2 tabindex="-1"></h2>
+        <p class="history-card-meta"></p>
+        <div class="history-card-summary">
+          <img class="history-cover" alt="" hidden>
+          <p></p>
+        </div>
+        <button type="button" class="synopsis-button" hidden>Read synopsis <span aria-hidden="true">↗</span></button>
+      </div>
     </div>
-    <button type="button" class="synopsis-button" hidden>Read synopsis <span aria-hidden="true">↗</span></button>
+    <ol class="history-extra-matches" aria-label="Other matches" hidden></ol>
   </template>
 </body>
 </html>

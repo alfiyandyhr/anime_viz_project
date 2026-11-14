@@ -24,6 +24,7 @@ PERIODS = (
     ("birth", 1963, 1979), ("expansion", 1980, 1989), ("global", 1990, 1999),
     ("digital", 2000, 2009), ("streaming", 2010, 2019), ("modern", 2020, None),
 )
+HISTORY_MATCH_LIMIT = 5
 
 
 def digest(path):
@@ -70,6 +71,13 @@ def select_years(archive):
     return [{"year": row["year"], "anime": [min(row["anime"], key=popularity_rank)]}
             for row in sorted(archive["years"], key=lambda row: row["year"])
             if row.get("status") != "unavailable" and row["anime"]]
+
+
+def history_movie_indices(movies):
+    """Use TMDB genres and exclude cartoon hybrids and unclassified records."""
+    return [i for i, movie in enumerate(movies)
+            if movie["genres"] and "Animation" not in movie["genres"]
+            and "cartoon characters" not in movie["tags"]]
 
 
 def read_base_scores(bundle, matrix):
@@ -158,12 +166,9 @@ def fetch_missing_records(works, cache, offline=False):
 
 
 def compute_missing(works, movies, args, corpus_hash):
-    """Cache new full rows; never re-encode or rescore an existing anime row."""
-    import numpy as np
-    import torch
-    from sentence_transformers import SentenceTransformer
+    """Reuse verified full rows and encode only when explicitly requested."""
     cache = args.cache_dir
-    records = fetch_missing_records(works, cache, args.offline)
+    records = fetch_missing_records(works, cache, args.offline or not args.compute_missing)
     movie_records = prepare_records(movie_rows(movies), cache / "movies.csv", "tmdb")
     spec = model_spec()
     row_cache = cache / "scores"
@@ -181,6 +186,13 @@ def compute_missing(works, movies, args, corpus_hash):
             pending.append((record, path, expected))
     if not pending:
         return result
+    if not args.compute_missing:
+        raise ValueError("Missing verified supplemental scores; run with --compute-missing")
+
+    import numpy as np
+    import torch
+    from sentence_transformers import SentenceTransformer
+
     vector_path = cache / "movie_embeddings.npy"
     vector_meta_path = cache / "movie_embeddings.meta.json"
     vector_spec = {"model": spec, "movie_corpus_sha256": corpus_hash,
@@ -245,6 +257,8 @@ def compute_missing(works, movies, args, corpus_hash):
 
 def build_bundle(archive, groups, base, get_scores, additional, hashes, *, annual=False):
     movie_fields = ("id", "title", "year", "genres", "tags", "synopsis", "url")
+    movie_indices = history_movie_indices(base["movies"]) if annual else range(len(base["movies"]))
+    limit = HISTORY_MATCH_LIMIT if annual else 3
     used_movies, result = {}, []
     reused = computed = 0
     for group in groups:
@@ -260,7 +274,7 @@ def build_bundle(archive, groups, base, get_scores, additional, hashes, *, annua
             if scores is None:
                 raise ValueError(f"Missing scores for {work['id']}: {work['title']}; run with --compute-missing")
             validate_scores(scores, len(base["movies"]))
-            order = sorted(range(len(scores)), key=lambda i: (-scores[i], i))[:1 if annual else 3]
+            order = sorted(movie_indices, key=lambda i: (-scores[i], i))[:limit]
             matches = []
             for i in order:
                 movie = base["movies"][i]
@@ -270,21 +284,24 @@ def build_bundle(archive, groups, base, get_scores, additional, hashes, *, annua
                           "popularity": work.get("popularity", 0), "rank": rank,
                           "score_source": source, "matches": matches})
         if annual:
-            result.append({"year": group["year"], "anime_id": anime[0]["id"], **anime[0]["matches"][0]})
+            result.append({"year": group["year"], "anime_id": anime[0]["id"], "matches": anime[0]["matches"]})
         else:
             result.append({**group, "anime": anime})
-    return {"schema_version": 1, "meta": {
+    bundle = {"schema_version": 2 if annual else 1, "meta": {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "model": model_spec(), "movie_count": len(base["movies"]),
+        "model": model_spec(), "movie_count": len(movie_indices),
         "reused_anime": reused, "supplemental_anime": computed,
-        "reused_pair_count": reused * len(base["movies"]),
-        "supplemental_pair_count": computed * len(base["movies"]),
+        "reused_pair_count": reused * len(movie_indices),
+        "supplemental_pair_count": computed * len(movie_indices),
         "supplemental_scores_sha256": fingerprint(additional),
         "selection": ("Current AniList popularity descending, ID ascending, within each "
                       + ("year's sample" if annual else "period's annual Top 10 sample")),
         "movie_ties": "Original published movie record order", "sources": hashes,
         "archive_generated_at": archive["meta"].get("generated_at")},
         ("years" if annual else "periods"): result, "movies": list(used_movies.values())}
+    if annual:
+        bundle["live_action_movie_ids"] = [base["movies"][i]["id"] for i in movie_indices]
+    return bundle
 
 
 def main():
@@ -293,7 +310,7 @@ def main():
     parser.add_argument("--base", type=Path, default=ROOT / "data/movie_recommendations.json")
     parser.add_argument("--matrix", type=Path, default=ROOT / "data/movie_anime_scores.bin")
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--annual", action="store_true", help="Export the best movie match for each annual winner")
+    parser.add_argument("--annual", action="store_true", help="Export the top five live-action movie matches for each annual winner")
     parser.add_argument("--cache-dir", type=Path, default=ROOT / "data/semantic_similarity/output/story")
     parser.add_argument("--model-cache", type=Path, default=ROOT / "data/semantic_similarity/output/model-cache")
     parser.add_argument("--similarity-dir", type=Path, help="Optional original completed similarity run with movie vectors")
@@ -310,7 +327,7 @@ def main():
     missing = {work["id"]: work for group in groups for work in group["anime"] if get_scores(work["id"]) is None}
     print(f"{sum(len(group['anime']) for group in groups)} anime; {len(missing)} missing rows; {len(base['movies'])} movies", flush=True)
     additional = compute_missing(list(missing.values()), base["movies"], args,
-        fingerprint(movie_rows(base["movies"]))) if missing and args.compute_missing else {}
+        fingerprint(movie_rows(base["movies"]))) if missing else {}
     bundle = build_bundle(archive, groups, base, get_scores, additional, {
         "story_sha256": digest(args.archive), "base_sha256": digest(args.base), "matrix_sha256": digest(args.matrix)
     }, annual=args.annual)

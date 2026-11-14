@@ -31,7 +31,8 @@ class StoryRecommendationsTests(unittest.TestCase):
         base = {"meta": {"model": exporter.embedding.MODEL_ID, "score_matrix": {
             "dtype": "float32-le", "layout": "movie-major", "rows": 3, "columns": 2,
             "sha256": hashlib.sha256(raw).hexdigest()}}, "anime": [{"id": "7"}, {"id": "8"}],
-            "movies": [{"id": str(i), "title": str(i), "year": 2000, "genres": [],
+            "movies": [{"id": str(i), "title": str(i), "year": 2000,
+                        "genres": ["Animation" if i == 1 else "Drama"],
                         "tags": [], "synopsis": "", "url": ""} for i in range(3)]}
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "scores.bin"
@@ -51,8 +52,10 @@ class StoryRecommendationsTests(unittest.TestCase):
             self.assertEqual(output["meta"]["supplemental_anime"], 0)
             annual = exporter.build_bundle({"meta": {}}, [{"year": 1979, "anime": period["anime"]}],
                                            base, read, {}, {}, annual=True)
-            self.assertEqual(annual["years"], [{"year": 1979, "anime_id": 7,
-                                               "movie_id": "1", "score": read(7)[1]}])
+            self.assertEqual(annual["live_action_movie_ids"], ["0", "2"])
+            self.assertEqual(annual["years"], [{"year": 1979, "anime_id": 7, "matches": [
+                {"movie_id": "2", "score": read(7)[2]}, {"movie_id": "0", "score": read(7)[0]}
+            ]}])
             path.write_bytes(raw + b"x")
             with self.assertRaises(ValueError):
                 exporter.read_base_scores(base, path)

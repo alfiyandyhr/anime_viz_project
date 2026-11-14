@@ -144,17 +144,23 @@ GitHub Pages picks up the new data automatically after the push.
 Choose **History** from the view dropdown or visit `/history` or `/story` with Flask.
 Scroll to advance one anime release year at a time, or use the year selector.
 The left timeline follows the most popular title from that year’s AniList sample.
-The right timeline marks the actual release year of its highest-scoring movie
-across the 1,000-title TMDB corpus. Open either synopsis for the full introduction.
-Popularity uses AniList user-list counts from the published snapshot. Both axes
-share the same release-year scale.
+The right timeline marks the release years of the highest-scoring live-action
+movie matches. Use **Connections** to show one to five matches, ordered by cosine
+similarity. Hover over a connection or a match title to highlight both.
+Select either to turn the card to that match. Open **Read synopsis** to see the
+full text. Popularity uses AniList user-list counts from the published snapshot.
+Both axes share a release-year scale. The anime axis starts at 1963 and the
+movie axis includes earlier release years from the movie sample.
 
 Switch from **Anime Timeline** to **Movie Timeline** to start with the top movie
 by TMDB popularity in each represented release year. Each movie links to its
-highest-scoring match in the published 1,000-title AniList similarity catalogue.
+highest-scoring matches in the published 1,000-title AniList similarity catalogue.
 The selector keeps the current release year when available and moves to the
-nearest represented year otherwise. Movie Timeline loads the existing movie
-recommendation and popularity snapshots on first use.
+nearest represented year otherwise. The active timeline moves to the left
+when switching perspectives. Movie Timeline loads the existing movie
+recommendation and popularity snapshots on first use. Both perspectives use
+the same History movie sample, which excludes TMDB Animation titles, records
+tagged with cartoon characters, and titles without genre metadata.
 
 History reads the published `story.json` and `data/history_movie_matches.json` on
 Flask and GitHub Pages. Regenerate them together so the annual winners and their
@@ -164,6 +170,9 @@ scores stay in sync:
 python data/refresh_story.py
 python data/export_story_recommendations.py --annual --compute-missing
 ```
+
+If all supplemental scores are already cached, use `--annual --offline` to
+regenerate the matches without loading the model.
 
 The archive samples up to ten Japanese, non-adult titles per first-release year,
 excluding unreleased entries. The Flask `/api/story` endpoint also serves annual
