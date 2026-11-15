@@ -101,8 +101,9 @@ test('the anime timeline ranks the five highest-scoring live-action movies for e
   for (const id of ['8392', '1311031']) assert.ok(!eligible.has(id));
   const pairs = model.yearPairs(archive, bundle);
   assert.equal(pairs.length, archive.years.length);
-  for (const { year, anchor: anime, matches } of pairs) {
-    assert.equal(anime.id, model.topAnime(archive, { start: year, end: year }, 1)[0].id);
+  for (const { year, anchor: anime, top, matches } of pairs) {
+    assert.deepEqual(top, model.topAnime(archive, { start: year, end: year }, 5));
+    assert.equal(anime, top[0]);
     assert.equal(matches.length, 5);
     assert.ok(matches.every(({ work, score }, rank) => work.synopsis && !excluded(work)
       && (rank === 0 || score <= matches[rank - 1].score)));
@@ -125,10 +126,13 @@ test('the movie timeline chooses live-action winners and links to the five highe
   const pairs = model.movieYearPairs(catalogue, popularity, ids);
   const years = [...new Set(movies.map(movie => movie.year))].sort((a, b) => a - b);
   assert.deepEqual(pairs.map(pair => pair.year), years);
-  for (const { year, anchor: movie, matches } of pairs) {
+  for (const { year, anchor: movie, top, matches } of pairs) {
     const ranked = movies.filter(movie => movie.year === year)
+      .filter(movie => Number.isFinite(popularity.popularity[movie.id]))
       .sort((a, b) => popularity.popularity[b.id] - popularity.popularity[a.id]);
-    assert.equal(movie.id, ranked[0].id);
+    assert.deepEqual(top.map(work => work.id), ranked.slice(0, 5).map(work => work.id));
+    assert.ok(top.every(work => work.popularity === popularity.popularity[work.id]));
+    assert.equal(movie, top[0]);
     const row = catalogue.movies.findIndex(record => record.id === movie.id);
     const scores = catalogue.anime.map((anime, index) =>
       [anime.id, matrix.readFloatLE((row * catalogue.anime.length + index) * 4)]);

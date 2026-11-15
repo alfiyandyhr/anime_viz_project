@@ -63,7 +63,7 @@
           <header class="history-header">
             <div>
               <p class="history-kicker">The AnIViz archive <span id="history-range"></span></p>
-              <h1>Anime through time</h1>
+              <h1>Screen Echoes</h1>
               <p class="history-intro" id="history-intro">Scroll to explore each year’s most popular anime and its closest live-action movie matches.</p>
             </div>
             <div class="history-controls" id="history-controls" hidden>
@@ -101,7 +101,7 @@
           <section class="history-pair" id="history-pair" aria-label="Anime and movie matches" hidden>
             <article class="history-card history-anime" id="history-anime"></article>
             <figure class="history-visual">
-              <svg id="history-timeline" role="img" aria-labelledby="timeline-title" viewBox="0 0 264 286">
+              <svg id="history-timeline" role="group" aria-labelledby="timeline-title" viewBox="0 0 264 286">
                 <title id="timeline-title">Anime and movie release timelines</title>
                 <defs>
                   <linearGradient id="history-link-gradient" gradientUnits="userSpaceOnUse" x1="66" y1="0" x2="198" y2="0">
@@ -111,7 +111,8 @@
                 </defs>
                 <g id="history-connection"></g>
                 <path id="history-highlight-line" class="history-highlight-line" aria-hidden="true" hidden></path>
-                <g id="anime-axis" class="history-track anime-track">
+                <g id="anime-axis" class="history-track anime-track" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="history-zoom" aria-label="Zoom into the anime timeline">
+                  <rect class="history-track-hit" x="-22" y="0" width="44" height="282" rx="8"></rect>
                   <text y="15" text-anchor="middle">ANIME</text>
                   <path class="history-axis"></path>
                   <g class="history-ticks" aria-hidden="true"></g>
@@ -119,7 +120,8 @@
                   <circle id="anime-point" class="history-point" r="5"></circle>
                   <text id="anime-point-year" class="history-point-label"></text>
                 </g>
-                <g id="movie-axis" class="history-track movie-track">
+                <g id="movie-axis" class="history-track movie-track" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="history-zoom" aria-label="Zoom into the movie timeline">
+                  <rect class="history-track-hit" x="-22" y="0" width="44" height="282" rx="8"></rect>
                   <text y="15" text-anchor="middle">MOVIES</text>
                   <path class="history-axis"></path>
                   <g class="history-ticks" aria-hidden="true"></g>
@@ -128,7 +130,10 @@
                   <text id="movie-point-year" class="history-point-label"></text>
                 </g>
               </svg>
-              <figcaption class="history-score" id="history-score"></figcaption>
+              <figcaption class="history-score">
+                <div id="history-score"></div>
+                <p class="history-zoom-hint">Select a timeline to see its top five.</p>
+              </figcaption>
             </figure>
             <article class="history-card history-movie" id="history-movie"></article>
           </section>
@@ -149,6 +154,21 @@
     <h2 id="synopsis-title"></h2>
     <p id="synopsis-text"></p>
     <a id="synopsis-source" target="_blank" rel="noopener noreferrer"></a>
+  </dialog>
+
+  <dialog class="history-zoom" id="history-zoom" aria-labelledby="history-zoom-title" aria-describedby="history-zoom-hint">
+    <header class="history-zoom-header">
+      <div>
+        <h2 id="history-zoom-title"></h2>
+        <p id="history-zoom-hint">Scroll to explore other years.</p>
+      </div>
+      <button type="button" id="close-history-zoom" aria-label="Close expanded timeline"><span aria-hidden="true">×</span></button>
+    </header>
+    <div class="history-zoom-years" id="history-zoom-years" tabindex="0" role="region" aria-label="Annual rankings" autofocus></div>
+    <div class="history-load history-zoom-status" id="history-zoom-status" hidden>
+      <span role="status"></span>
+      <button type="button" hidden>Retry</button>
+    </div>
   </dialog>
 
   <template id="history-card-template">

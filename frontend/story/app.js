@@ -17,6 +17,10 @@
   const status = $("#history-load");
   const message = status.querySelector("span");
   const dialog = $("#history-dialog");
+  const zoom = $("#history-zoom");
+  const zoomYears = $("#history-zoom-years");
+  const zoomStatus = $("#history-zoom-status");
+  const zoomRetry = zoomStatus.querySelector("button");
   const retry = $("#retry-data");
   const yearTravel = 76;
   const animeStart = 1963;
@@ -42,6 +46,9 @@
   let synopsisScroll;
   let frame = 0;
   let connectionFrame = 0;
+  let zoomTrack;
+  let zoomSession = 0;
+  let zoomAnimation;
 
   function safeURL(value) {
     try {
@@ -184,6 +191,7 @@
   function updatePoint(track, year) {
     const point = $(`#${track}-point`);
     const label = $(`#${track}-point-year`);
+    $(`#${track}-axis`).setAttribute("aria-label", `Zoom into the ${track} timeline for ${year ?? pairs[activeIndex].year}`);
     point.toggleAttribute("hidden", year == null);
     label.toggleAttribute("hidden", year == null);
     if (year == null) return;
@@ -357,9 +365,142 @@
   }
 
   function goToYear(year, reason) {
-    const index = pairs.reduce((best, pair, i) =>
-      Math.abs(pair.year - year) < Math.abs(pairs[best].year - year) ? i : best, 0);
-    goTo(index, reason);
+    goTo(nearestYearIndex(pairs, year), reason);
+  }
+
+  function nearestYearIndex(rows, year) {
+    return rows.reduce((best, row, i) =>
+      Math.abs(row.year - year) < Math.abs(rows[best].year - year) ? i : best, 0);
+  }
+
+  function showZoomStatus(text = "", retryAction = null) {
+    zoomStatus.hidden = !text;
+    zoomStatus.querySelector("span").textContent = text;
+    zoomYears.inert = Boolean(text);
+    zoomRetry.hidden = !retryAction;
+    zoomRetry.onclick = retryAction;
+  }
+
+  async function loadMovieTimeline() {
+    if (!timelines.has("movie")) {
+      const catalogue = await AnivizData.recommendations();
+      const popularity = await AnivizData.moviePopularity(catalogue);
+      if (!timelines.has("movie")) {
+        timelines.set("movie", {
+          pairs: StoryData.movieYearPairs(catalogue, popularity, liveActionMovieIds),
+          matchCount: catalogue.anime.length
+        });
+      }
+    }
+    return timelines.get("movie");
+  }
+
+  function makeZoomYear({ year, top }, movie) {
+    const section = document.createElement("section");
+    section.className = "history-zoom-year";
+    const title = document.createElement("h3");
+    title.textContent = year;
+    title.tabIndex = -1;
+    section.append(title);
+    if (!top.length) {
+      const empty = document.createElement("p");
+      empty.textContent = "No rankings are available for this year.";
+      section.append(empty);
+      return section;
+    }
+    const list = document.createElement("ol");
+    for (const work of top) {
+      const item = document.createElement("li");
+      const name = document.createElement("strong");
+      name.textContent = work.title;
+      const href = safeURL(movie ? work.url : work.site_url);
+      if (href) {
+        const link = document.createElement("a");
+        link.href = href;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = work.title;
+        name.replaceChildren(link);
+      }
+      const popularity = document.createElement("span");
+      popularity.textContent = Number.isFinite(work.popularity)
+        ? (movie ? `TMDB popularity ${number.format(work.popularity)}` : `${number.format(work.popularity)} AniList users`)
+        : "Popularity unavailable";
+      item.append(name, popularity);
+      list.append(item);
+    }
+    section.append(list);
+    return section;
+  }
+
+  async function showZoomYear(track, year, session) {
+    if (!timelines.has(track)) {
+      showZoomStatus("Loading movie rankings…");
+      try {
+        await loadMovieTimeline();
+      } catch (error) {
+        if (session !== zoomSession) return;
+        showZoomStatus("Movie rankings could not be loaded.", () => showZoomYear(track, year, session));
+        console.warn("Timeline rankings unavailable", error);
+        return;
+      }
+    }
+    if (session !== zoomSession) return;
+    showZoomStatus();
+    const rows = timelines.get(track).pairs;
+    const sections = rows.map(row => makeZoomYear(row, track === "movie"));
+    const selected = sections[nearestYearIndex(rows, year)];
+    zoomYears.replaceChildren(...sections);
+    zoomYears.scrollTo({ top: selected.offsetTop, behavior: "instant" });
+    selected.querySelector("h3").focus({ preventScroll: true });
+  }
+
+  function zoomOrigin() {
+    const track = zoomTrack.id === "movie-axis" ? "movie" : "anime";
+    const point = $(`#${track}-point`);
+    const y = point.hasAttribute("hidden") ? 141 : point.cy.baseVal.value;
+    const origin = new DOMPoint(0, y).matrixTransform(zoomTrack.getScreenCTM());
+    const bounds = zoom.getBoundingClientRect();
+    const x = origin.x - (bounds.left + bounds.width / 2);
+    const offsetY = origin.y - (bounds.top + bounds.height / 2);
+    return { transform: `translate(${x}px, ${offsetY}px) scale(.28)`, opacity: 0 };
+  }
+
+  function openZoom(track, trigger) {
+    if (zoom.open || activeIndex < 0) return;
+    zoomTrack = trigger;
+    const point = $(`#${track}-point`);
+    const year = point.hasAttribute("hidden") ? pairs[activeIndex].year : Number($(`#${track}-point-year`).textContent);
+    zoom.dataset.track = track;
+    $("#history-zoom-title").textContent = track === "movie" ? "Top live-action movies by year" : "Top anime by year";
+    zoomYears.replaceChildren();
+    showZoomStatus();
+    zoom.showModal();
+    showZoomYear(track, year, ++zoomSession);
+    if (!reducedMotion.matches) zoomAnimation = zoom.animate([zoomOrigin(), { transform: "none", opacity: 1 }], slideTiming);
+  }
+
+  function closeZoom() {
+    if (zoom.hasAttribute("data-closing")) return;
+    ++zoomSession;
+    const finish = () => {
+      zoom.close();
+      zoom.removeAttribute("data-closing");
+      zoomTrack.focus({ preventScroll: true });
+    };
+    const current = getComputedStyle(zoom);
+    const from = { transform: current.transform, opacity: current.opacity };
+    zoomAnimation?.cancel();
+    if (reducedMotion.matches) {
+      finish();
+      return;
+    }
+    zoom.dataset.closing = "";
+    zoomAnimation = zoom.animate([from, zoomOrigin()], { duration: 220, easing: "ease-in", fill: "forwards" });
+    zoomAnimation.onfinish = () => {
+      finish();
+      zoomAnimation.cancel();
+    };
   }
 
   function followLegacyHash() {
@@ -437,12 +578,7 @@
     if (!timelines.has(mode)) {
       showStatus("Loading Movie Timeline…");
       try {
-        const catalogue = await AnivizData.recommendations();
-        const popularity = await AnivizData.moviePopularity(catalogue);
-        timelines.set(mode, {
-          pairs: StoryData.movieYearPairs(catalogue, popularity, liveActionMovieIds),
-          matchCount: catalogue.anime.length
-        });
+        await loadMovieTimeline();
       } catch (error) {
         if (request !== perspectiveRequest) return;
         perspective.querySelector(`[value="${activePerspective}"]`).checked = true;
@@ -506,6 +642,24 @@
     synopsisScroll = null;
     goTo(activeIndex);
   });
+  for (const [track, axis] of [["anime", animeAxis], ["movie", movieAxis]]) {
+    axis.addEventListener("click", () => openZoom(track, axis));
+    axis.addEventListener("keydown", event => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      if (!event.repeat) openZoom(track, axis);
+    });
+  }
+  let pressedBackdrop = false;
+  zoom.addEventListener("pointerdown", event => { pressedBackdrop = event.target === zoom; });
+  zoom.addEventListener("click", event => {
+    if (pressedBackdrop && event.target === zoom) closeZoom();
+  });
+  zoom.addEventListener("cancel", event => {
+    event.preventDefault();
+    closeZoom();
+  });
+  $("#close-history-zoom").addEventListener("click", closeZoom);
   perspective.addEventListener("change", changePerspective);
   yearPicker.addEventListener("change", () => goTo(yearPicker.selectedIndex));
   matchCount.addEventListener("change", () => {
