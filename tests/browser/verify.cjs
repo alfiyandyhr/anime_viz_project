@@ -246,6 +246,58 @@ const url = route => new URL(route, base).href;
     assert.equal(await page.locator('#anime-point-year').textContent(), '1995');
     assert.equal(await page.locator('#history-movie .history-card-year').textContent(),
       await page.locator('#movie-point-year').textContent());
+    const zoom = page.locator('#history-zoom');
+    const rankings = page.locator('#history-zoom-years');
+    const checkRankingLink = async (name, href) => {
+      const link = rankings.getByRole('link', {name, exact:true});
+      assert.equal(await link.getAttribute('href'), href);
+      await context.route(href, route => route.fulfill({body:'Title page'}));
+      const [destination] = await Promise.all([page.waitForEvent('popup'), link.click()]);
+      assert.equal(destination.url(), href);
+      await destination.close();
+      await context.unroute(href);
+      assert.ok(await zoom.isVisible());
+    };
+    const currentRanking = () => rankings.evaluate(scroller => {
+      const year = [...scroller.children].find(section =>
+        section.offsetTop + section.offsetHeight > scroller.scrollTop + scroller.clientHeight / 2);
+      return { year: year.querySelector('h3').textContent, titles: [...year.querySelectorAll('li strong')].map(title => title.textContent) };
+    });
+    const overviewScroll = await page.evaluate(() => scrollY);
+    await page.locator('#anime-point').click();
+    await zoom.waitFor();
+    assert.deepEqual(await currentRanking(), {
+      year: '1995', titles: ['Neon Genesis Evangelion', 'Ghost in the Shell', 'GOLDEN BOY', 'Whisper of the Heart', 'Memories']
+    });
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.textContent), 'Neon Genesis Evangelion');
+    await checkRankingLink('Neon Genesis Evangelion', 'https://anilist.co/anime/30');
+    await rankings.hover();
+    const height = await rankings.evaluate(scroller => scroller.clientHeight);
+    await page.mouse.wheel(0, height);
+    await page.waitForFunction(() => {
+      const scroller = document.querySelector('#history-zoom-years');
+      const years = [...scroller.querySelectorAll('h3')];
+      const next = years.find(heading => heading.textContent === '1996').parentElement;
+      return Math.abs(scroller.scrollTop - next.offsetTop) <= 2;
+    });
+    assert.equal((await currentRanking()).year, '1996');
+    await page.mouse.click(8, 8);
+    await zoom.waitFor({state:'hidden'});
+    assert.equal(await page.evaluate(() => scrollY), overviewScroll);
+    assert.equal(await page.inputValue('#year-picker'), '1995');
+    await page.route('**/movie_popularity.json', route => route.fulfill({status:503}));
+    await page.locator('#movie-axis').press('Enter');
+    await zoom.getByText('Movie rankings could not be loaded.').waitFor();
+    await page.unroute('**/movie_popularity.json');
+    await zoom.getByRole('button', {name:'Retry'}).click();
+    await rankings.locator('li').first().waitFor({state:'attached'});
+    assert.equal((await currentRanking()).year, await page.locator('#movie-point-year').textContent());
+    assert.equal((await currentRanking()).titles.length, 5);
+    await checkRankingLink('The Conjuring', 'https://www.themoviedb.org/movie/138843');
+    await page.keyboard.press('Escape');
+    await zoom.waitFor({state:'hidden'});
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'movie-axis');
     await page.locator('#history-movie .synopsis-button').click();
     assert.ok(await page.locator('#history-dialog').isVisible());
     await page.keyboard.press('Escape');

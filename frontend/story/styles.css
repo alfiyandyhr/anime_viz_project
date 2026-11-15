@@ -1,9 +1,11 @@
-body[data-chapter="story"] { overflow-x: clip; }
-
-.history-stage {
+body[data-chapter="story"] {
   --anime-color: #bda5ff;
   --movie-color: #74e1ed;
   --history-display: "Space Grotesk", Inter, sans-serif;
+  overflow-x: clip;
+}
+
+.history-stage {
   max-width: 1400px;
   margin-inline: auto;
   padding-bottom: 0;
@@ -253,7 +255,12 @@ body[data-chapter="story"] { overflow-x: clip; }
 #history-timeline text { font: 600 11px var(--history-display); letter-spacing: .06em; }
 #history-timeline .anime-track { fill: var(--anime-color); }
 #history-timeline .movie-track { fill: var(--movie-color); }
-.history-track { transition: transform .44s cubic-bezier(.22, 1, .36, 1); }
+.history-track { cursor: zoom-in; transition: transform .44s cubic-bezier(.22, 1, .36, 1); }
+.history-track-hit { fill: transparent; stroke: transparent; }
+.history-track:hover .history-track-hit { fill: color-mix(in srgb, currentColor 12%, transparent); }
+.history-track:focus-visible .history-track-hit { stroke: currentColor; }
+.anime-track { color: var(--anime-color); }
+.movie-track { color: var(--movie-color); }
 .anime-track { transform: translateX(66px); }
 .movie-track { transform: translateX(198px); }
 [data-perspective="movie"] .anime-track { transform: translateX(198px); }
@@ -283,6 +290,7 @@ body[data-chapter="story"] { overflow-x: clip; }
 
 .history-score { margin: 0; color: var(--text-soft); font-size: .74rem; text-align: center; }
 .history-score strong { margin-left: 4px; color: var(--text); font: 700 1rem var(--history-display); }
+.history-zoom-hint { margin: 4px 0 0; }
 .history-note { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 20px; margin-top: 10px; }
 .history-note p { margin: 0; color: var(--text-soft); font-size: .72rem; }
 
@@ -304,6 +312,102 @@ body[data-chapter="story"] { overflow-x: clip; }
 .history-dialog h2 { margin: 6px 0; font-family: "Space Grotesk", sans-serif; }
 .history-dialog #synopsis-text { color: var(--text-soft); white-space: pre-line; }
 .history-dialog a { color: var(--cyan); }
+
+html:has(.history-zoom[open]) { overflow-y: hidden; scrollbar-gutter: stable; }
+
+.history-zoom {
+  --zoom-accent: var(--anime-color);
+  width: min(780px, calc(100vw - 32px));
+  height: min(580px, calc(100svh - 32px));
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--zoom-accent) 45%, var(--border-strong));
+  border-radius: 16px;
+  background: #0d1221;
+  box-shadow: 0 24px 90px #030510b3;
+  color: var(--text);
+}
+.history-zoom[data-track="movie"] { --zoom-accent: var(--movie-color); }
+.history-zoom[open] { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.history-zoom::backdrop {
+  background: rgb(6 9 19 / .76);
+  animation: history-zoom-backdrop .3s ease-out both;
+}
+.history-zoom[data-closing]::backdrop { animation: history-zoom-backdrop-out .22s ease-in both; }
+@keyframes history-zoom-backdrop { from { opacity: 0; } }
+@keyframes history-zoom-backdrop-out { to { opacity: 0; } }
+
+.history-zoom-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: clamp(12px, 2.7vw, 24px) clamp(16px, 4vw, 36px);
+  border-bottom: 1px solid var(--border-strong);
+}
+.history-zoom-header h2 { margin: 0; font: 700 clamp(1rem, 3vw, 1.4rem)/1.2 var(--history-display); }
+.history-zoom-header p { margin: 4px 0 0; color: var(--text-soft); font-size: .8rem; }
+.history-zoom-header button {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface-solid);
+  color: var(--text);
+  font: 400 1.5rem/1 var(--history-display);
+}
+.history-zoom-header button:hover { background: var(--surface-light); }
+.history-zoom-years {
+  grid-area: 2 / 1;
+  position: relative;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-color: var(--zoom-accent) #0d1221;
+  outline-offset: -3px;
+}
+.history-zoom-year {
+  display: grid;
+  grid-template-columns: minmax(125px, .4fr) minmax(0, 1fr);
+  align-content: center;
+  align-items: start;
+  gap: clamp(14px, 4vw, 42px);
+  min-height: 100%;
+  padding: clamp(14px, 4vw, 36px);
+  background: radial-gradient(ellipse at 0 50%, color-mix(in srgb, var(--zoom-accent) 13%, transparent), transparent 64%);
+}
+.history-zoom-year + .history-zoom-year { border-top: 1px solid var(--border-strong); }
+.history-zoom-year h3 {
+  margin: 0;
+  padding-left: 14px;
+  border-left: 2px solid var(--zoom-accent);
+  color: var(--zoom-accent);
+  font: 700 clamp(2.45rem, 7vw, 4rem)/1 var(--history-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.05em;
+}
+.history-zoom-year ol {
+  margin: 0;
+  padding-left: 2rem;
+  border-left: 1px solid var(--border-strong);
+}
+.history-zoom-year li { padding: .55rem 0 .55rem .2rem; }
+.history-zoom-year li + li { border-top: 1px solid var(--border-strong); }
+.history-zoom-year li::marker { color: var(--zoom-accent); font-weight: 700; }
+.history-zoom-year li strong { display: block; font-size: clamp(.9rem, 2.2vw, 1.14rem); overflow-wrap: anywhere; }
+.history-zoom-year li a { color: inherit; text-decoration: underline; text-underline-offset: .17em; }
+.history-zoom-year li a:hover, .history-zoom-year li a:focus-visible { color: var(--zoom-accent); }
+.history-zoom-year li span, .history-zoom-year p { color: var(--text-soft); font-size: .8rem; }
+.history-zoom-status { grid-area: 2 / 1; position: relative; justify-content: center; padding-inline: 16px; }
+
+@media (max-width: 540px) {
+  .history-zoom-year { grid-template-columns: minmax(0, 1fr); }
+  .history-zoom-year ol { padding-left: 1.65rem; }
+  .history-zoom-year li { padding-block: .35rem; }
+}
 
 @media (max-width: 710px) {
   .history-stage { padding: 10px clamp(10px, 3vw, 20px) 0; }
@@ -364,5 +468,5 @@ body[data-chapter="story"] { overflow-x: clip; }
 @media (prefers-reduced-motion: reduce) {
   .history-perspective::before, .history-track { transition: none; }
   .history-card [data-match-rank], .history-connection { transition: none; }
-  .history-dialog[open] { animation: none; }
+  .history-dialog[open], .history-zoom::backdrop, .history-zoom[data-closing]::backdrop { animation: none; }
 }

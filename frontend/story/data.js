@@ -118,24 +118,28 @@ const StoryData = (() => {
     return Array.from({ length: end - start + 1 }, (_, index) => {
       const year = start + index;
       const row = rows.get(year);
-      const anime = row && row.status !== "unavailable" ? [...row.anime].sort(byPopularity)[0] || null : null;
+      const top = row && row.status !== "unavailable" ? [...row.anime].sort(byPopularity).slice(0, 5) : [];
+      const anime = top[0] ?? null;
       const match = matches.get(year);
-      return { year, anchor: anime, matches: anime && anime.id === match?.animeId ? match.ranked : [] };
+      return { year, anchor: anime, top, matches: anime && anime.id === match?.animeId ? match.ranked : [] };
     });
   }
 
   function movieYearPairs(catalogue, { popularity }, liveActionMovieIds) {
     const eligible = new Set(liveActionMovieIds);
-    const winners = new Map();
+    const byYear = new Map();
     for (const movie of catalogue.movies) {
       const value = popularity[movie.id];
       if (!eligible.has(movie.id) || !Number.isInteger(movie.year) || !Number.isFinite(value)) continue;
-      const current = winners.get(movie.year);
-      if (!current || value > popularity[current.id]) winners.set(movie.year, movie);
+      if (!byYear.has(movie.year)) byYear.set(movie.year, []);
+      byYear.get(movie.year).push(movie);
     }
-    if (!winners.size) throw new Error("No live-action movies with a release year and popularity score");
+    if (!byYear.size) throw new Error("No live-action movies with a release year and popularity score");
 
-    return [...winners.values()].sort((a, b) => a.year - b.year).map(movie => {
+    return [...byYear.keys()].sort((a, b) => a - b).map(year => {
+      const top = byYear.get(year).sort((a, b) => popularity[b.id] - popularity[a.id]).slice(0, 5)
+        .map(movie => ({ ...movie, popularity: popularity[movie.id] }));
+      const movie = top[0];
       // The exporter ranks each movie against the entire anime catalogue.
       if (!Array.isArray(movie.matches) || movie.matches.length < Math.min(5, catalogue.anime.length)) {
         throw new Error(`Incomplete anime matches for movie ${movie.id}`);
@@ -148,11 +152,7 @@ const StoryData = (() => {
         }
         return { work: { ...anime, description: anime.synopsis, site_url: anime.url }, score };
       });
-      return {
-        year: movie.year,
-        anchor: { ...movie, popularity: popularity[movie.id] },
-        matches
-      };
+      return { year, anchor: movie, top, matches };
     });
   }
 
