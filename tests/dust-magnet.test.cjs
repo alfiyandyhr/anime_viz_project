@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const { createHash } = require("node:crypto");
 const vm = require("node:vm");
-const { getDustMatches, defaultMagnetPositions, dustAttraction, createDustNodes, stepDust, layoutDust } = require("../frontend/recommendations/dust-magnet.js");
+const { getDustMatches, defaultMagnetPositions, createDustNodes, rebaseDustPositions, dragDustStep, constrainMagnetPosition } = require("../frontend/recommendations/dust-magnet.js");
 const data = JSON.parse(readFileSync(require.resolve("../data/movie_recommendations.json"), "utf8"));
 const binary = readFileSync(require.resolve("../data/movie_anime_scores.bin"));
 const view = new DataView(binary.buffer, binary.byteOffset, binary.byteLength);
@@ -29,7 +29,7 @@ test("empty field clicks deselect once while dust, magnet, controls, drag and ou
   };
   let deselections = 0;
   const context = vm.createContext({ document, hideTooltip() {},
-    AnivizMain: { deselectLast() { deselections++; } } });
+    AnivizMain: { deselectLast() { deselections++; }, resetPositions() {}, resetStrengths() {} } });
   vm.runInContext(readFileSync(require.resolve("../frontend/recommendations/dust-magnet.js"), "utf8"), context);
   vm.runInContext("bindDustControls();", context);
   const click = (target, defaultPrevented = false) => {
@@ -97,144 +97,244 @@ test("empty magnets and unavailable scores do not invent matches", () => {
   assert.equal(getDustMatches(data, scores, favorites, 90).length, 90);
 });
 
-function simulate(nodes, anchors, width = 640, height = 500, ticks = 480) {
-  for (let tick = 0; tick < ticks; tick++) stepDust(nodes, anchors, width, height);
-  return nodes;
-}
-
 function grain(scores, x = 100, y = 100) {
-  return { anime: { id: "test", title: "Test" }, index: 0, scores, x, y, vx: 0, vy: 0 };
+  return { key: "anilist:test", scores, x, y };
 }
 
-test("single-magnet attraction retains positive-score pull", () => {
-  const anchors = [{ x: 300, y: 100 }];
-  const force = dustAttraction(grain([.8]), anchors);
-  assert.equal(force.x, 18 * .8 * 200);
-  assert.equal(force.y, 0);
-  assert.deepEqual(dustAttraction(grain([0]), anchors), { x: 0, y: 0 });
-  assert.deepEqual(dustAttraction(grain([-.5]), anchors), { x: 0, y: 0 });
-  const weak = dustAttraction(grain([.2]), anchors);
-  const strong = dustAttraction(grain([.8]), anchors);
-  assert.equal(strong.x, weak.x * 4);
-});
+const FRAME_TIME = 1 / 60;
+const FRAME_BUDGET = 2;
+const SLOW_FRAME_BUDGET = 3;
+const WIDTH = 640;
+const HEIGHT = 500;
 
-test("one magnet gathers dust at its surface instead of a distant score radius", () => {
-  const anchors = [{ x: 320, y: 250 }];
-  const nodes = simulate([grain([.2], 20, 250), grain([.9], 620, 250)], anchors);
-  for (const node of nodes) assert.ok(Math.abs(Math.hypot(node.x - 320, node.y - 250) - 34) < 2);
-});
+const sample = limit => getDustMatches(data, scores, favorites, limit)
+  .map(match => ({ ...match, key: `anilist:${match.anime.id}` }));
+const maxTravel = (nodes, before) => Math.max(...nodes.map((node, index) => distance(node, before[index])));
 
-function assertScoreOrder(node, anchors) {
-  const distances = anchors.map((a) => Math.hypot(node.x - a.x, node.y - a.y));
-  for (let i = 0; i < anchors.length; i++) for (let j = i + 1; j < anchors.length; j++) {
-    if (node.scores[i] === node.scores[j]) continue;
-    assert.ok((node.scores[i] - node.scores[j]) * (distances[i] - distances[j]) < 0,
-      `${node.anime.title || node.anime.id}: scores ${node.scores}, distances ${distances}`);
-  }
-}
-
-test("higher scores mean shorter distances for uneven triangles and signed scores", () => {
-  const layouts = [[{ x: 100, y: 250 }, { x: 540, y: 250 }],
-    [{ x: 100, y: 100 }, { x: 540, y: 100 }, { x: 320, y: 450 }],
-    defaultMagnetPositions(3, 1000, 500)];
-  const permutations = [[.8, .6, .4], [.8, .4, .6], [.6, .8, .4], [.4, .8, .6], [.6, .4, .8], [.4, .6, .8],
-    [.501, .5, .499], [0, -.2, -.7], [-.8, -.1, -.5], [.5, .5, .4]];
-  for (const anchors of layouts) for (const scores of permutations) {
-    const nodes = layoutDust([grain(scores.slice(0, anchors.length))], anchors, 1000, 500);
-    assertScoreOrder(nodes[0], anchors);
-  }
-});
-
-test("moving magnets preserves score order immediately and throughout the animation", () => {
-  const anchors = defaultMagnetPositions(3, 640, 500);
-  const nodes = layoutDust(getDustMatches(data, scores, favorites, 60), anchors, 640, 500);
-  const identities = nodes.slice();
-  for (const position of [{ x: 90, y: 75 }, { x: 550, y: 140 }, { x: 320, y: 100 }]) {
-    Object.assign(anchors[0], position);
-    for (let tick = 0; tick < 60; tick++) {
-      stepDust(nodes, anchors, 640, 500, tick === 0 ? 0 : 1 / 60);
-      nodes.forEach((node, i) => { assert.equal(node, identities[i]); assertScoreOrder(node, anchors); });
-    }
-  }
-});
-
-test("changing attraction scores refreshes geometry with fixed magnet positions", () => {
-  const anchors = [{ x: 100, y: 250 }, { x: 540, y: 250 }];
-  const node = grain([.8, .2], 250, 250);
-  stepDust([node], anchors, 640, 500, 0);
-  assertScoreOrder(node, anchors);
-  node.scores = [.2, .8];
-  stepDust([node], anchors, 640, 500, 0);
-  assertScoreOrder(node, anchors);
-});
-
-test("impossible collinear orders keep the best movie nearest and flag the limitation", () => {
-  const anchors = [{ x: 100, y: 250 }, { x: 320, y: 250 }, { x: 540, y: 250 }];
-  const [node] = layoutDust([grain([.8, .2, .6])], anchors, 640, 500);
-  const distances = anchors.map((a) => Math.hypot(node.x - a.x, node.y - a.y));
-  assert.equal(node.scoreLayout.approximate, true);
-  assert.equal(distances.indexOf(Math.min(...distances)), 0);
-});
-
-test("magnet drags preserve particle identity and bound per-frame travel, even through dust", () => {
-  const anchors = [{ x: 320, y: 250 }];
-  const nodes = layoutDust(getDustMatches(data, scores, favorites.slice(0, 1), 60), anchors, 640, 500);
-  const identities = nodes.slice();
-  for (const target of [{ x: 330, y: 250 }, { x: nodes[0].x, y: nodes[0].y }, { x: 76, y: 44 }]) {
-    Object.assign(anchors[0], target);
-    for (let tick = 0; tick < 120; tick++) {
-      const before = nodes.map((n) => ({ x: n.x, y: n.y }));
-      stepDust(nodes, anchors, 640, 500);
-      nodes.forEach((node, i) => {
-        assert.equal(node, identities[i]);
-        assert.ok(Math.hypot(node.x - before[i].x, node.y - before[i].y) <= 5.00001);
-      });
-    }
-  }
-  const before = { ...nodes[0] };
-  stepDust(nodes, anchors, 640, 500, 10); // Resuming a hidden tab must not jump ten seconds.
-  assert.ok(Math.hypot(nodes[0].x - before.x, nodes[0].y - before.y) <= 10.00001);
-});
-
-test("restoring a chart retains positions and momentum by anime ID, including resize", () => {
-  const matches = getDustMatches(data, scores, favorites, 30);
-  const nodes = layoutDust(matches, defaultMagnetPositions(3, 640, 500), 640, 500);
-  const previous = { width: 640, height: 500, positions: new Map(nodes.map((n) => [n.anime.id, n])) };
-  const restored = createDustNodes(matches.slice().reverse(), defaultMagnetPositions(3, 320, 440), 320, 440, previous);
-  restored.forEach((node) => {
-    const saved = previous.positions.get(node.anime.id);
-    assert.ok(Math.abs(node.x - saved.x / 2) < 1e-10);
-    assert.ok(Math.abs(node.y - saved.y * 440 / 500) < 1e-10);
-    assert.equal(node.vx, saved.vx);
-  });
-});
-
-test("1-3 magnets gather 30-90 readable dots inside mobile and desktop bounds", () => {
-  for (const width of [240, 320, 640, 1000]) {
-    for (const count of [1, 2, 3]) {
-      for (const limit of [30, 60, 90]) {
-        const matches = getDustMatches(data, scores, favorites.slice(0, count), limit);
-        const before = JSON.stringify(matches);
-        const anchors = defaultMagnetPositions(count, width, 500);
-        const nodes = layoutDust(matches, anchors, width, 500);
-        assert.equal(JSON.stringify(matches), before);
-        for (const [i, node] of nodes.entries()) {
-          assertScoreOrder(node, anchors);
-          assert.ok(Number.isFinite(node.x) && Number.isFinite(node.y));
-          assert.ok(node.x >= 14 && node.x <= width - 14 && node.y >= 18 && node.y <= 482);
-          for (const other of nodes.slice(i + 1)) {
-            assert.ok(Math.hypot(node.x - other.x, node.y - other.y) > 10,
-              `overlap at ${width}px, ${count} magnets, ${limit} dots`);
-          }
-          for (const anchor of anchors) assert.ok(Math.hypot(node.x - anchor.x, node.y - anchor.y) > 29);
+test("exported 30-, 60- and 90-dot samples stay bounded crossing a straight line and during fast sweeps", () => {
+  for (const width of [320, WIDTH]) {
+    for (const limit of [30, 60, 90]) {
+      const inset = Math.min(76, width * .22);
+      const anchors = [{ x: width / 2, y: 300 }, { x: inset, y: 350 }, { x: width - inset, y: 350 }];
+      let nodes = createDustNodes(sample(limit), width, HEIGHT);
+      for (const [x, y, elapsed, budget] of [
+        ...[350, 349, 350, 351].map(y => [width / 2, y, FRAME_TIME, FRAME_BUDGET]),
+        [inset, 44, .1, SLOW_FRAME_BUDGET], [width - inset, 420, 10, SLOW_FRAME_BUDGET]
+      ]) {
+        Object.assign(anchors[0], { x, y });
+        const next = dragDustStep(nodes, anchors, width, HEIGHT, elapsed);
+        const travel = maxTravel(next, nodes);
+        assert.ok(travel > 0 && travel <= budget + 1e-9);
+        for (const { x, y } of next) {
+          assert.ok(x >= 14 && x <= width - 14 && y >= 18 && y <= HEIGHT - 18);
         }
+        nodes = nodes.map((node, index) => ({ ...node, ...next[index] }));
       }
     }
   }
 });
 
+function mockChart(reducedMotion) {
+  const frames = new Map(), draws = [[], []], controls = [];
+  let nextFrame = 0, time = 0, saves = 0;
+  const field = { clientWidth: WIDTH, clientHeight: HEIGHT, isConnected: true };
+  const mirror = {};
+  const elements = new Map();
+  const state = vm.createContext({
+    field, mirror,
+    window: { matchMedia: () => ({ matches: reducedMotion }) },
+    document: { querySelector(selector) {
+      if (!elements.has(selector)) elements.set(selector, {});
+      return elements.get(selector);
+    } },
+    AnivizDust: { REVERSE: "reverse" },
+    AnivizMain: { snapshot: () => ({ selectedKeys: [] }), color: () => "blue",
+      magnetStrength: () => 1, saveLayout() { saves++; } },
+    recommendationState: { magnetPositions: {} },
+    requestAnimationFrame(callback) { frames.set(++nextFrame, callback); return nextFrame; },
+    cancelAnimationFrame(id) { frames.delete(id); },
+    mockDustView(container, matches, anchors, width, height, movement) {
+      controls.push({ anchor: anchors[0], ...movement });
+      return {
+        draw(positions) {
+          const node = positions.get("anilist:test");
+          draws[container === field ? 0 : 1].push({ x: node.x, y: node.y });
+        },
+        drawLinks() {}
+      };
+    }
+  });
+  vm.runInContext(readFileSync(require.resolve("../frontend/recommendations/dust-magnet.js"), "utf8"), state);
+  vm.runInContext(`
+    createDustView = mockDustView;
+    const node = { key: "anilist:test", x: 100, y: 100, scores: [1] };
+    dustChart = { width: ${WIDTH}, height: ${HEIGHT}, positions: new Map([[node.key, node]]) };
+    renderDustChart(field, mirror, [{ key: "magnet" }], [node], false);
+  `, state);
+  return {
+    ...controls[1],
+    advanceFrame(delay = 1000 / 60) {
+      assert.equal(frames.size, 1);
+      const [[id, callback]] = frames;
+      frames.delete(id);
+      callback(time += delay);
+    },
+    attractDust: () => vm.runInContext("dustChart.attractDust()", state),
+    stop: () => vm.runInContext("stopDustChart()", state),
+    get point() {
+      assert.deepEqual(draws[0], draws[1]);
+      return draws[0].at(-1);
+    },
+    get draws() { return draws[0].length; },
+    get frames() { return frames.size; },
+    get saves() { return saves; }
+  };
+}
+
+test("both views share one bounded frame per pointer move and stay still during a hold and after release", () => {
+  const chart = mockChart(false);
+  const { anchor, startMove, moveAnchor, endMove } = chart;
+  const start = chart.point;
+  assert.equal(chart.frames, 0);
+  endMove(startMove(anchor)); // Click.
+  assert.equal(chart.frames, 0);
+  assert.deepEqual(chart.point, start);
+
+  const gesture = startMove(anchor);
+  moveAnchor(gesture, 450, 350);
+  moveAnchor(gesture, 500, 340);
+  assert.equal(chart.draws, 1);
+  chart.advanceFrame();
+  assert.equal(chart.draws, 2);
+  assert.deepEqual([anchor.x, anchor.y], [500, 340]);
+  assert.ok(distance(chart.point, start) > 0 && distance(chart.point, start) <= FRAME_BUDGET + 1e-9);
+  const held = chart.point;
+  assert.equal(chart.frames, 0);
+  moveAnchor(gesture, 500, 340); // Duplicate pointer event while stationary.
+  chart.advanceFrame();
+  assert.deepEqual(chart.point, held);
+  assert.equal(chart.draws, 2);
+  assert.equal(chart.frames, 0);
+
+  moveAnchor(gesture, 140, 60);
+  chart.advanceFrame(1000);
+  assert.ok(distance(chart.point, held) > 0 && distance(chart.point, held) <= FRAME_BUDGET + 1e-9);
+  const released = chart.point;
+  moveAnchor(gesture, 90, 60);
+  endMove(gesture);
+  assert.deepEqual([anchor.x, anchor.y], [90, 60]);
+  assert.deepEqual(chart.point, released);
+  assert.equal(chart.frames, 0);
+  assert.equal(chart.saves, 1);
+});
+
+test("reduced motion applies a single bounded dust step only after a moved magnet is released", () => {
+  const chart = mockChart(true);
+  const { anchor, startMove, moveAnchor, endMove } = chart;
+  const start = chart.point;
+  endMove(startMove(anchor));
+  assert.deepEqual(chart.point, start);
+  const gesture = startMove(anchor);
+  moveAnchor(gesture, 500, 340);
+  chart.advanceFrame(1000);
+  assert.equal(anchor.x, 500);
+  assert.deepEqual(chart.point, start);
+  assert.equal(chart.frames, 0);
+  moveAnchor(gesture, 510, 340);
+  endMove(gesture);
+  assert.equal(anchor.x, 510);
+  assert.ok(distance(chart.point, start) > 0 && distance(chart.point, start) <= FRAME_BUDGET + 1e-9);
+  assert.equal(chart.frames, 0);
+  assert.equal(chart.saves, 1);
+});
+
+test("cancellation and chart teardown discard pending moves and simulation time", () => {
+  for (const reducedMotion of [false, true]) {
+    const chart = mockChart(reducedMotion);
+    const { anchor, startMove, moveAnchor, endMove } = chart;
+    const gesture = startMove(anchor);
+    moveAnchor(gesture, 500, 340);
+    chart.advanceFrame();
+    const held = chart.point;
+    moveAnchor(gesture, 520, 340);
+    endMove(gesture, true);
+    assert.equal(anchor.x, 500);
+    assert.deepEqual(chart.point, held);
+    assert.equal(chart.frames, 0);
+
+    const hidden = startMove(anchor);
+    moveAnchor(hidden, 530, 340);
+    chart.stop();
+    endMove(hidden);
+    assert.equal(anchor.x, 500);
+    assert.deepEqual(chart.point, held);
+    assert.equal(chart.frames, 0);
+  }
+});
+
+test("keyboard and Attract dust actions each apply one bounded step", () => {
+  for (const reducedMotion of [false, true]) {
+    const chart = mockChart(reducedMotion);
+    const start = chart.point;
+    chart.nudgeAnchor(chart.anchor, 12, 0);
+    assert.equal(chart.anchor.x, WIDTH / 2 + 12);
+    const nudged = chart.point;
+    assert.ok(distance(nudged, start) > 0 && distance(nudged, start) <= FRAME_BUDGET + 1e-9);
+    chart.attractDust();
+    assert.ok(distance(chart.point, nudged) > 0 && distance(chart.point, nudged) <= FRAME_BUDGET + 1e-9);
+    assert.equal(chart.draws, 3);
+    assert.equal(chart.frames, 0);
+    assert.equal(chart.saves, 2);
+  }
+});
+
+test("rerender and resize restore positions by typed key and drop legacy velocities", () => {
+  const matches = sample(30);
+  const nodes = createDustNodes(matches, WIDTH, HEIGHT);
+  const previous = { width: WIDTH, height: HEIGHT,
+    positions: new Map(nodes.map(node => [node.key, { ...node, vx: 40, vy: -20 }])) };
+  const restored = createDustNodes(matches.slice().reverse(), 320, 440, rebaseDustPositions(previous, 320, 440));
+  restored.forEach(node => {
+    const saved = previous.positions.get(node.key);
+    near(node.x, saved.x / 2);
+    near(node.y, saved.y * 440 / HEIGHT);
+    assert.equal(node.vx, undefined);
+    assert.equal(node.vy, undefined);
+  });
+});
+
+test("first entry seeds a deterministic, compact cloud with individually reachable dots", () => {
+  for (const width of [240, 320, WIDTH, 1000]) {
+    for (const limit of [30, 60, 90]) {
+      const matches = sample(limit);
+      const nodes = createDustNodes(matches, width, HEIGHT);
+      assert.deepEqual(nodes, createDustNodes(matches, width, HEIGHT));
+      for (const [index, node] of nodes.entries()) {
+        assert.ok(node.x >= 14 && node.x <= width - 14 && node.y >= 18 && node.y <= HEIGHT - 18);
+        assert.ok(distance(node, { x: width / 2, y: HEIGHT / 2 }) < 120);
+        for (const other of nodes.slice(index + 1)) assert.ok(distance(node, other) > 9);
+      }
+    }
+  }
+  assert.deepEqual(createDustNodes([], WIDTH, HEIGHT), []);
+});
+
+test("adding magnets and changing dot count seed new grains clear of the saved grains", () => {
+  const positions = new Map();
+  for (const [limit, magnetCount] of [[60, 1], [60, 2], [60, 3], [30, 3], [90, 3]]) {
+    const matches = getDustMatches(data, scores, favorites.slice(0, magnetCount), limit)
+      .map(match => ({ ...match, key: `anilist:${match.anime.id}` }));
+    const nodes = createDustNodes(matches, 240, 260, positions);
+    for (const [index, node] of nodes.entries()) {
+      const saved = positions.get(node.key);
+      if (saved) assert.equal(distance(node, saved), 0);
+      for (const other of nodes.slice(index + 1)) assert.ok(distance(node, other) >= 12);
+      positions.set(node.key, node);
+    }
+  }
+});
+
 test("pointer and keyboard movement keep magnets separated and within bounds", () => {
-  const { constrainMagnetPosition } = require("../frontend/recommendations/dust-magnet.js");
   for (const width of [240, 320, 640, 1000]) {
     const anchors = defaultMagnetPositions(3, width, 500);
     for (const anchor of anchors) {
@@ -244,7 +344,8 @@ test("pointer and keyboard movement keep magnets separated and within bounds", (
         assert.ok(result.x >= margin && result.x <= width - margin);
         assert.ok(result.y >= 44 && result.y <= 422);
         for (const other of anchors.filter((item) => item !== anchor)) {
-          assert.ok(Math.hypot(result.x - other.x, result.y - other.y) >= Math.min(110, width * .42) - 1e-6);
+          const separation = Math.min(110, (width - 2 * margin - 8) / 2);
+          assert.ok(Math.hypot(result.x - other.x, result.y - other.y) >= separation - 1e-6);
         }
         Object.assign(anchor, result);
       }
@@ -252,27 +353,123 @@ test("pointer and keyboard movement keep magnets separated and within bounds", (
   }
 });
 
-test("dense constrained dust settles instead of animating idle contact jitter forever", () => {
-  for (const width of [240, 640]) {
-    const anchors = defaultMagnetPositions(3, width, 500);
-    const nodes = layoutDust(getDustMatches(data, scores, favorites, 90), anchors, width, 500);
-    let quietFrames = 0;
-    for (let frame = 0; frame < 600 && quietFrames < 24; frame++) {
-      quietFrames = stepDust(nodes, anchors, width, 500) < .015 ? quietFrames + 1 : 0;
-    }
-    assert.equal(quietFrames, 24, `never settled at ${width}px`);
-    nodes.forEach((node) => assertScoreOrder(node, anchors));
+const dragPoint = (node, anchors, elapsed = 1 / 60) => dragDustStep([node], anchors, 640, 500, elapsed)[0];
+const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
+
+test("drag pull scales with elapsed time, affinity and strength below the shared cap", () => {
+  const node = grain([.25], 320, 250);
+  const anchor = { x: 500, y: 250, strength: 1 };
+  const move = (scores, strength, elapsed) => dragPoint({ ...node, scores }, [{ ...anchor, strength }], elapsed).x - node.x;
+  const baseline = move([.25], 1, 1 / 60);
+  assert.ok(baseline > 0 && baseline < .25);
+  near(move([.25], 2, 1 / 60), 2 * baseline);
+  near(move([.5], 1, 1 / 60), 2 * baseline);
+  near(move([.25], 1, 1 / 120), baseline / 2);
+  near(move([2], 1, 1 / 60), 4 * baseline);
+  const mixed = { ...node, scores: [.25], rawScores: [100_000] };
+  assert.deepEqual(dragPoint(mixed, [anchor]), dragPoint(node, [anchor]));
+  assert.deepEqual(dragPoint(node, [anchor], 0), { x: node.x, y: node.y });
+});
+
+test("collinear pulls cancel or reinforce, and changing strength can reverse the net pull", () => {
+  const node = grain([.5, .5], 320, 250);
+  const left = { x: 100, y: 250 }, right = { x: 540, y: 250 };
+  assert.deepEqual(dragPoint(node, [left, right]), { x: node.x, y: node.y });
+  const pull = node.x - dragPoint(node, [left]).x;
+  assert.ok(pull > 0);
+  near(dragPoint(node, [left, { x: 200, y: 250 }]).x, node.x - 2 * pull);
+  near(dragPoint(node, [{ ...left, strength: 2 }, right]).x, node.x - pull);
+  near(dragPoint(node, [{ ...left, strength: 0 }, right]).x, node.x + pull);
+
+  const tied = grain([1, 1, 1], 320, 250);
+  const sameSide = [right, { x: 550, y: 250 }, { x: 560, y: 250 }].map(anchor => ({ ...anchor, strength: 2 }));
+  near(dragPoint(tied, sameSide).x, tied.x + 2);
+  near(dragPoint(tied, sameSide, 10).x, tied.x + 3);
+});
+
+test("missing scores are skipped, nonpositive scores do not attract, and muted magnets give no clearance", () => {
+  const node = grain([.8], 320, 250);
+  const nearAnchor = { x: 322, y: 250 }, farAnchor = { x: 500, y: 250 };
+  const start = { x: node.x, y: node.y };
+  for (const missing of [null, undefined, NaN, Infinity]) {
+    assert.deepEqual(dragPoint({ ...node, scores: [missing] }, [nearAnchor]), start);
+  }
+  for (const score of [-.8, 0]) {
+    assert.deepEqual(dragPoint({ ...node, scores: [score] }, [farAnchor]), start);
+  }
+  const threeScores = { ...node, scores: [.8, 1, 1] };
+  assert.deepEqual(dragPoint(threeScores, [farAnchor, { ...nearAnchor, strength: 0 }, { x: 100, y: 250, strength: 0 }]),
+    dragPoint(node, [farAnchor]));
+  const muted = { ...nearAnchor, strength: 0 };
+  assert.deepEqual(dragDustStep([node, node], [muted], 640, 500), [start, start]);
+});
+
+test("tapered pull and clearance stay continuous and finite at the magnet center", () => {
+  const node = grain([.8], 320, 250);
+  const start = { x: node.x, y: node.y };
+  const at = dx => ({ x: node.x + dx, y: node.y });
+  assert.deepEqual(dragPoint(node, [at(0)]), start);
+  const pull = dx => dragPoint(node, [at(dx)]).x - dragPoint({ ...node, scores: [0] }, [at(dx)]).x;
+  near(pull(1), 2 * pull(.5));
+  near(pull(1), -pull(-1));
+  assert.ok(pull(1) > 0);
+  for (const dx of [-.001, .001]) assert.ok(distance(dragPoint(node, [at(dx)]), start) < .001);
+});
+
+test("drag displacement survives a magnet permutation and changes continuously through collinearity", () => {
+  const node = grain([.7, .2, .7], 270, 255);
+  const anchors = [{ x: 100, y: 350, strength: 2 }, { x: 320, y: 349, strength: .75 }, { x: 540, y: 350 }];
+  const order = [2, 0, 1];
+  let previous = dragPoint(node, anchors);
+  for (let i = 1; i <= 16; i++) {
+    anchors[1].y = 349 + i / 8;
+    const next = dragPoint(node, anchors);
+    assert.ok(distance(next, previous) > 0 && distance(next, previous) < .001);
+    const permuted = dragPoint({ ...node, scores: order.map(i => node.scores[i]) }, order.map(i => anchors[i]));
+    near(distance(next, permuted), 0);
+    previous = next;
   }
 });
 
-test("empty selections, tied and nonpositive scores remain finite and deterministic", () => {
-  const anchors = defaultMagnetPositions(2, 640, 500);
-  assert.deepEqual(layoutDust([], anchors, 640, 500), []);
-  assert.deepEqual(layoutDust([grain([.5])], [], 640, 500), []);
-  const matches = [[1, 0], [0, 1], [-1, -.5], [0, 0], [.5, .5]].map((values, index) => ({
-    anime: { id: `synthetic-${index}` }, index, scores: values
+test("local spacing separates coincident grains gently and fits the total travel and field limits", () => {
+  const nodes = [Object.freeze(grain([1, 1, 1], 320, 250)), Object.freeze(grain([1, 1, 1], 320, 250))];
+  Object.freeze(nodes);
+  const noPull = [{ x: 320, y: 250 }];
+  const spaced = dragDustStep(nodes, noPull, 640, 500);
+  assert.ok(distance(...spaced) > 0 && distance(...spaced) <= 2);
+  near((spaced[0].x + spaced[1].x) / 2, nodes[0].x);
+  near((spaced[0].y + spaced[1].y) / 2, nodes[0].y);
+  const anchors = [410, 520, 630].map(x => Object.freeze({ x, y: 300, strength: 2 }));
+  const next = dragDustStep(nodes, Object.freeze(anchors), 640, 500, 10);
+  next.forEach((point, i) => assert.ok(distance(point, nodes[i]) <= 3 + 1e-9));
+  const edge = grain([1], 14, 18);
+  assert.deepEqual(dragPoint(edge, [{ x: -100, y: -100 }]), { x: 14, y: 18 });
+});
+
+test("a dense 90-dot drag keeps each grain reachable within its hit area", () => {
+  const nodes = getDustMatches(data, scores, favorites, 90).map((match, i) => ({
+    ...match, x: 260 + (i % 10) * 12, y: 200 + Math.floor(i / 10) * 12
   }));
-  const nodes = layoutDust(matches, anchors, 640, 500);
-  assert.deepEqual(nodes, layoutDust(matches, anchors, 640, 500));
-  for (const node of nodes) assert.ok(Number.isFinite(node.x) && Number.isFinite(node.y));
+  const anchors = [{ x: 100, y: 350 }, { x: 320, y: 350, strength: 2 }, { x: 540, y: 350 }];
+  // Try the center and nearby points within the SVG's 9-unit hit radius.
+  const hitOffsets = [{ x: 0, y: 0 }, ...[4, 8].flatMap(radius => Array.from({ length: 12 }, (_, i) => ({
+    x: radius * Math.cos(i * Math.PI / 6), y: radius * Math.sin(i * Math.PI / 6)
+  })))];
+  for (let frame = 0; frame < 300; frame++) {
+    anchors[1].y = 350 + 48 * Math.sin(frame / 20);
+    const next = dragDustStep(nodes, anchors, 640, 500);
+    next.forEach((point, i) => {
+      assert.ok(distance(point, nodes[i]) <= FRAME_BUDGET + 1e-9);
+      Object.assign(nodes[i], point);
+    });
+    if ((frame + 1) % 60 !== 0) continue;
+    nodes.forEach((node, i) => {
+      assert.ok(hitOffsets.some(offset => {
+        const hit = { x: node.x + offset.x, y: node.y + offset.y };
+        return nodes.slice(i + 1).every(above => distance(hit, above) > 9)
+          && anchors.every(anchor => distance(hit, anchor) > 25);
+      }), `grain ${i} is covered at frame ${frame + 1}`);
+    });
+  }
 });

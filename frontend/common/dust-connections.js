@@ -146,7 +146,7 @@
         showScores(rows.append('td').attr('class', 'dust-member-score'));
         scroll.node().scrollTop = memberScrollTop;
       } else {
-        memberPanel.append('p').attr('class', 'dust-member-empty').text(`None of the displayed ${noun} are closest to ${title}.`);
+        memberPanel.append('p').attr('class', 'dust-member-empty').text(`None of the displayed ${noun} have ${title} as their highest-scoring magnet.`);
       }
 
       drawLines = () => {

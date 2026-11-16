@@ -100,13 +100,17 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       el.value = value; el.dispatchEvent(new Event(event,{bubbles:true}));
     },{value,event});
     const addMovie = async title => {
-      await page.locator('#movie-search').fill(title);
-      await page.locator('#movie-search').press('Enter');
+      const search = page.locator('#movie-search');
+      await search.evaluate(el => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
+      await search.fill(title);
+      await search.press('Enter');
     };
     assert.equal((await check()).count,60);
-    for (const title of ['Interstellar','The Matrix']) {
+    for (const [index, title] of ['Interstellar','The Matrix'].entries()) {
       await addMovie(title);
-      assert.equal((await check()).count,60);
+      const evidence = await check();
+      assert.equal(evidence.count,60);
+      assert.equal(evidence.movieCount,index + 2);
     }
     for (const count of [30,90,60]) {
       await control('#dust-limit',String(count));

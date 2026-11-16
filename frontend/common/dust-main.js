@@ -155,9 +155,9 @@
     $('[data-dust-scope]').textContent = elements.filterSummary.textContent = `${count} / ${candidates} ${dustNoun()}`;
     $('#dust-limit').value = snapshot.dustLimit;
     $('#recommendation-score-note').textContent = snapshot.mixed
-      ? 'Select up to 3 dots · Distance: order of attraction percentiles (0–1) · Color: highest percentile.'
-      : 'Select up to 3 dots · distance: preference order · cosine ≠ percentage.';
-    $('#dust-connection-method').textContent = `Select a magnet to rank the displayed titles by ${snapshot.mixed ? 'attraction percentile' : 'cosine similarity'}. Thicker curves show higher scores within that magnet’s range. Color shows each title’s closest magnet. Dust members lists the titles closest to the selected magnet. Scroll either list to see more titles.`;
+      ? 'Select up to 3 dots · Hover or focus for raw scores and attraction percentiles.'
+      : 'Select up to 3 dots · Hover or focus for cosine scores.';
+    $('#dust-connection-method').textContent = `Select a magnet to rank the displayed titles by ${snapshot.mixed ? 'attraction percentile' : 'cosine similarity'}. Thicker curves show higher scores within that magnet’s range. Color identifies each title’s highest-scoring magnet. Dust members lists the titles whose highest score comes from the selected magnet. Scroll either list to see more titles.`;
     const notes = {
       genres: [metric === 'count' ? 'Genres' : 'Genre ' + metric,
         row => row.genres.length && (metric === 'score' ? Number.isFinite(row.average_score) : metric !== 'popularity' || Number.isFinite(row.popularity)),
@@ -167,7 +167,7 @@
     if (reverse) {
       notes.reception = ['Movies with TMDB score and rank', AnivizChartData.hasMovieReception,
         snapshot.popularity.snapshotDate
-          ? `TMDB snapshot ${snapshot.popularity.snapshotDate} UTC · Rank #1 is most popular in the movie sample. Color: closest magnet.`
+          ? `TMDB snapshot ${snapshot.popularity.snapshotDate} UTC · Rank #1 is most popular in the movie sample. Color shows the highest-scoring magnet.`
           : snapshot.popularity.status === 'unavailable' ? 'Archived TMDB reception data unavailable.'
             : 'Loading archived TMDB reception data…'];
       $('[data-coverage="studios"]').textContent = 'The published TMDB sample has no production company or cast credits.';
@@ -177,7 +177,7 @@
         studios: ['Titles with studio, score and popularity', row => row.studio_names.length && row.popularity > 0 && Number.isFinite(row.average_score), 'Circle area represents matching titles. Studio credits can overlap.'],
         heatmap: ['Studio × genre', row => row.studio_names.length && row.genres.length,
           'Up to 15 studios and 10 genres, ranked by displayed title count. Titles can appear in multiple cells.'],
-        reception: ['Ratings', row => row.popularity > 0 && Number.isFinite(row.average_score), 'Circle area: favourites · Color: closest magnet.']
+        reception: ['Ratings', row => row.popularity > 0 && Number.isFinite(row.average_score), 'Circle area shows favourites. Color shows the highest-scoring magnet.']
       });
     }
     Object.entries(notes).forEach(([kind, [label, predicate, suffix]]) => {
@@ -196,7 +196,7 @@
     if (signature !== rankingSignature) { rankingPage = 0; rankingSignature = signature; }
     const sort = $('[data-dust-ranking-sort]');
     sort.innerHTML = `<option value="average">${AnivizDust.averageLabel(snapshot.mixed)}</option>` + snapshot.magnets.map((magnet, i) => {
-      const label = snapshot.mixed || magnet.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : `Closest to Magnet ${i + 1} — ${magnet.title}`;
+      const label = snapshot.mixed || magnet.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : `Similarity to M${i + 1} — ${magnet.title}`;
       return `<option value="${escapeAttribute(magnet.key)}">${escapeHTML(label)}</option>`;
     }).join('');
     sort.value = snapshot.activeMagnetKeys.includes(snapshot.rankingSortKey) ? snapshot.rankingSortKey : 'average';
@@ -323,11 +323,16 @@
     recommendationState.magnetPositions = { ...layout.magnetPositions };
     magnetColors.clear();
     Object.entries(layout.magnetColors || {}).forEach(([key, value]) => magnetColors.set(key, value));
-    const particles = layout.particles;
-    const positions = Array.isArray(particles?.positions) ? particles.positions.filter(node =>
-      typeof node?.key === 'string' && Number.isFinite(node.x) && Number.isFinite(node.y)) : [];
-    dustChart = positions.length && particles.width > 0 && particles.height > 0
-      ? { ...particles, positions: new Map(positions.map(node => [node.key, node])), stop() {} } : null;
+    const { particles } = layout;
+    dustChart = null;
+    if (!Array.isArray(particles?.positions)) return;
+    const { width, height } = particles;
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
+    const prefix = `${AnivizDust.DIRECTIONS[latest.direction].dust}:`;
+    const positions = new Map(particles.positions.filter(node => typeof node?.key === 'string'
+      && node.key.startsWith(prefix) && Number.isFinite(node.x) && Number.isFinite(node.y))
+      .map(({ key, x, y }) => [key, { x, y }]));
+    dustChart = { width, height, positions };
   }
   function updateDirectionControls() {
     const reverse = isReverse();
@@ -362,7 +367,7 @@
   function saveLayout() {
     if (!context || !recommendationState.data) return;
     const particles = dustChart ? { width: dustChart.width, height: dustChart.height,
-      positions: [...dustChart.positions.values()].map(({ key, x, y, vx, vy }) => ({ key, x, y, vx, vy })) } : null;
+      positions: [...dustChart.positions].map(([key, { x, y }]) => ({ key, x, y })) } : null;
     context.saveLayout({ magnetPositions: recommendationState.magnetPositions, magnetColors: Object.fromEntries(magnetColors),
       particles, scrollY: scrollRestored ? window.scrollY : context.getLayout().scrollY });
   }
@@ -396,6 +401,17 @@
     setMagnets(keys) { context.setMagnets(keys); renderRecommendations(); },
     setDustLimit(value) { context.setDustLimit(value); renderRecommendations(); },
     select, focusMagnet, color, saveLayout, loadPopularity,
+    magnetStrength: key => context.getMagnetStrength(key),
+    setMagnetStrength(key, value, { commit = true } = {}) {
+      if (!latest.activeMagnetKeys.includes(key)) return;
+      const strength = AnivizDust.normalizeMagnetStrength(value);
+      if (commit) context.setMagnetStrength(key, strength);
+      updateDustStrengths(key, strength);
+    },
+    resetStrengths() {
+      context.resetStrengths();
+      updateDustStrengths();
+    },
     deselectLast() {
       if (latest.selectedKeys.length) {
         focusedMagnetKey = null;
@@ -403,17 +419,15 @@
       }
     },
     resetPositions() {
-      stopDustChart();
-      context.resetPositions();
       recommendationState.magnetPositions = {};
-      dustChart = null;
-      renderRecommendations();
+      dustChart?.resetPositions?.();
+      saveLayout();
     },
     snapshot: () => latest
   };
   registerPage({ usesDashboard: false, bindControls: bind, applyFilters, resetFilters,
     render() { composition?.setActive(!document.hidden); renderRecommendations(); composition?.refresh(); },
-    pause() { saveLayout(); stopDustChart(); composition?.setActive(false); },
-    destroy() { saveLayout(); stopDustChart(); composition?.destroy(); }
+    pause() { stopDustChart(); saveLayout(); composition?.setActive(false); },
+    destroy() { stopDustChart(); saveLayout(); composition?.destroy(); }
   });
 })(globalThis);

@@ -207,6 +207,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     await page.mouse.down();
     await page.mouse.move(x + 35, y, { steps: 5 });
     await page.mouse.up();
+    await page.evaluate(() => new Promise(requestAnimationFrame));
     assert.notDeepEqual(await positions(), beforeDrag);
     assert.equal(await page.locator('#dust-focus h3').innerText(), 'Pacific Rim');
     await magnet.press('Space');
@@ -282,6 +283,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     assert.deepEqual((await evidence()).selectedKeys, selected);
     const originalPositions = await positions();
     await field.locator('.dust-magnet').first().press('ArrowRight');
+    await page.evaluate(() => new Promise(requestAnimationFrame));
     assert.notDeepEqual(await positions(), originalPositions);
     const moved = await positions();
 

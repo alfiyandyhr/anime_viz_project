@@ -36,7 +36,7 @@ linked charts share the displayed set. The full similarity ranking covers every
 title in the dust catalogue, marks displayed rows, and sorts by any active
 magnet or their arithmetic mean. Sorting and dragging preserve membership,
 scores, and selection. Removing the active sort magnet returns to average
-similarity. Field distances express each title’s preference order across magnets.
+similarity. Settled field distances approximate each title’s score order across magnets.
 
 Click, tap, or use Enter/Space to toggle a title. Compare up to three titles and
 their exact per-magnet scores below the field. Clicking empty playground space
@@ -245,9 +245,8 @@ sorts and score evidence still expose the raw values. Titles without popularity
 stay in the full ranking with an unavailable combined rank. Remove the
 popularity magnet to return to cosine scores.
 
-Choose 30, 60, or 90 dots and use **Reset positions** directly in the left panel.
-Open **Filter** to narrow the displayed titles. Drag magnets, or focus
-one and use arrow keys, to rearrange the field. Hover or keyboard-focus an anime
+Choose 30, 60, or 90 dots. Open **Filter** to narrow the displayed titles.
+Drag magnets, or focus one and use arrow keys, to pull dust. Hover or keyboard-focus an anime
 for its title and cosine scores rounded to three decimals. Click or press Enter
 to show its details in the right panel. Enter/Space or another click toggles selection; two or three
 selected titles compare automatically. Clear selection and individual removal
@@ -259,31 +258,25 @@ available by scrolling.
 The dust field defaults to **60 dots**, with 30 and 90 options. It reserves half
 the candidate budget equally for each magnet's strongest matches, then fills
 remaining slots with the highest average attraction scores, deduplicating overlap.
-The reference sample stays fixed when dot count or filters change. Color identifies the highest-scoring
-magnet; white outlines mark selected anime. Selected dots show connections;
-hover and keyboard focus show score tooltips without selecting an anime.
+The reference sample stays fixed when dot count or filters change. Color shows
+the strongest base score, using cosine similarity or attraction percentile.
+White outlines mark selected titles, and selected dots show connections.
+Hover and keyboard focus show score tooltips without selecting an anime.
 
-With two or three magnets, each dot is closer to its higher-scoring magnets.
-Targets fit squared-distance differences to score differences, using signed
-cosines or attraction percentiles. Each dot is constrained to the intersection of the
-appropriate sides of the magnets' perpendicular bisectors. Collision separation
-also respects these constraints, so crowding cannot reverse the score order.
-Tied scores impose no ordering. A single magnet gathers a compact cloud at its
-surface using positive-score attraction.
+Dust starts in a compact cloud. During a drag, dot speed and direction show the
+combined pull from the current magnets. The playground and mirror move together.
+Each magnet's **Strength** ranges from 0× (muted) to 2×, with 1× as the default.
+Pull uses positive cosine scores or the calibrated percentiles in mixed fields.
+Attraction and local spacing share a travel budget of 120 field units per second,
+with a maximum of 3 units per frame. Dust holds its position as soon as you pause
+or release. With reduced motion, a drag takes one short dust step on release.
+Each arrow-key move and each **Attract dust** press takes one short step.
 
-Damping and fixed time substeps animate movement while retaining particle
-identities and momentum. Dragging or resizing projects dots into their valid
-score regions immediately, then they settle around their new targets. Motion
-settles when idle; reduced-motion preferences use settled positions. Switching
-pages stops the animation. Magnets stay separated and inside the chart.
-
-Distances encode each dot's **preference order across movies**, rather than an
-exact cosine scale or a ranking of different anime. Some nearly collinear
-magnet arrangements cannot express all three preferences inside the chart.
-In that case the highest-scoring movie stays nearest and an inline message
-suggests spreading the magnets or resetting their positions. Anime-to-anime
-distances carry no meaning. Exact scores remain in tooltips and details. Moving
-magnets does not change the candidate set, scores, or rank.
+Use **Center dust** to reseed the cloud and **Spread dust** to space out
+overlapping dots. **Reset positions** restores the magnets, and **Reset strengths**
+restores their pull. Each direction saves its
+positions and strengths for the tab session. A dot's final position reflects its
+drag history. Use its tooltip, details, or the ranking for score comparisons.
 
 Each of up to three active movies has a compact curved-link map of its top 5 and
 bottom 5 anime within the displayed dust, with local ranks and cosine scores.

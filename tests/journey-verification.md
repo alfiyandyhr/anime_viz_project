@@ -1,3 +1,20 @@
+# Drag-driven Dust & Magnet
+
+Run `node --test tests/*.test.cjs` and `node tests/browser/dust-motion.cjs`
+with the Playwright setup below. The browser check drags Inception across the
+line between Interstellar and The Matrix at 30, 60, and 90 dots using both
+desktop pointer and mobile touch input. It checks the 3-unit frame cap on
+line crossings and fast sweeps, stillness during a hold and after release,
+and shared field and mirror positions. It also checks two muted magnets,
+the dust commands, and layout restoration after reload.
+
+Run `dust-directions.cjs`, `dust-genres.cjs`, `dust-popularity.cjs`,
+`dust-reception.cjs`, `dust-connections.cjs`, and `dust-strengths.cjs` from
+`tests/browser` for the direction, magnet, selection, mirror, and strength
+journeys. The Node suite covers reduced-motion release and cancellation.
+
+---
+
 # High-popularity magnets
 
 1. Keep **Inception** in **Movie → Anime**. Add **Science Fiction movies** and

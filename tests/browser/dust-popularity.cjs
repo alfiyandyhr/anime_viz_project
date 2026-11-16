@@ -93,6 +93,7 @@ const state = page => page.evaluate(() => {
     await page.selectOption('#dust-limit', '60');
     await ready(page);
     await page.locator('#recommendation-chart .dust-magnet').last().press('ArrowRight');
+    await page.evaluate(() => new Promise(requestAnimationFrame));
     assert.deepEqual((await state(page)).ranking, combined.ranking);
     await page.locator(`[data-remove-magnet="${anime}"]`).click();
     assert.deepEqual((await state(page)).ranking, cosine.ranking);

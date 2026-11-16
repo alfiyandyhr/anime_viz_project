@@ -116,6 +116,68 @@ test('versioned session round trip restores movies, filters, selections and inde
   memory.set(STORAGE_KEY,JSON.stringify({version:999,state:{movieIds:movies}}));
   assert.equal(createContext({storage}).restore(),false);
 });
+test('typed strength settings are layout-only and survive reloads, magnet swaps and direction changes', () => {
+  const { context, storage } = setup();
+  const title = movieKeys[0], genre = 'tmdb:genre:Science Fiction', popularity = 'anilist:popularity';
+  context.setMagnets([title, genre, popularity]);
+  context.setSelection(context.snapshot().displayedKeys.slice(0, 2));
+  const before = context.snapshot();
+  assert.equal(context.getMagnetStrength(title), 1);
+  context.setMagnetStrength(title, 0);
+  context.setMagnetStrength(genre, 1.375);
+  context.setMagnetStrength(popularity, 2);
+  assert.deepEqual(context.snapshot(), before);
+
+  context.setDirection(REVERSE);
+  const [anime] = context.snapshot().activeMagnetKeys;
+  assert.equal(context.getMagnetStrength(anime), 1);
+  context.setMagnetStrength(anime, 1.25);
+
+  const restored = createContext({ storage });
+  assert.equal(restored.restore(), true);
+  restored.setMetadata(dashboard.anime);
+  restored.setSources(data, scores);
+  assert.equal(restored.snapshot().direction, REVERSE);
+  assert.equal(restored.getMagnetStrength(anime), 1.25);
+  restored.setDirection(FORWARD);
+  assert.deepEqual(restored.snapshot().selectedKeys, before.selectedKeys);
+  assert.deepEqual(restored.snapshot().candidateKeys, before.candidateKeys);
+  assert.deepEqual(restored.snapshot().ranking, before.ranking);
+  assert.deepEqual([title, genre, popularity].map(restored.getMagnetStrength), [0, 1.375, 2]);
+  restored.setMagnets([popularity, title]);
+  restored.setMagnets([popularity, genre, title]);
+  assert.equal(restored.getMagnetStrength(genre), 1.375);
+
+  const positions = { [`3:${title}`]: { x: .2, y: .4 } };
+  restored.resetPositions();
+  assert.equal(restored.getMagnetStrength(title), 0);
+  restored.saveLayout({ magnetPositions: positions });
+  restored.resetStrengths();
+  assert.deepEqual(restored.getLayout().magnetPositions, positions);
+  assert.deepEqual([title, genre, popularity].map(restored.getMagnetStrength), [1, 1, 1]);
+  restored.setDirection(REVERSE);
+  assert.equal(restored.getMagnetStrength(anime), 1.25);
+});
+test('restoring layout clamps numeric strengths and defaults missing or invalid values to one', () => {
+  const { memory, storage } = setup();
+  const saved = JSON.parse(memory.get(STORAGE_KEY));
+  const layout = saved.sessions[FORWARD].layout;
+  delete layout.magnetStrengths;
+  memory.set(STORAGE_KEY, JSON.stringify(saved));
+  const older = createContext({ storage });
+  assert.equal(older.restore(), true);
+  assert.deepEqual(movieKeys.map(older.getMagnetStrength), [1, 1, 1]);
+
+  layout.magnetStrengths = { [movieKeys[0]]: -4, [movieKeys[1]]: 5, [movieKeys[2]]: "0.5",
+    'tmdb:genre:Science Fiction': null, 'anilist:popularity': 0.5, 'anilist:123': 0 };
+  memory.set(STORAGE_KEY, JSON.stringify(saved));
+  const restored = createContext({ storage });
+  assert.equal(restored.restore(), true);
+  assert.deepEqual(movieKeys.map(restored.getMagnetStrength), [0, 2, 1]);
+  assert.equal(restored.getMagnetStrength('tmdb:genre:Science Fiction'), 1);
+  assert.equal(restored.getMagnetStrength('anilist:popularity'), 0.5);
+  assert.equal(restored.getMagnetStrength('anilist:123'), 1);
+});
 test('storage denial preserves in-memory context and emits one relevant notice', () => {
   const notices=[]; const context=createContext({onNotice:m=>notices.push(m),storage:{getItem(){throw Error('disabled')},setItem(){throw Error('disabled')}}});
   context.restore();context.setSources(data,scores);context.setMagnets(movieKeys);context.setFilters({genre:'Action'});
@@ -482,6 +544,7 @@ test('v1 imports typed selections, sorts and layouts and keeps both directions i
   assert.deepEqual(context.snapshot().selectedKeys, [anilist(selected)]);
   assert.deepEqual(context.getLayout().magnetPositions, { [`3:${movieKeys[0]}`]: { x: .2, y: .4 } });
   assert.deepEqual(context.getLayout().magnetColors, { [movieKeys[0]]: '#43d9e6' });
+  assert.deepEqual(movieKeys.map(context.getMagnetStrength), [1, 1, 1]);
   assert.equal(context.getLayout().particles.positions[0].key, anilist(selected));
   assert.equal(context.getLayout().scrollY, 450);
   context.setDirection(REVERSE);

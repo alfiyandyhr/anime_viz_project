@@ -1,6 +1,6 @@
 "use strict";
 
-// Analytical state only. Particle/magnet positions and scroll live in the session envelope.
+// Analytical state is separate from the direction-specific field layout.
 (function (root, factory) {
   const api = factory();
   if (typeof module !== "undefined" && module.exports) module.exports = api;
@@ -174,22 +174,28 @@
   const dustLimit = value => [30, 60, 90].includes(Number(value)) ? Number(value) : 60;
   const blankState = direction => ({ magnetKeys: [], dustLimit: 60, candidateKeys: [], displayedKeys: [],
     rankingSortKey: "average", rankingOrder: "ascending", filters: defaults(direction), selectedKeys: [], example: false });
-  const blankLayout = () => ({ magnetPositions: {}, magnetColors: {}, particles: null, scrollY: 0 });
+  const blankLayout = () => ({ magnetPositions: {}, magnetColors: {}, magnetStrengths: {}, particles: null, scrollY: 0 });
+  const normalizeMagnetStrength = value => Number.isFinite(value) ? Math.max(0, Math.min(2, value)) : 1;
+  const isMagnetKey = (key, direction) => key.startsWith(`${DIRECTIONS[direction].magnet}:`) || key === popularityKey(direction);
 
   function readSession(direction, saved) {
     const state = blankState(direction), value = saved.state;
-    const { magnet, dust } = DIRECTIONS[direction];
+    const { dust } = DIRECTIONS[direction];
     const typedIds = (values, catalogue) => ids(Array.isArray(values) ? values : []).filter(key => key.startsWith(`${catalogue}:`));
     return {
       state: { ...state, magnetKeys: ids(Array.isArray(value.magnetKeys) ? value.magnetKeys : [])
-        .filter(key => key.startsWith(`${magnet}:`) || key === popularityKey(direction)).slice(0, 3),
+        .filter(key => isMagnetKey(key, direction)).slice(0, 3),
         selectedKeys: typedIds(value.selectedKeys, dust).slice(0, 3),
         dustLimit: dustLimit(value.dustLimit), rankingSortKey: typeof value.rankingSortKey === "string" ? value.rankingSortKey : "average",
         rankingOrder: value.rankingOrder === "descending" ? "descending" : "ascending",
         filters: Object.fromEntries(Object.entries(state.filters).map(([key, fallback]) =>
           [key, typeof value.filters?.[key] === (fallback === null ? "number" : typeof fallback) ? value.filters[key] : fallback])),
         example: value.example === true },
-      layout: { ...blankLayout(), ...saved.layout }
+      layout: { ...blankLayout(), ...saved.layout, magnetStrengths: Object.fromEntries(
+        Object.entries(saved.layout?.magnetStrengths || {})
+          .filter(([key]) => isMagnetKey(key, direction))
+          .map(([key, strength]) => [key, normalizeMagnetStrength(strength)])
+      ) }
     };
   }
 
@@ -442,11 +448,17 @@
       },
       getLayout() { return session.layout; },
       saveLayout(patch) { session.layout = { ...session.layout, ...patch }; persist(); },
-      resetPositions() { api.saveLayout({ magnetPositions: {}, particles: null }); }
+      getMagnetStrength(key) { return normalizeMagnetStrength(session.layout.magnetStrengths[key]); },
+      setMagnetStrength(key, value) {
+        if (!magnets.some(magnet => magnet.key === key)) return;
+        api.saveLayout({ magnetStrengths: { ...session.layout.magnetStrengths, [key]: normalizeMagnetStrength(value) } });
+      },
+      resetPositions() { api.saveLayout({ magnetPositions: {} }); },
+      resetStrengths() { api.saveLayout({ magnetStrengths: {} }); }
     };
     return api;
   }
   return { VERSION, STORAGE_KEY, FORWARD, REVERSE, DIRECTIONS, keyFor, catalogueFor, magnetScoreLabel, cohortDescription,
-    averageLabel, formatPercentile, formatRawScore, mixedEvidence, defaults, joinRecords,
+    averageLabel, formatPercentile, formatRawScore, mixedEvidence, defaults, joinRecords, normalizeMagnetStrength,
     passesFilters, createScoreAccessor, forwardVectors, rankCorpus, sampleDust, createContext };
 });

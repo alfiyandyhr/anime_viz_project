@@ -93,6 +93,7 @@ const snapshot = page => page.evaluate(() => {
     await page.mouse.down();
     await page.mouse.move(x + width / 2 + 30, y + height / 2 + 22, { steps: 5 });
     await page.mouse.up();
+    await page.evaluate(() => new Promise(requestAnimationFrame));
     const dragged = await anchor.getAttribute('transform');
     assert.notEqual(dragged, before);
     await page.reload();
@@ -146,9 +147,11 @@ const snapshot = page => page.evaluate(() => {
     await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [center] });
     await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: center.x + 20, y: center.y + 18 }] });
     await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await mobile.evaluate(() => new Promise(requestAnimationFrame));
     const mobileDragged = await mobileAnchor.getAttribute('transform');
     assert.notEqual(mobileDragged, mobileBefore);
     await mobileAnchor.press('ArrowDown');
+    await mobile.evaluate(() => new Promise(requestAnimationFrame));
     assert.notEqual(await mobileAnchor.getAttribute('transform'), mobileDragged);
     await dots(mobile).first().press('Enter');
     const mobileFocus = await mobile.locator('#dust-focus').innerText();
