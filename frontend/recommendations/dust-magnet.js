@@ -1,13 +1,14 @@
 "use strict";
 
 const MAGNET_COLORS = ["#43d9e6", "#ff6fae", "#ffcc70"];
+const DUST_UNIFORM_COLOR = "#c3cbe1";
+const DUST_ENGINE = typeof module !== "undefined" && module.exports ? require("../common/dust-context.js") : AnivizDust;
 let dustChart = null;
 
 // Keep the original forward helper available to existing callers.
 function getDustMatches(data, scores, movieIds, limit = 60) {
-  const engine = typeof module !== "undefined" && module.exports ? require("../common/dust-context.js") : AnivizDust;
   const count = [30, 60, 90].includes(Number(limit)) ? Number(limit) : 60;
-  return engine.sampleDust(engine.forwardVectors(data, scores, movieIds), movieIds.length, count)
+  return DUST_ENGINE.sampleDust(DUST_ENGINE.forwardVectors(data, scores, movieIds), movieIds.length, count)
     .map(({ record, key, sortScore, ...match }) => ({ ...match, anime: record }));
 }
 
@@ -17,89 +18,107 @@ function defaultMagnetPositions(count, width, height) {
   return positions.slice(0, count).map(([x, y]) => ({ x: x * width, y: y * height }));
 }
 
-const DUST_SPACING = 18;
-const DUST_CLEARANCE = 34;
+const DUST_HIT_RADIUS = 9;
+const MAGNET_CORE_RADIUS = 25;
+const DUST_SPACING = 2 * DUST_HIT_RADIUS;
+const DUST_CLEARANCE = MAGNET_CORE_RADIUS + DUST_HIT_RADIUS;
+const DUST_MULTI_CLEARANCE = DUST_CLEARANCE + 8;
+const DUST_INSET_X = 14;
+const DUST_INSET_Y = 18;
+const DUST_EDGE_BUFFER = 24;
+const DUST_MAX_RANK_SPREAD = 160;
+const DUST_RANK_CURVE = .125;
+const DUST_RADIAL_STIFFNESS = 185;
 const DUST_STEP = 1 / 120;
+const DUST_MAX_SPEED = 145;
+const DUST_QUIET_FRAMES = 24;
+const DUST_QUIET_MOVEMENT = .015;
 
-// A score order is a set of linear half-planes: being closer to A than B
-// means (B - A) dot (point - midpoint(A, B)) < 0. Unlike weighted springs,
-// this remains true for an uneven triangle and after collision separation.
-function clipDustRegion(polygon, a, b, gap) {
-  const length = Math.hypot(b.x - a.x, b.y - a.y);
-  if (length < 1e-6) return polygon;
-  const nx = (b.x - a.x) / length, ny = (b.y - a.y) / length;
-  const boundary = nx * (a.x + b.x) / 2 + ny * (a.y + b.y) / 2 - gap;
-  const result = [];
-  for (let i = 0; i < polygon.length; i++) {
-    const p = polygon[i], q = polygon[(i + 1) % polygon.length];
-    const dp = nx * p.x + ny * p.y - boundary;
-    const dq = nx * q.x + ny * q.y - boundary;
-    if (dp <= 0) result.push(p);
-    if ((dp <= 0) !== (dq <= 0)) {
-      const t = dp / (dp - dq);
-      result.push({ x: p.x + t * (q.x - p.x), y: p.y + t * (q.y - p.y) });
-    }
-  }
-  return result;
+function dustTemperature(mixed) {
+  // Percentiles have a wider spread than cosine scores in the displayed sample.
+  return mixed ? .24 : .07;
 }
 
-function projectDustPoint(point, region) {
-  let inside = true, best = null, distance = Infinity;
-  for (let i = 0; i < region.length; i++) {
-    const a = region[i], b = region[(i + 1) % region.length];
-    const dx = b.x - a.x, dy = b.y - a.y;
-    if (dx * (point.y - a.y) - dy * (point.x - a.x) < -1e-7) inside = false;
-    const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
-    const candidate = { x: a.x + t * dx, y: a.y + t * dy };
-    const d = (point.x - candidate.x) ** 2 + (point.y - candidate.y) ** 2;
-    if (d < distance) { best = candidate; distance = d; }
-  }
-  return inside ? { x: point.x, y: point.y } : best;
+function dustAffinity(score, best, temperature) {
+  return Math.exp((score - best) / temperature);
 }
 
-function dustScoreLayout(node, anchors, width, height) {
-  const key = `${width}:${height}:${anchors.map((a) => `${a.x},${a.y}`).join(":")}`;
-  if (node.scoreLayout?.key === key && node.scoreLayout.scores === node.scores) return node.scoreLayout;
-  const box = [{ x: 14, y: 18 }, { x: width - 14, y: 18 },
-    { x: width - 14, y: height - 18 }, { x: 14, y: height - 18 }];
-  let region = box, approximate = false;
-  const order = anchors.map((_, i) => i).sort((a, b) => node.scores[b] - node.scores[a]);
-  // Prioritize the best movie if a dragged, nearly collinear arrangement
-  // cannot express all three preferences within the visible field.
-  for (let i = 0; i < order.length; i++) {
-    for (let j = i + 1; j < order.length; j++) {
-      const gap = node.scores[order[i]] - node.scores[order[j]];
-      if (gap <= 0) continue; // Ties have no arbitrary movie-order preference.
-      const clipped = clipDustRegion(region, anchors[order[i]], anchors[order[j]], Math.min(.5, gap * 20));
-      if (clipped.length >= 3) region = clipped;
-      else approximate = true;
+function dustPreference(gap, temperature) {
+  const t = Math.min(1, gap / (.65 * temperature));
+  return t * t * (3 - 2 * t);
+}
+
+function dustScoreTarget(scores, anchors, temperature) {
+  // Subtract the maximum so the weights stay finite for signed scores.
+  const best = Math.max(...scores);
+  let x = 0, y = 0, total = 0;
+  anchors.forEach((anchor, index) => {
+    // Give every magnet a small share of the pull, even for large leads.
+    const weight = .06 + dustAffinity(scores[index], best, temperature);
+    x += anchor.x * weight;
+    y += anchor.y * weight;
+    total += weight;
+  });
+  return { x: x / total, y: y / total };
+}
+
+function dustRankSpreads(anchors, width, height, rankSpread) {
+  const fieldCap = Math.min(width - 2 * DUST_INSET_X, height - 2 * DUST_INSET_Y) / 3;
+  return anchors.map((anchor, index) => {
+    const gap = Math.min(...anchors.map((other, i) =>
+      i === index ? Infinity : Math.hypot(other.x - anchor.x, other.y - anchor.y)));
+    const available = 1.25 * (Math.min(fieldCap, .7 * gap) - DUST_CLEARANCE);
+    return Math.max(0, Math.min(DUST_MAX_RANK_SPREAD, available)) * (rankSpread / 100);
+  });
+}
+
+function dustScoreLayout(node, anchors, temperature, key, spreads) {
+  const { scoreLayout, winnerPercentile } = node;
+  if (scoreLayout?.key === key && scoreLayout.scores === node.scores
+      && scoreLayout.winnerPercentile === winnerPercentile) return scoreLayout;
+  const scores = node.scores;
+  const winner = scores.indexOf(Math.max(...scores));
+  const runnerUp = Math.max(...scores.filter((_, index) => index !== winner));
+  const lead = scores[winner] - runnerUp;
+  const confidence = 1 - Math.exp(-((lead / temperature) ** 2));
+  const winnerPreference = dustPreference(lead, temperature);
+  const weakness = 1 - winnerPercentile;
+  const clearance = anchors.length > 1 ? DUST_MULTI_CLEARANCE : DUST_CLEARANCE;
+  const preferredRadius = spreads[winner] > 0 && Number.isFinite(winnerPercentile)
+    ? clearance + spreads[winner] * (1 + DUST_RANK_CURVE) * weakness / (DUST_RANK_CURVE + weakness)
+    : null;
+  const comparisons = [];
+  for (let i = 0; i < anchors.length; i++) {
+    for (let j = i + 1; j < anchors.length; j++) {
+      const a = anchors[i], b = anchors[j];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const length = Math.hypot(dx, dy);
+      if (length < 1e-6) continue;
+      const x = dx / length, y = dy / length;
+      const boundary = x * (a.x + b.x) / 2 + y * (a.y + b.y) / 2;
+      // Give clear favorites room on their side of the bisector.
+      if (winnerPreference > 0 && (i === winner || j === winner)) {
+        const side = i === winner ? 1 : -1;
+        const strength = winnerPreference * dustPreference(Math.abs(scores[i] - scores[j]), temperature);
+        comparisons.push({ x: side * x, y: side * y, boundary: side * boundary - 14 * strength,
+          stiffness: 900 * strength, maxPull: 15000 * strength });
+      }
+      // Let comparable top scores share a wide band. A soft pull leaves room for crowding.
+      const shared = 1 - dustPreference(scores[winner] - Math.min(scores[i], scores[j]), temperature / 2);
+      if (shared > 0) {
+        const band = 12 + .12 * length;
+        const stiffness = 95 * shared, maxPull = 3200 * shared;
+        comparisons.push({ x, y, boundary: boundary + band, stiffness, maxPull },
+          { x: -x, y: -y, boundary: -boundary + band, stiffness, maxPull });
+      }
     }
   }
-  // Fit squared-distance differences to score differences. Three magnets give
-  // two linear equations; two magnets leave the perpendicular direction free.
-  // This uses signed scores, so zero/negative scores retain their true order.
-  const a = anchors[0], b = anchors[1];
-  const dx = b.x - a.x, dy = b.y - a.y, length2 = dx * dx + dy * dy;
-  const scale = Math.min(width, height) ** 2 * 1.5;
-  const rhs = (b.x * b.x + b.y * b.y - a.x * a.x - a.y * a.y
-    - scale * (node.scores[0] - node.scores[1])) / 2;
-  let target = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-  const offset = (rhs - dx * target.x - dy * target.y) / (length2 || 1);
-  target.x += dx * offset; target.y += dy * offset;
-  if (anchors.length === 3) {
-    const c = anchors[2], ex = c.x - a.x, ey = c.y - a.y;
-    const determinant = dx * ey - dy * ex;
-    if (Math.abs(determinant) > 1e-6) {
-      const other = (c.x * c.x + c.y * c.y - a.x * a.x - a.y * a.y
-        - scale * (node.scores[0] - node.scores[2])) / 2;
-      target = { x: (rhs * ey - dy * other) / determinant, y: (dx * other - rhs * ex) / determinant };
-    }
-  }
-  return (node.scoreLayout = { key, scores: node.scores, region, target: projectDustPoint(target, region), approximate });
+  const target = anchors.length > 1 ? dustScoreTarget(scores, anchors, temperature) : null;
+  return (node.scoreLayout = { key, scores, winnerPercentile, target, comparisons, winner, confidence, preferredRadius });
 }
 
 function dustAttraction(node, anchors, target) {
-  if (target) return { x: 10 * (target.x - node.x), y: 10 * (target.y - node.y) };
+  if (target) return { x: 21 * (target.x - node.x), y: 21 * (target.y - node.y) };
   let x = 0, y = 0;
   anchors.forEach((anchor, index) => {
     const strength = 18 * Math.max(0, Math.min(1, node.scores[index] || 0)) / anchors.length;
@@ -109,107 +128,162 @@ function dustAttraction(node, anchors, target) {
   return { x, y };
 }
 
-function createDustNodes(matches, anchors, width, height, previous) {
-  return matches.map((match, index) => {
-    const saved = previous?.positions.get(match.key ?? match.anime.id);
-    if (saved) return { ...match, x: saved.x * width / previous.width,
-      y: saved.y * height / previous.height, vx: saved.vx || 0, vy: saved.vy || 0 };
-    const layout = anchors.length > 1 ? dustScoreLayout({ ...match }, anchors, width, height) : null;
-    const weights = anchors.map((_, i) => Math.max(0, match.scores[i] || 0));
-    const total = weights.reduce((sum, weight) => sum + weight, 0);
-    const center = layout?.target || (total ? anchors.reduce((point, anchor, i) => ({
-      x: point.x + anchor.x * weights[i] / total,
-      y: point.y + anchor.y * weights[i] / total
-    }), { x: 0, y: 0 }) : { x: width / 2, y: height / 2 });
-    // A filled spiral seeds a compact cloud, never a similarity-radius ring.
-    const angle = index * Math.PI * (3 - Math.sqrt(5));
-    const radius = 10 * Math.sqrt(index + .5);
-    const point = { x: Math.max(14, Math.min(width - 14, center.x + radius * Math.cos(angle))),
-      y: Math.max(18, Math.min(height - 18, center.y + radius * Math.sin(angle))) };
-    return { ...match, ...(layout ? projectDustPoint(point, layout.region) : point), vx: 0, vy: 0 };
+function dustTitleHash(key) {
+  let hash = 2166136261;
+  for (const letter of String(key)) hash = Math.imul(hash ^ letter.codePointAt(0), 16777619);
+  return hash;
+}
+
+function dustDirection(hash) {
+  const angle = (hash >>> 0) / 2 ** 32 * 2 * Math.PI;
+  return { x: Math.cos(angle), y: Math.sin(angle) };
+}
+
+function dustSeed(key, radius) {
+  // Seed the angle and radius from the title key so a change in rank cannot move the seed.
+  const hash = dustTitleHash(key);
+  const direction = dustDirection(hash);
+  const radiusHash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
+  const distance = radius * Math.sqrt((radiusHash >>> 0) / 2 ** 32);
+  return { x: distance * direction.x, y: distance * direction.y };
+}
+
+function dustCenterDirection(node) {
+  return dustDirection(dustTitleHash(node.key ?? node.anime?.id ?? node.index));
+}
+
+function applyDustRankForce(force, node, anchor, { confidence, preferredRadius }, scale) {
+  if (preferredRadius === null || confidence === 0) return;
+  const dx = node.x - anchor.x, dy = node.y - anchor.y;
+  const distance = Math.hypot(dx, dy);
+  const direction = distance < 1e-6 ? dustCenterDirection(node) : { x: dx / distance, y: dy / distance };
+  const radial = force.x * direction.x + force.y * direction.y;
+  // Keep the tangential pull toward the weighted center.
+  const adjustment = scale * confidence * (DUST_RADIAL_STIFFNESS * (preferredRadius - distance) - radial);
+  force.x += adjustment * direction.x;
+  force.y += adjustment * direction.y;
+}
+
+function dustBounds(x, y, width, height) {
+  return { x: Math.max(DUST_INSET_X, Math.min(width - DUST_INSET_X, x)),
+    y: Math.max(DUST_INSET_Y, Math.min(height - DUST_INSET_Y, y)) };
+}
+
+function createDustNodes(matches, anchors, width, height, previous, mixed = false) {
+  const temperature = dustTemperature(mixed);
+  return matches.map((match) => {
+    const key = match.key ?? match.anime.id;
+    const saved = previous?.positions.get(key);
+    if (saved) {
+      const position = dustBounds(saved.x * width / previous.width, saved.y * height / previous.height, width, height);
+      return { ...match, ...position, vx: saved.vx || 0, vy: saved.vy || 0 };
+    }
+    let center, radius;
+    if (anchors.length > 1) {
+      center = dustScoreTarget(match.scores, anchors, temperature);
+      const [best, next] = match.scores.slice().sort((a, b) => b - a);
+      radius = 30 + 50 * Math.exp((next - best) / temperature);
+    } else {
+      center = match.scores[0] > 0 ? anchors[0] : { x: width / 2, y: height / 2 };
+      radius = 90;
+    }
+    const offset = dustSeed(key, radius);
+    const position = dustBounds(center.x + offset.x, center.y + offset.y, width, height);
+    return { ...match, ...position, vx: 0, vy: 0 };
   });
 }
 
-// Persistent positions and velocities are integrated in small fixed substeps.
-// Project collision motion back into each dot's score-order region so crowding
-// cannot make a lower-scoring movie appear closer.
-function stepDust(nodes, anchors, width, height, elapsed = 1 / 60) {
-  const steps = Math.max(1, Math.ceil(Math.min(Math.max(elapsed, 0), 1 / 30) / DUST_STEP));
-  const dt = Math.min(Math.max(elapsed, 0), 1 / 30) / steps;
-  const layouts = nodes.map((node) => anchors.length > 1 ? dustScoreLayout(node, anchors, width, height) : null);
+// Particle motion, including the response to moving bisectors, goes through velocity.
+function stepDust(nodes, anchors, width, height, elapsed = 1 / 60, mixed = false, motion = DUST_ENGINE.DEFAULT_MOTION) {
+  if (elapsed <= 0) return 0;
+  const duration = Math.min(elapsed, 1 / 30);
+  const steps = Math.ceil(duration / DUST_STEP);
+  const dt = duration / steps;
+  const damping = Math.exp(-motion.damping * dt);
+  const temperature = dustTemperature(mixed);
+  const key = `${temperature}:${width},${height}:${motion.rankSpread}:${anchors.map((a) => `${a.x},${a.y}`).join(":")}`;
+  const spreads = dustRankSpreads(anchors, width, height, motion.rankSpread);
+  const layouts = nodes.map((node) => anchors.length ? dustScoreLayout(node, anchors, temperature, key, spreads) : null);
+  const multiple = anchors.length > 1;
+  const clearance = multiple ? DUST_MULTI_CLEARANCE : DUST_CLEARANCE;
+  const rankScale = multiple ? .33 : 1;
+  const spacingForce = multiple ? 3700 : 2500;
+  const edgeForce = multiple ? 380 : 210;
   const before = nodes.map((node) => ({ x: node.x, y: node.y }));
   for (let step = 0; step < steps; step++) {
-    const forces = nodes.map((node, index) => dustAttraction(node, anchors, layouts[index]?.target));
+    const forces = nodes.map((node, index) => {
+      const layout = layouts[index];
+      const force = dustAttraction(node, anchors, layout?.target);
+      if (layout) {
+        // Let the other magnets influence position even when one leads.
+        applyDustRankForce(force, node, anchors[layout.winner], layout, rankScale);
+      }
+      force.x *= motion.strength;
+      force.y *= motion.strength;
+      // The edge buffer gives crowded dots a way back from the hard field limits.
+      force.x += edgeForce * (Math.max(0, DUST_INSET_X + DUST_EDGE_BUFFER - node.x)
+        - Math.max(0, node.x - (width - DUST_INSET_X - DUST_EDGE_BUFFER)));
+      force.y += edgeForce * (Math.max(0, DUST_INSET_Y + DUST_EDGE_BUFFER - node.y)
+        - Math.max(0, node.y - (height - DUST_INSET_Y - DUST_EDGE_BUFFER)));
+      for (const { x, y, boundary, stiffness, maxPull } of layout?.comparisons || []) {
+        const crossed = x * node.x + y * node.y - boundary;
+        if (crossed <= 0) continue;
+        const pull = Math.min(maxPull, stiffness * crossed) * motion.strength;
+        force.x -= x * pull;
+        force.y -= y * pull;
+      }
+      return force;
+    });
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];
       for (let j = i + 1; j < nodes.length; j++) {
         let dx = node.x - nodes[j].x, dy = node.y - nodes[j].y;
-        let distance = Math.hypot(dx, dy);
-        if (distance >= DUST_SPACING) continue;
+        const distance2 = dx * dx + dy * dy;
+        if (distance2 >= DUST_SPACING * DUST_SPACING) continue;
+        let distance = Math.sqrt(distance2);
         if (distance < 1e-6) { dx = Math.cos(i + j); dy = Math.sin(i + j); distance = 1; }
-        const push = (DUST_SPACING - distance) * 2500 / distance;
+        const push = (DUST_SPACING - distance) * spacingForce / distance;
         forces[i].x += dx * push; forces[i].y += dy * push;
         forces[j].x -= dx * push; forces[j].y -= dy * push;
       }
       for (const anchor of anchors) {
-        let dx = node.x - anchor.x, dy = node.y - anchor.y;
-        let distance = Math.hypot(dx, dy);
-        if (distance >= DUST_CLEARANCE) continue;
-        if (distance < 1e-6) { dx = Math.cos(i); dy = Math.sin(i); distance = 1; }
-        const push = (DUST_CLEARANCE - distance) * 900 / distance;
-        forces[i].x += dx * push; forces[i].y += dy * push;
+        const dx = node.x - anchor.x, dy = node.y - anchor.y;
+        const distance2 = dx * dx + dy * dy;
+        if (distance2 >= clearance * clearance) continue;
+        const distance = Math.sqrt(distance2);
+        const direction = distance < 1e-6 ? dustCenterDirection(node) : { x: dx / distance, y: dy / distance };
+        const push = (clearance - distance) * 2800;
+        forces[i].x += direction.x * push; forces[i].y += direction.y * push;
       }
     }
     nodes.forEach((node, index) => {
-      node.vx = ((node.vx || 0) + forces[index].x * dt) * Math.exp(-10 * dt);
-      node.vy = ((node.vy || 0) + forces[index].y * dt) * Math.exp(-10 * dt);
+      node.vx = ((node.vx || 0) + forces[index].x * dt) * damping;
+      node.vy = ((node.vy || 0) + forces[index].y * dt) * damping;
       const speed = Math.hypot(node.vx, node.vy);
-      if (speed > 300) { node.vx *= 300 / speed; node.vy *= 300 / speed; }
-      let x = Math.max(14, Math.min(width - 14, node.x + node.vx * dt));
-      let y = Math.max(18, Math.min(height - 18, node.y + node.vy * dt));
-      if (layouts[index]) {
-        const point = projectDustPoint({ x, y }, layouts[index].region);
-        // Remove velocity into a score boundary, retaining motion along it.
-        const dx = x - point.x, dy = y - point.y, d2 = dx * dx + dy * dy;
-        const outward = node.vx * dx + node.vy * dy;
-        if (d2 > 1e-12 && outward > 0) { node.vx -= outward * dx / d2; node.vy -= outward * dy / d2; }
-        x = point.x; y = point.y;
-      }
-      if (x === 14 || x === width - 14) node.vx = 0;
-      if (y === 18 || y === height - 18) node.vy = 0;
+      if (speed > DUST_MAX_SPEED) { node.vx *= DUST_MAX_SPEED / speed; node.vy *= DUST_MAX_SPEED / speed; }
+      const nextX = node.x + node.vx * dt, nextY = node.y + node.vy * dt;
+      const { x, y } = dustBounds(nextX, nextY, width, height);
+      if (x !== nextX) node.vx = 0;
+      if (y !== nextY) node.vy = 0;
       node.x = x; node.y = y;
     });
-  }
-  // At a narrow score-region corner, a grain cannot yield in every direction.
-  // Pass its blocked share of a contact correction to its neighbor instead of
-  // leaving two visible grains stacked at the corner.
-  if (anchors.length > 1) for (let pass = 0; pass < 6; pass++) {
-    for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
-      const a = nodes[i], b = nodes[j];
-      const dx = a.x - b.x, dy = a.y - b.y, distance = Math.hypot(dx, dy);
-      if (distance >= 11 || distance < 1e-8) continue;
-      const nx = dx / distance, ny = dy / distance, overlap = 11 - distance;
-      const p = projectDustPoint({ x: a.x + nx * overlap / 2, y: a.y + ny * overlap / 2 }, layouts[i].region);
-      const moved = (p.x - a.x) * nx + (p.y - a.y) * ny;
-      const q = projectDustPoint({ x: b.x - nx * (overlap - moved), y: b.y - ny * (overlap - moved) }, layouts[j].region);
-      const remaining = overlap - moved - ((b.x - q.x) * nx + (b.y - q.y) * ny);
-      const next = projectDustPoint({ x: p.x + nx * remaining, y: p.y + ny * remaining }, layouts[i].region);
-      Object.assign(a, next); Object.assign(b, q);
-      const closing = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
-      if (closing < 0) {
-        a.vx -= closing * nx / 2; a.vy -= closing * ny / 2;
-        b.vx += closing * nx / 2; b.vy += closing * ny / 2;
-      }
-    }
   }
   return nodes.reduce((movement, node, i) => Math.max(movement,
     Math.hypot(node.x - before[i].x, node.y - before[i].y)), 0);
 }
 
-function layoutDust(matches, anchors, width, height) {
+function settleDust(nodes, anchors, width, height, mixed, motion) {
+  let quietFrames = 0;
+  for (let tick = 0; tick < 480 && quietFrames < DUST_QUIET_FRAMES; tick++) {
+    const movement = stepDust(nodes, anchors, width, height, 1 / 60, mixed, motion);
+    quietFrames = movement < DUST_QUIET_MOVEMENT ? quietFrames + 1 : 0;
+  }
+}
+
+function layoutDust(matches, anchors, width, height, mixed = false, motion = DUST_ENGINE.DEFAULT_MOTION) {
   if (!matches.length || !anchors.length) return [];
-  const nodes = createDustNodes(matches, anchors, width, height);
-  for (let tick = 0; tick < 480; tick++) stepDust(nodes, anchors, width, height);
+  const nodes = createDustNodes(matches, anchors, width, height, null, mixed);
+  settleDust(nodes, anchors, width, height, mixed, motion);
   return nodes;
 }
 
@@ -266,19 +340,29 @@ function bindDustControls() {
   document.querySelector("#reset-magnets").addEventListener("click", AnivizMain.resetPositions);
 }
 
+function renderDustLegend({ magnets, colorByMagnet, mixed }) {
+  const legend = document.querySelector("#dust-legend");
+  legend.hidden = !magnets.length;
+  if (!magnets.length) { legend.replaceChildren(); return; }
+  const colors = colorByMagnet ? magnets.map((magnet, index) => `
+    <span title="${mixed ? "Highest attraction percentile for" : "Titles most similar to"} ${escapeAttribute(magnet.title)}"><i class="dust-legend-dot" style="--magnet-color:${AnivizMain.color(magnet.key)}" aria-hidden="true"></i>M${index + 1}</span>`).join("")
+    : `<span><i class="dust-legend-dot" style="--magnet-color:${DUST_UNIFORM_COLOR}" aria-hidden="true"></i>Dust</span>`;
+  legend.innerHTML = colors + '<span><i class="dust-legend-dot is-selected" aria-hidden="true"></i>Selected</span>';
+}
+
+function refreshDustColors() {
+  renderDustLegend(AnivizMain.snapshot());
+  dustChart?.views?.forEach(view => view.drawColors());
+}
+
 function renderDustRecommendations() {
-  const { magnets, magnetKeys, popularity, mixed, displayedDust, direction, example } = AnivizMain.snapshot();
+  const snapshot = AnivizMain.snapshot();
+  const { magnets, magnetKeys, popularity, mixed, displayedDust, direction, example } = snapshot;
   const reverse = direction === AnivizDust.REVERSE;
   const noun = reverse ? "movies" : "anime";
   const container = document.querySelector("#recommendation-chart");
   const mirror = document.querySelector("#dust-mirror");
-  const legend = document.querySelector("#dust-legend");
-  legend.hidden = !magnets.length;
-  legend.innerHTML = magnets.map((magnet, index) => `
-    <span title="${mixed ? "Highest attraction percentile for" : "Titles most similar to"} ${escapeAttribute(magnet.title)}"><i class="dust-legend-dot" style="--magnet-color:${AnivizMain.color(magnet.key)}" aria-hidden="true"></i>M${index + 1}</span>`).join("")
-    + (magnets.length ? `<span><i class="dust-legend-dot is-selected" aria-hidden="true"></i>Selected</span>` : "");
-  document.querySelector("#dust-layout-status").hidden = true;
-  document.querySelector("#dust-layout-status").textContent = "";
+  renderDustLegend(snapshot);
   document.querySelector("#recommendation-content").hidden = false;
   document.querySelector("#recommendation-chart-title").textContent = reverse ? "Movies shown" : "Anime shown";
   document.querySelector("#movie-magnets").innerHTML = magnetKeys.map(key => {
@@ -324,12 +408,40 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
     .attr("width", width).attr("height", height).attr("class", "dust-map").attr("role", "group")
     .attr("aria-label", `${label} ${mixed ? "attraction to" : "similarity to"} ${anchors.map(({ magnet }) => magnet.title).join(", ")}`);
   const paths = svg.append("g").attr("aria-hidden", "true");
+  const selectedPaths = paths.append("g");
+  const previewPaths = paths.append("g");
+  const temperature = dustTemperature(mixed);
+  let positions, hovered, focused;
+  let selectedKeys = [];
+  function drawLinks(layer, className, keys) {
+    const links = keys.flatMap(key => {
+      const node = positions.get(key);
+      if (!node) return [];
+      const best = Math.max(...node.scores);
+      return anchors.map((anchor, index) => ({ anchor, node,
+        affinity: dustAffinity(node.scores[index], best, temperature) }));
+    });
+    layer.selectAll("line").data(links).join("line")
+      .attr("class", className)
+      .attr("stroke", ({ anchor }) => anchor.color)
+      .attr("stroke-width", ({ affinity }) => .8 + 1.5 * affinity)
+      .attr("stroke-opacity", ({ affinity }) => .14 + .56 * affinity)
+      .attr("x1", ({ anchor }) => anchor.x).attr("y1", ({ anchor }) => anchor.y)
+      .attr("x2", ({ node }) => node.x).attr("y2", ({ node }) => node.y);
+  }
+  function drawPreview() {
+    const key = hovered || focused;
+    drawLinks(previewPaths, "dust-preview-link", key && !selectedKeys.includes(key) ? [key] : []);
+  }
   const dots = svg.append("g").selectAll("g").data(matches, (match) => match.key).join("g")
     .attr("class", "dust-node").attr("data-match-id", (match) => match.key)
     .attr("role", "button").attr("tabindex", 0).attr("aria-controls", "dust-focus recommendation-detail")
     .attr("aria-label", (match) => `${match.record.title}. ${anchors.map(({ magnet }, index) => mixed ? AnivizDust.mixedEvidence(match, magnet, index)
       : `${AnivizDust.magnetScoreLabel(magnet)}: ${match.scores[index].toFixed(3)}`).join(". ")}. Toggle selection for details or comparison.`)
     .on("mouseenter focus", (event, match) => {
+      if (event.type === "focus") focused = match.key;
+      else hovered = match.key;
+      drawPreview();
       const rect = event.currentTarget.getBoundingClientRect();
       const pointer = event.type === "focus" ? { clientX: rect.x + rect.width / 2, clientY: rect.y + rect.height / 2 } : event;
       showTooltip(pointer, `<strong>${escapeHTML(match.record.title)}</strong><span>${match.key.startsWith("anilist:") ? escapeHTML(humanize(match.record.format)) + " · " : ""}${match.record.year || "Year unknown"}</span>`
@@ -341,14 +453,23 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
         + '<span class="dust-tooltip-hint">Click to toggle selection</span>');
     })
     .on("mousemove", moveTooltip)
-    .on("mouseleave blur", hideTooltip)
+    .on("mouseleave blur", (event) => {
+      if (event.type === "blur") focused = null;
+      else hovered = null;
+      drawPreview();
+      hideTooltip();
+    })
     .on("click", (event, match) => { hideTooltip(); AnivizMain.select(match.key); })
     .on("keydown", (event, match) => {
       if (["Enter", " "].includes(event.key)) { event.preventDefault(); hideTooltip(); AnivizMain.select(match.key); }
-      if (event.key === "Escape") hideTooltip();
+      if (event.key === "Escape") {
+        hovered = focused = null;
+        drawPreview();
+        hideTooltip();
+      }
     });
-  dots.append("circle").attr("class", "dust-hit-area").attr("r", 9);
-  dots.append("circle").attr("class", "dust-grain").attr("r", 4.5).attr("fill", (match) => anchors[match.closest].color);
+  dots.append("circle").attr("class", "dust-hit-area").attr("r", DUST_HIT_RADIUS);
+  const grains = dots.append("circle").attr("class", "dust-grain").attr("r", 4.5).attr("fill", AnivizMain.dustColor);
   const magnets = svg.append("g").selectAll("g").data(anchors, anchor => anchor.magnet.key).join("g").attr("class", "dust-magnet")
     .attr("role", ({ magnet }) => magnet.kind === undefined ? "button" : "group").attr("tabindex", 0)
     .attr("aria-controls", ({ magnet }) => magnet.kind === undefined ? "dust-focus" : null)
@@ -367,10 +488,14 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
       event.preventDefault();
       onMove(anchor, anchor.x + delta[0], anchor.y + delta[1]);
     })
-    .call(d3.drag().clickDistance(4).on("start", hideTooltip)
+    .call(d3.drag().clickDistance(4).on("start", () => {
+      hovered = focused = null;
+      drawPreview();
+      hideTooltip();
+    })
       .on("drag", (event, anchor) => onMove(anchor, event.x, event.y)));
-  magnets.append("circle").attr("class", "magnet-halo").attr("r", 34).attr("stroke", (anchor) => anchor.color);
-  magnets.append("circle").attr("class", "magnet-core").attr("r", 25).attr("stroke", (anchor) => anchor.color);
+  magnets.append("circle").attr("class", "magnet-halo").attr("r", DUST_CLEARANCE).attr("stroke", (anchor) => anchor.color);
+  magnets.append("circle").attr("class", "magnet-core").attr("r", MAGNET_CORE_RADIUS).attr("stroke", (anchor) => anchor.color);
   magnets.append("text").attr("class", "magnet-number").attr("text-anchor", "middle").attr("dy", 5)
     .attr("fill", (anchor) => anchor.color).text((_, index) => `M${index + 1}`);
   magnets.append("text").attr("class", "magnet-title").attr("text-anchor", "middle").attr("y", 49)
@@ -379,16 +504,18 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
     : magnet.kind === "genre" ? AnivizDust.cohortDescription(magnet) : magnet.year || "Year unknown"})`);
 
   return {
-    draw(positions) {
+    drawColors() {
+      grains.attr("fill", AnivizMain.dustColor);
+    },
+    draw(nextPositions) {
+      positions = nextPositions;
       dots.attr("transform", (match) => { const node = positions.get(match.key); return `translate(${node.x},${node.y})`; });
       magnets.attr("transform", (anchor) => `translate(${anchor.x},${anchor.y})`);
     },
-    drawLinks(links) {
-      paths.selectAll("line").data(links).join("line")
-        .attr("class", "dust-selected-link")
-        .attr("stroke", link => link.anchor.color)
-        .attr("x1", link => link.anchor.x).attr("y1", link => link.anchor.y)
-        .attr("x2", link => link.node.x).attr("y2", link => link.node.y);
+    drawLinks(keys) {
+      selectedKeys = keys;
+      drawLinks(selectedPaths, "dust-selected-link", keys);
+      drawPreview();
     }
   };
 }
@@ -409,69 +536,67 @@ function renderDustChart(container, mirror, magnets, matches, mixed) {
   for (const anchor of anchors) {
     Object.assign(anchor, constrainMagnetPosition(anchor, anchor.x, anchor.y, anchors, width, height));
   }
-  const noun = AnivizMain.snapshot().direction === AnivizDust.REVERSE ? "movies" : "anime";
+  const snapshot = AnivizMain.snapshot();
+  const noun = snapshot.direction === AnivizDust.REVERSE ? "movies" : "anime";
+  let motion = snapshot.motion;
   const views = [createDustView(container, matches, anchors, width, height, moveAnchor, `Displayed ${noun}`, mixed),
     createDustView(mirror, matches, anchors, width, height, moveAnchor, `Mirror of ${noun}`, mixed)];
-  const nodes = createDustNodes(matches, anchors, width, height, dustChart);
-  // First entry is already gathered; subsequent changes retain the same grains.
-  if (!dustChart) for (let tick = 0; tick < 360; tick++) stepDust(nodes, anchors, width, height);
-  const positions = new Map(nodes.map((node) => [node.key, node]));
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const nodes = createDustNodes(matches, anchors, width, height, dustChart, mixed);
+  // First entry is already gathered. Later changes start from the previous positions.
+  if (!dustChart || reducedMotion) settleDust(nodes, anchors, width, height, mixed, motion);
+  const positions = new Map(nodes.map((node) => [node.key, node]));
   let frame = null, lastTime = null, quietFrames = 0;
-  dustChart = { views, positions, anchors, width, height, stop() {
+  dustChart = { views, positions, anchors, width, height, setMotion(next) {
+    motion = next;
+    if (reducedMotion) {
+      settleDust(nodes, anchors, width, height, mixed, motion);
+      draw();
+      AnivizMain.saveLayout();
+    } else {
+      wake();
+    }
+  }, stop() {
     if (frame !== null) cancelAnimationFrame(frame);
     frame = null; lastTime = null;
   } };
   function moveAnchor(anchor, x, y) {
-    Object.assign(anchor, constrainMagnetPosition(anchor, x, y, anchors, width, height));
+    const position = constrainMagnetPosition(anchor, x, y, anchors, width, height);
+    if (position.x === anchor.x && position.y === anchor.y) return;
+    Object.assign(anchor, position);
     recommendationState.magnetPositions[`${magnets.length}:${anchor.magnet.key}`] = { x: anchor.x / width, y: anchor.y / height };
-    // Keep each grain's identity and project only as far as needed to preserve
-    // its score order when the moving bisectors cross it.
-    stepDust(nodes, anchors, width, height, 0);
+    if (reducedMotion) settleDust(nodes, anchors, width, height, mixed, motion);
     draw();
-    wake();
+    if (!reducedMotion) wake();
     AnivizMain.saveLayout();
   }
   function draw() {
     views.forEach(view => view.draw(positions));
     highlightDustConnections();
-    const status = document.querySelector("#dust-layout-status");
-    const approximate = nodes.some((node) => node.scoreLayout?.approximate);
-    const message = approximate
-      ? "This magnet arrangement cannot show every score order. Each dot is still nearest its highest-scoring magnet. Spread the magnets into a triangle or use Reset positions to compare all three distances."
-      : "";
-    if (status.textContent !== message) status.textContent = message;
-    status.hidden = !approximate;
   }
   function animate(time) {
     frame = null;
     if (!container.isConnected) return;
-    const movement = stepDust(nodes, anchors, width, height, lastTime === null ? 1 / 60 : (time - lastTime) / 1000);
+    const elapsed = lastTime === null ? 1 / 60 : (time - lastTime) / 1000;
+    const movement = stepDust(nodes, anchors, width, height, elapsed, mixed, motion);
     lastTime = time;
     draw();
-    quietFrames = movement < .015 ? quietFrames + 1 : 0;
-    if (quietFrames < 24) frame = requestAnimationFrame(animate);
+    quietFrames = movement < DUST_QUIET_MOVEMENT ? quietFrames + 1 : 0;
+    if (quietFrames < DUST_QUIET_FRAMES) frame = requestAnimationFrame(animate);
     else { lastTime = null; AnivizMain.saveLayout(); }
   }
   function wake() {
     quietFrames = 0;
-    if (reducedMotion) {
-      for (let tick = 0; tick < 480; tick++) stepDust(nodes, anchors, width, height);
-      draw();
-    } else if (frame === null) frame = requestAnimationFrame(animate);
+    if (frame === null) frame = requestAnimationFrame(animate);
   }
-  stepDust(nodes, anchors, width, height, 0);
   draw();
-  wake();
+  if (!reducedMotion) wake();
 }
 
 function highlightDustConnections() {
   if (!dustChart?.views) return;
-  const links = AnivizMain.snapshot().selectedKeys.flatMap(key => {
-    const node = dustChart.positions.get(key);
-    return node ? dustChart.anchors.map(anchor => ({ anchor, node })) : [];
-  });
-  dustChart.views.forEach(view => view.drawLinks(links));
+  const { selectedKeys } = AnivizMain.snapshot();
+  dustChart.views.forEach(view => view.drawLinks(selectedKeys));
 }
 
 if (typeof module !== "undefined" && module.exports) {

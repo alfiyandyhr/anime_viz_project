@@ -14,6 +14,21 @@
     [FORWARD]: { magnet: "tmdb", dust: "anilist", example: "Inception" },
     [REVERSE]: { magnet: "anilist", dust: "tmdb", example: "Attack on Titan" }
   };
+  const MOTION_RANGES = {
+    damping: { min: 6, max: 16, step: 1 },
+    strength: { min: .5, max: 1.5, step: .1 },
+    rankSpread: { min: 0, max: 100, step: 5 }
+  };
+  const DEFAULT_MOTION = Object.freeze({ damping: 10, strength: 1, rankSpread: 80 });
+  function readMotion(settings) {
+    return Object.freeze(Object.fromEntries(Object.entries(MOTION_RANGES).map(([key, { min, max, step }]) => {
+      const value = settings?.[key];
+      if (!Number.isFinite(value)) return [key, DEFAULT_MOTION[key]];
+      const bounded = Math.max(min, Math.min(max, value));
+      const snapped = min + Math.round((bounded - min) / step) * step;
+      return [key, Number(snapped.toFixed(2))];
+    })));
+  }
   const keyFor = (catalogue, id) => `${catalogue}:${id}`;
   const catalogueFor = (data, catalogue) => (catalogue === "tmdb" ? data?.movies : data?.anime) || [];
   const magnetScoreLabel = magnet => magnet.kind === "popularity" ? magnet.metric
@@ -120,16 +135,20 @@
       return cohortVectors.get(magnet.key);
     });
     const popularityIndex = magnets.findIndex(magnet => magnet.kind === "popularity");
-    const eligible = popularityIndex < 0 ? null : records.flatMap((_, index) =>
-      Number.isFinite(rawColumns[popularityIndex][index]) ? [index] : []);
-    const columns = eligible ? rawColumns.map(column => midrankPercentiles(column, eligible)) : rawColumns;
+    const mixed = popularityIndex >= 0;
+    const eligible = records.flatMap((_, index) =>
+      !mixed || Number.isFinite(rawColumns[popularityIndex][index]) ? [index] : []);
+    // Keep geometry ranks with the scored vectors so sampling and filtering cannot change them.
+    const percentiles = rawColumns.map(column => midrankPercentiles(column, eligible));
+    const columns = mixed ? percentiles : rawColumns;
     return records.map((record, index) => {
       const scores = columns.map(column => column[index]);
       const available = scores[0] !== null;
+      const closest = available ? scores.indexOf(Math.max(...scores)) : null;
       return { record, key: keyFor(DIRECTIONS[direction].dust, record.id), index, scores,
-        rawScores: eligible ? rawColumns.map(column => column[index]) : scores,
+        rawScores: mixed ? rawColumns.map(column => column[index]) : scores,
         score: available ? scores.reduce((sum, value) => sum + value, 0) / scores.length : null,
-        closest: available ? scores.indexOf(Math.max(...scores)) : null, group: "dust" };
+        closest, winnerPercentile: available ? percentiles[closest][index] : null, group: "dust" };
     });
   }
 
@@ -225,7 +244,7 @@
     let cohorts = [];
     let catalogue = new Map(), lookup = new Map(), magnets = [], vectors = [], candidates = [], displayed = [], ranking = [];
     let popularity;
-    let persistent = true, warned = false, revision = 0;
+    let persistent = true, warned = false, revision = 0, colorByMagnet = false, motion = DEFAULT_MOTION;
     const listeners = new Set();
     function storageFailure() {
       persistent = false;
@@ -240,7 +259,7 @@
       if (!data) return;
       try {
         if (!storage) { storageFailure(); return; }
-        const serialized = JSON.stringify({ version: VERSION, direction, sessions: Object.fromEntries(sessions) });
+        const serialized = JSON.stringify({ version: VERSION, direction, colorByMagnet, motion, sessions: Object.fromEntries(sessions) });
         storage.setItem(STORAGE_KEY, serialized);
         if (storage.getItem(STORAGE_KEY) !== serialized) storageFailure();
       } catch (_) { storageFailure(); }
@@ -248,7 +267,7 @@
     function snapshot() {
       const state = session.state;
       const visible = new Set(state.displayedKeys);
-      return { ...state, version: VERSION, direction, revision, magnets, genreCohorts: cohorts, candidateDust: candidates, displayedDust: displayed,
+      return { ...state, version: VERSION, direction, revision, colorByMagnet, motion, magnets, genreCohorts: cohorts, candidateDust: candidates, displayedDust: displayed,
         ranking, lookup, metadataStatus, persistent, popularity, mixed: magnets.some(magnet => magnet.kind === "popularity"),
         activeMagnetKeys: magnets.map(magnet => magnet.key),
         missingMetadataIds: direction === FORWARD ? state.candidateKeys.filter(key => !lookup.get(key)?.metadata) : [],
@@ -335,6 +354,8 @@
             if (Array.isArray(entry?.state?.magnetKeys)) sessions.set(name, readSession(name, entry));
           }
           direction = saved.direction;
+          colorByMagnet = saved.colorByMagnet === true;
+          motion = readMotion(saved.motion);
         } else {
           const legacy = read(LEGACY_KEY);
           if (legacy?.version !== 1 || legacy.state?.version !== 1 || !Array.isArray(legacy.state.movieIds)) return false;
@@ -414,6 +435,17 @@
         session.state.dustLimit = dustLimit(value);
         return derive({ resample: true });
       },
+      setColorByMagnet(value) {
+        if (colorByMagnet === (value === true)) return snapshot();
+        colorByMagnet = value === true;
+        return publish();
+      },
+      setMotion(patch) {
+        const next = readMotion({ ...motion, ...patch });
+        if (Object.keys(MOTION_RANGES).every(key => next[key] === motion[key])) return snapshot();
+        motion = next;
+        return publish();
+      },
       setFilters(patch) {
         for (const key of Object.keys(defaults(direction))) {
           if (Object.hasOwn(patch, key)) session.state.filters = { ...session.state.filters, [key]: patch[key] };
@@ -446,7 +478,7 @@
     };
     return api;
   }
-  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, DIRECTIONS, keyFor, catalogueFor, magnetScoreLabel, cohortDescription,
+  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, DIRECTIONS, DEFAULT_MOTION, MOTION_RANGES, keyFor, catalogueFor, magnetScoreLabel, cohortDescription,
     averageLabel, formatPercentile, formatRawScore, mixedEvidence, defaults, joinRecords,
     passesFilters, createScoreAccessor, forwardVectors, rankCorpus, sampleDust, createContext };
 });

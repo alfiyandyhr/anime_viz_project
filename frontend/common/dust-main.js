@@ -2,6 +2,7 @@
 // Connect one directional dust snapshot to the field, details and analysis.
 (function (root) {
   let context, composition, latest, rankingPage = 0, rankingSignature = "";
+  let syncMotionControls;
   let scrollRestored = false, pendingNotice = "", metadataLoading = false;
   let movieDetailsRequest, focusedMagnetKey = null, inspectedMovieKey = null;
   const $ = selector => document.querySelector(selector);
@@ -10,6 +11,8 @@
   const dustNoun = () => isReverse() ? "movies" : "anime";
   const detailHelpers = () => ({ escapeHTML, escapeAttribute, humanize, formatNumber });
   const color = key => magnetColors.get(key);
+  const dustColor = match => latest.colorByMagnet
+    ? color(latest.activeMagnetKeys[match.closest]) : DUST_UNIFORM_COLOR;
   const notice = message => {
     pendingNotice = message;
     $('[data-dust-notice]').textContent = message;
@@ -125,7 +128,14 @@
   }
   function publish(snapshot) {
     const switched = latest.direction !== snapshot.direction;
+    const recolor = latest.colorByMagnet !== snapshot.colorByMagnet;
+    const motionChanged = latest.motion !== snapshot.motion;
     latest = snapshot;
+    if (motionChanged) {
+      syncMotionControls(snapshot.motion);
+      dustChart?.setMotion?.(snapshot.motion);
+      return;
+    }
     if (switched || !snapshot.activeMagnetKeys.includes(focusedMagnetKey)) focusedMagnetKey = null;
     if (switched) loadLayout();
     const reverse = isReverse();
@@ -137,9 +147,11 @@
       used.add(value);
     });
     if (switched) updateDirectionControls();
+    $('#dust-color-by-magnet').checked = snapshot.colorByMagnet;
+    if (recolor) refreshDustColors();
     const records = snapshot.displayedKeys.map(key => snapshot.lookup.get(key).record);
     const dustColors = new Map(snapshot.displayedDust.map(match => [
-      String(match.record.id), color(snapshot.activeMagnetKeys[match.closest])
+      String(match.record.id), dustColor(match)
     ]));
     const metric = $('[data-dust-genre-metric]').value;
     const selectedIds = snapshot.selectedKeys.map(key => snapshot.lookup.get(key)?.record.id).filter(id => id != null).map(String);
@@ -155,9 +167,10 @@
     $('[data-dust-scope]').textContent = elements.filterSummary.textContent = `${count} / ${candidates} ${dustNoun()}`;
     $('#dust-limit').value = snapshot.dustLimit;
     $('#recommendation-score-note').textContent = snapshot.mixed
-      ? 'Select up to 3 dots · Distance: order of attraction percentiles (0–1) · Color: highest percentile.'
-      : 'Select up to 3 dots · distance: preference order · cosine ≠ percentage.';
-    $('#dust-connection-method').textContent = `Select a magnet to rank the displayed titles by ${snapshot.mixed ? 'attraction percentile' : 'cosine similarity'}. Thicker curves show higher scores within that magnet’s range. Color shows each title’s closest magnet. Dust members lists the titles closest to the selected magnet. Scroll either list to see more titles.`;
+      ? 'Hover or focus for attraction percentiles. Thicker links show a stronger pull for that dot. Select up to 3 dots.'
+      : 'Hover or focus for similarity scores. Thicker links show a stronger pull for that dot. Select up to 3 dots.';
+    const colorNote = snapshot.colorByMagnet ? ' Color identifies each title’s highest-scoring magnet.' : '';
+    $('#dust-connection-method').textContent = `Select a magnet to rank the displayed titles by ${snapshot.mixed ? 'attraction percentile' : 'cosine similarity'}. Thicker curves show higher scores within that magnet’s range.${colorNote} Dust members lists the titles that score highest for the selected magnet. Scroll either list to see more titles.`;
     const notes = {
       genres: [metric === 'count' ? 'Genres' : 'Genre ' + metric,
         row => row.genres.length && (metric === 'score' ? Number.isFinite(row.average_score) : metric !== 'popularity' || Number.isFinite(row.popularity)),
@@ -167,7 +180,7 @@
     if (reverse) {
       notes.reception = ['Movies with TMDB score and rank', AnivizChartData.hasMovieReception,
         snapshot.popularity.snapshotDate
-          ? `TMDB snapshot ${snapshot.popularity.snapshotDate} UTC · Rank #1 is most popular in the movie sample. Color: closest magnet.`
+          ? `TMDB snapshot ${snapshot.popularity.snapshotDate} UTC · Rank #1 is most popular in the movie sample.${colorNote}`
           : snapshot.popularity.status === 'unavailable' ? 'Archived TMDB reception data unavailable.'
             : 'Loading archived TMDB reception data…'];
       $('[data-coverage="studios"]').textContent = 'The published TMDB sample has no production company or cast credits.';
@@ -177,7 +190,7 @@
         studios: ['Titles with studio, score and popularity', row => row.studio_names.length && row.popularity > 0 && Number.isFinite(row.average_score), 'Circle area represents matching titles. Studio credits can overlap.'],
         heatmap: ['Studio × genre', row => row.studio_names.length && row.genres.length,
           'Up to 15 studios and 10 genres, ranked by displayed title count. Titles can appear in multiple cells.'],
-        reception: ['Ratings', row => row.popularity > 0 && Number.isFinite(row.average_score), 'Circle area: favourites · Color: closest magnet.']
+        reception: ['Ratings', row => row.popularity > 0 && Number.isFinite(row.average_score), `Circle area: favourites.${colorNote}`]
       });
     }
     Object.entries(notes).forEach(([kind, [label, predicate, suffix]]) => {
@@ -196,7 +209,7 @@
     if (signature !== rankingSignature) { rankingPage = 0; rankingSignature = signature; }
     const sort = $('[data-dust-ranking-sort]');
     sort.innerHTML = `<option value="average">${AnivizDust.averageLabel(snapshot.mixed)}</option>` + snapshot.magnets.map((magnet, i) => {
-      const label = snapshot.mixed || magnet.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : `Closest to Magnet ${i + 1} — ${magnet.title}`;
+      const label = snapshot.mixed || magnet.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : `Similarity to M${i + 1} · ${magnet.title}`;
       return `<option value="${escapeAttribute(magnet.key)}">${escapeHTML(label)}</option>`;
     }).join('');
     sort.value = snapshot.activeMagnetKeys.includes(snapshot.rankingSortKey) ? snapshot.rankingSortKey : 'average';
@@ -284,6 +297,8 @@
     context = AnivizDust.createContext({ storage, onNotice: notice });
     context.restore();
     latest = context.snapshot();
+    syncMotionControls = bindMotionControls();
+    syncMotionControls(latest.motion);
     composition = AnivizComposition.create({ onError: error => console.error(error) });
     document.querySelectorAll('[data-dust-chart]').forEach(container => {
       const kind = container.dataset.dustChart;
@@ -296,6 +311,7 @@
         });
     });
     context.subscribe(publish);
+    $('#dust-color-by-magnet').addEventListener('change', event => context.setColorByMagnet(event.target.checked));
     $('[data-dust-genre-metric]').addEventListener('change', () => publish(context.snapshot()));
     $('[data-dust-ranking-sort]').addEventListener('change', event => context.setRankingSort(event.target.value));
     $('[data-dust-ranking-order]').addEventListener('change', event => context.setRankingOrder(event.target.value));
@@ -317,6 +333,29 @@
     });
     bindRecommendationControls();
     void loadMetadata();
+  }
+  function bindMotionControls() {
+    const formats = {
+      damping: value => [`${value} s⁻¹`, `${value} per second`],
+      strength: value => [`${value.toFixed(1)}×`, `${value.toFixed(1)} times`],
+      rankSpread: value => [`${value}%`, `${value} percent`]
+    };
+    const controls = Object.entries(AnivizDust.MOTION_RANGES).map(([key, range]) => {
+      const input = $(`[data-dust-motion="${key}"]`);
+      const output = $(`output[for="${input.id}"]`);
+      Object.assign(input, range);
+      input.addEventListener('input', () => context.setMotion({ [key]: input.valueAsNumber }));
+      return { key, input, output };
+    });
+    $('#reset-dust-motion').addEventListener('click', () => context.setMotion(AnivizDust.DEFAULT_MOTION));
+    return motion => {
+      for (const { key, input, output } of controls) {
+        const [visible, spoken] = formats[key](motion[key]);
+        input.value = motion[key];
+        input.setAttribute('aria-valuetext', spoken);
+        output.value = visible;
+      }
+    };
   }
   function loadLayout() {
     const layout = context.getLayout();
@@ -395,7 +434,7 @@
     },
     setMagnets(keys) { context.setMagnets(keys); renderRecommendations(); },
     setDustLimit(value) { context.setDustLimit(value); renderRecommendations(); },
-    select, focusMagnet, color, saveLayout, loadPopularity,
+    select, focusMagnet, color, dustColor, saveLayout, loadPopularity,
     deselectLast() {
       if (latest.selectedKeys.length) {
         focusedMagnetKey = null;

@@ -35,6 +35,9 @@ by catalogue, for example `tmdb:27205`, `anilist:1`, and `tmdb:genre:Science Fic
 - `saveLayout(patch)`, `getLayout()`, and `resetPositions()` manage magnet and
   particle positions, colors, and scroll without advancing the analytical
   revision or notifying chart subscribers.
+- `setMotion(patch)` and `setColorByMagnet(value)` publish display preferences
+  shared across directions. Motion updates reuse the live particles and their
+  velocities. Both preferences reuse the current sample and ranking.
 
 The v2 session stores separate state and layout for both directions and remembers
 which is active. A compatible v1 session imports into Movie → Anime. If no saved
@@ -72,7 +75,7 @@ extents prevent deferred rendering from displacing restored scroll positions.
 
 `dust-main.js` connects the active context to the field, connections, charts,
 ranking, and details. Movie dust uses count-only genre and release-year charts
-alongside a reception chart colored by each movie's closest magnet.
+alongside a reception chart that shares the field's dust color setting.
 The shared chart composition clears inactive marks when the direction changes.
 The `#reception`, `#content`, and `#creators` anchors work with either catalogue.
 

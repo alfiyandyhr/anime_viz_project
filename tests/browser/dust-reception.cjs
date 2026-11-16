@@ -14,6 +14,8 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     const field = page.locator('#recommendation-chart');
     const mirror = page.locator('#dust-mirror');
     const scatter = page.locator('[data-dust-chart="reception"]');
+    const connections = page.locator('[data-dust-chart="connections"]');
+    const colorControl = page.getByRole('checkbox', { name: 'Color dust by strongest magnet' });
     await field.locator('.dust-node').first().waitFor();
     await page.waitForFunction(() => AnivizMain.snapshot().metadataStatus === 'ready');
 
@@ -78,6 +80,49 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     assert.notDeepEqual(afterMove, beforeMove);
     assert.deepEqual(await geometry(mirror), afterMove);
 
+    const grainColors = view => view.locator('.dust-grain').evaluateAll(grains => grains.map(grain => grain.getAttribute('fill')));
+    const uniform = await grainColors(field);
+    assert.equal(await colorControl.isChecked(), false);
+    assert.equal(new Set(uniform).size, 1);
+    assert.deepEqual(await grainColors(mirror), uniform);
+    await colorControl.press('Space');
+    assert.equal(await colorControl.isChecked(), true);
+    const grouped = await grainColors(field);
+    const winners = await page.evaluate(() => {
+      const { displayedDust, activeMagnetKeys } = AnivizMain.snapshot();
+      return displayedDust.map(match => AnivizMain.color(activeMagnetKeys[match.closest]));
+    });
+    assert.equal(new Set(grouped).size, 3);
+    assert.deepEqual(grouped, winners);
+    assert.deepEqual(await grainColors(mirror), grouped);
+    assert.match(await page.locator('#dust-legend').innerText(), /M1.*M2.*M3/s);
+    assert.deepEqual(await geometry(field), afterMove);
+    assert.deepEqual(await selection(), [firstId]);
+
+    const verifyConnectionColors = async () => {
+      await connections.scrollIntoViewIfNeeded();
+      await connections.locator('.dust-connection-row').first().waitFor();
+      const matchesField = await connections.evaluate(container => {
+        const fill = match => getComputedStyle(document.querySelector(
+          `#recommendation-chart [data-match-id="${match.key}"] .dust-grain`
+        )).fill;
+        const rows = [...container.querySelectorAll('.dust-connection-dot')];
+        const paths = [...container.querySelectorAll('svg path')];
+        return rows.length > 0 && paths.length > 0
+          && rows.every(dot => getComputedStyle(dot).backgroundColor === fill(dot.__data__))
+          && paths.every(path => getComputedStyle(path).stroke === fill(path.__data__.match));
+      });
+      assert.ok(matchesField);
+    };
+    await verifyConnectionColors();
+    await colorControl.uncheck();
+    assert.deepEqual(await grainColors(field), uniform);
+    assert.deepEqual(await grainColors(mirror), uniform);
+    assert.deepEqual(await page.locator('#dust-legend > span').allTextContents(), ['Dust', 'Selected']);
+    assert.deepEqual(await geometry(field), afterMove);
+    assert.deepEqual(await selection(), [firstId]);
+    await verifyConnectionColors();
+
     await scatter.scrollIntoViewIfNeeded();
     await scatter.locator('.reception-dot').first().waitFor();
     assert.match(await page.locator('[data-coverage="reception"]').innerText(), /Circle area: favourites/);
@@ -85,9 +130,9 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     assert.ok(layout[0].x + layout[0].width < layout[1].x);
     assert.equal(layout[0].height, 473);
     const pair = await page.locator('.dust-reception').boundingBox();
-    const connections = await page.locator('[data-dust-chart="connections"]').boundingBox();
+    const connectionBounds = await connections.boundingBox();
     const genres = await page.locator('#content').boundingBox();
-    assert.ok(connections.y + connections.height < pair.y && pair.y + pair.height < genres.y);
+    assert.ok(connectionBounds.y + connectionBounds.height < pair.y && pair.y + pair.height < genres.y);
     const evidence = await scatter.evaluate(container => {
       const points = [...container.querySelectorAll('.reception-dot')];
       const dust = document.querySelector('#recommendation-chart');
@@ -189,7 +234,51 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       return mirror.getBoundingClientRect().top > scatter.getBoundingClientRect().bottom
         && document.documentElement.scrollWidth === innerWidth;
     });
+
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.selectOption('#dust-limit', '90');
+    await page.locator('#reset-magnets').click();
+    const motion = await field.evaluate(async container => {
+      const mirror = document.querySelector('#dust-mirror');
+      const dots = view => Array.from(view.querySelectorAll('.dust-node'), dot => dot.getAttribute('transform'));
+      const magnet = container.querySelector('.dust-magnet');
+      const before = dots(container);
+      const anchor = magnet.getAttribute('transform');
+      magnet.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+      const immediate = dots(container);
+      const anchorMoved = magnet.getAttribute('transform') !== anchor;
+      const immediateMirror = dots(mirror);
+      // Read both views after the animation loop has integrated several frames.
+      for (let frame = 0; frame < 6; frame++) await new Promise(resolve => requestAnimationFrame(resolve));
+      return { before, immediate, immediateMirror, anchorMoved, after: dots(container), afterMirror: dots(mirror) };
+    });
+    assert.equal(motion.before.length, 90);
+    assert.ok(motion.anchorMoved);
+    assert.deepEqual(motion.immediate, motion.before, 'dots lag behind a moving magnet');
+    assert.deepEqual(motion.immediateMirror, motion.immediate);
+    assert.notDeepEqual(motion.after, motion.before, 'dots follow the magnet on animation frames');
+    assert.deepEqual(motion.afterMirror, motion.after);
+    assert.deepEqual(await selection(), selected);
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.locator('#reset-magnets').click();
+    const reset = await geometry(field);
+    await mirrorMagnet.press('ArrowDown');
+    assert.notDeepEqual(await geometry(field), reset);
+    await page.locator('#reset-magnets').click();
+    assert.deepEqual(await geometry(field), reset, 'reset reproduces the settled reduced-motion geometry');
+    assert.deepEqual(await geometry(mirror), reset);
+
+    const hits = await field.evaluate(container => {
+      container.scrollIntoView({ block: 'center', behavior: 'instant' });
+      return [...container.querySelectorAll('.dust-node')].flatMap(dot => {
+        const { x, y, width, height } = dot.querySelector('.dust-grain').getBoundingClientRect();
+        const hit = document.elementFromPoint(x + width / 2, y + height / 2);
+        return container.contains(hit) ? [hit.closest('.dust-node') === dot] : [];
+      });
+    });
+    assert.ok(hits.length >= 80 && hits.every(Boolean), 'visible dot centers can be clicked through nearby decorations');
     assert.deepEqual(errors, []);
-    console.log('Verified scatter styling, shared selection, mirror dragging and keyboard controls, and desktop/mobile layout.');
+    console.log('Verified scatter styling, shared selection, mirror motion and reset, and desktop/mobile layout.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

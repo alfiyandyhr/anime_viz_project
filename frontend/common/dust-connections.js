@@ -19,7 +19,7 @@
     observer?.observe(container);
 
     function update(value, resetMemberScroll = false) {
-      const { snapshot } = value;
+      const { snapshot, dustColor } = value;
       const { magnets, activeMagnetKeys: magnetKeys, displayedDust, selectedKeys, mixed } = snapshot;
       const noun = snapshot.direction === 'anime-to-movies' ? 'movies' : 'anime';
       const focused = document.activeElement;
@@ -49,6 +49,7 @@
 
       const ranking = movieConnections(snapshot, magnetIndex);
       const isSelected = match => selectedKeys.includes(match.key);
+      const matchColor = match => dustColor(String(match.record.id));
       const titleFor = index => magnets[index].title;
       const midpoint = Math.ceil(ranking.length / 2);
       const max = ranking[0].similarity, min = ranking.at(-1).similarity;
@@ -97,7 +98,7 @@
           .attr('data-dust-connection-panel', index);
         const rows = list.selectAll('button').data(matches).join('button')
           .attr('type', 'button').attr('class', 'dust-connection-row')
-          .style('--dust-color', match => color(magnetKeys[match.closest]))
+          .style('--dust-color', matchColor)
           .attr('data-dust-connection-id', match => `${selectedMagnetKey}:${match.key}`)
           .attr('aria-pressed', isSelected)
           .attr('aria-haspopup', match => isSelected(match) ? null : 'dialog')
@@ -129,7 +130,7 @@
         const scroll = memberPanel.append('div').attr('class', 'dust-member-scroll').attr('role', 'region')
           .attr('tabindex', 0).attr('aria-label', `Dust member ranking for ${title}`).attr('data-dust-member-scroll', '');
         const table = scroll.append('table').attr('aria-label', `Dust members for ${title}`)
-          .style('--magnet-color', color(selectedMagnetKey));
+          .style('--dust-color', matchColor(members[0]));
         table.append('thead').append('tr').selectAll('th').data(['Rank', noun === 'movies' ? 'Movie' : 'Anime', mixed ? scoreLabel : cohortLabel || 'Similarity']).join('th')
           .attr('scope', 'col').classed('dust-member-similarity', label => label === 'Similarity').text(label => label);
         const rows = table.append('tbody').selectAll('tr').data(members).join('tr')
@@ -146,7 +147,7 @@
         showScores(rows.append('td').attr('class', 'dust-member-score'));
         scroll.node().scrollTop = memberScrollTop;
       } else {
-        memberPanel.append('p').attr('class', 'dust-member-empty').text(`None of the displayed ${noun} are closest to ${title}.`);
+        memberPanel.append('p').attr('class', 'dust-member-empty').text(`None of the displayed ${noun} have their highest score for ${title}.`);
       }
 
       drawLines = () => {
@@ -167,7 +168,7 @@
             const bend = x + (row.x - x) * .55;
             return `M${x},${y} C${bend},${y} ${bend},${row.y} ${row.x},${row.y}`;
           })
-          .attr('stroke', row => color(magnetKeys[row.match.closest]))
+          .attr('stroke', row => matchColor(row.match))
           .attr('stroke-width', row => max === min ? 5 : 1 + 8 * (row.match.similarity - min) / (max - min));
       };
       drawLines();

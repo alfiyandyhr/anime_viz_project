@@ -15,6 +15,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     await page.goto(new URL('frontend/dust-magnet/index.html',base).href);
     await page.waitForSelector('.dust-node');
     await page.waitForFunction(() => AnivizMain.snapshot().metadataStatus === 'ready');
+    await page.getByRole('checkbox', { name: 'Color dust by strongest magnet' }).check();
     const chart = page.locator('[data-dust-chart="connections"]');
     const magnets = chart.locator('[data-dust-connection-movie]');
     const memberMagnets = chart.locator('[data-dust-member-movie]');
@@ -100,8 +101,10 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       el.value = value; el.dispatchEvent(new Event(event,{bubbles:true}));
     },{value,event});
     const addMovie = async title => {
-      await page.locator('#movie-search').fill(title);
-      await page.locator('#movie-search').press('Enter');
+      const search = page.locator('#movie-search');
+      await search.click();
+      await search.fill(title);
+      await search.press('Enter');
     };
     assert.equal((await check()).count,60);
     for (const title of ['Interstellar','The Matrix']) {

@@ -126,6 +126,29 @@
               <option value="90">90 · explore</option>
             </select>
           </label>
+          <fieldset class="dust-motion-controls">
+            <legend>Field motion</legend>
+            <div class="dust-motion-setting">
+              <label for="dust-motion-damping">Motion damping</label>
+              <output for="dust-motion-damping" aria-hidden="true"></output>
+              <input id="dust-motion-damping" data-dust-motion="damping" type="range">
+            </div>
+            <div class="dust-motion-setting">
+              <label for="dust-magnet-strength">Magnet strength</label>
+              <output for="dust-magnet-strength" aria-hidden="true"></output>
+              <input id="dust-magnet-strength" data-dust-motion="strength" type="range">
+            </div>
+            <div class="dust-motion-setting">
+              <label for="dust-rank-spread">Rank spread</label>
+              <output for="dust-rank-spread" aria-hidden="true"></output>
+              <input id="dust-rank-spread" data-dust-motion="rankSpread" type="range">
+            </div>
+            <button id="reset-dust-motion" class="small-button ghost" type="button">Reset motion settings</button>
+          </fieldset>
+          <label class="dust-color-control">
+            <input id="dust-color-by-magnet" type="checkbox">
+            Color dust by strongest magnet
+          </label>
           <button id="reset-magnets" class="small-button ghost" type="button">Reset positions</button>
           <details class="field-options" data-field-options>
             <summary aria-controls="filterbar">Filter</summary>
@@ -216,14 +239,13 @@
               <p id="recommendation-chart-guide" class="recommendation-chart-guide"></p>
               <div id="dust-toolbar" class="dust-toolbar" hidden>
                 <p data-dust-scope role="status" aria-live="polite"></p>
-                <div id="dust-legend" class="dust-legend" role="group" aria-label="Dust colors by highest-scoring magnet" hidden></div>
+                <div id="dust-legend" class="dust-legend" role="group" aria-label="Dust color legend" hidden></div>
 
               </div>
               <p data-dust-notice role="status" aria-live="polite"></p>
               <div data-dust-chips aria-label="Active dust filters"></div>
               <div id="recommendation-chart" class="recommendation-chart"></div>
-              <p id="dust-layout-status" class="recommendation-chart-guide" role="status" hidden></p>
-              <p id="recommendation-score-note" class="recommendation-score-note">Select up to 3 dots · distance: preference order · cosine ≠ percentage.</p>
+              <p id="recommendation-score-note" class="recommendation-score-note">Hover or focus for similarity scores. Thicker links show a stronger pull for that dot. Select up to 3 dots.</p>
             </article>
 
           </div>
@@ -241,7 +263,7 @@
 
           <article class="chart-card dust-analysis-wide"><p class="chart-kicker">Compare similarities &amp; differences</p>
             <h3>Which stories are similar—and which differ?</h3>
-            <p id="dust-connection-method">Select a magnet to rank the displayed titles by cosine similarity. Thicker curves show higher scores within that magnet’s range. Color shows each title’s closest magnet. Dust members lists the titles closest to the selected magnet. Scroll either list to see more titles.</p>
+            <p id="dust-connection-method">Select a magnet to rank the displayed titles by cosine similarity. Thicker curves show higher scores within that magnet’s range. Dust members lists the titles that score highest for the selected magnet. Scroll either list to see more titles.</p>
             <p>Outlined titles are selected for comparison in the playground and here. Click an outlined title to remove it. Click any other title to open its details and add it to the comparison if there’s room for it. Compare up to three titles.</p>
             <p data-coverage="connections"></p><div class="dust-linked-chart" role="region" aria-label="Similarity connections" data-dust-chart="connections"></div></article>
           <div class="dust-analysis-wide dust-reception">
@@ -283,7 +305,8 @@
             <article><h3>Genre cohorts</h3><p>Genre magnets use mean cosine similarity. For each dust title, the score is the arithmetic mean of its signed cosine similarities to every sampled title with that genre in the magnet catalogue. A title can belong to multiple cohorts and contribute to each of their scores. Each magnet contributes one score to the combined average. Filters narrow the dust while the cohorts stay fixed.</p></article>
             <article><h3>High popularity</h3><p>One popularity magnet can use AniList list users for anime or the TMDB popularity metric for movies. The picker shows the snapshot date and sample coverage. With popularity active, each magnet’s raw scores become attraction percentiles from 0 to 1 over the same titles with known popularity. Ties share the average rank and a sample of one gets 0.5. Magnets contribute equally to the average attraction percentile. Dot count and filters leave the reference sample fixed. The full ranking retains titles with unavailable popularity and supports sorting by raw evidence.</p></article>
 
-            <article><h3>Reading the magnets</h3><p>The field samples each magnet’s strongest matches, then fills remaining slots by average cosine or average attraction percentile. Distances express each dot’s preference order across magnets. Color identifies its highest-scoring magnet. If three magnets approach a straight line, some distances become approximate. Spread the magnets or reset positions to recover the full ordering. Hover or focus a dot to see its scores. Select up to three dots with a click, tap, Enter, or Space. Select again to remove a title, or click empty space to remove the latest selection.</p></article>
+            <article><h3>Reading the magnets</h3><p>The field samples each magnet’s strongest matches, then fills remaining slots by average cosine or average attraction percentile. Similar scores draw a dot into the space between magnets. Nearby dots can shift it to make room. Hover, focus, or select a dot to see its links. Thicker links show which magnets pull more strongly on that dot. Enable Color dust by strongest magnet to see each title’s highest-scoring magnet at a glance. Hover or focus a dot, or use the full ranking table, to compare scores. Select up to three dots with a click, tap, Enter, or Space. Select again to remove a title, or click empty space to remove the latest selection.</p></article>
+            <article><h3>Adjusting field motion</h3><p>Raise Motion damping to slow the dust and reduce overshoot. Magnet strength changes how strongly dots are pulled toward their preferred positions. Rank spread controls how much room separates stronger and weaker matches. At 0%, the clouds use the compact layout. The space available depends on the field size and how close the magnets are. Reset motion settings restores the three sliders.</p></article>
             <article><h3>Reading the charts</h3><p>Charts use the displayed titles. The full ranking uses the entire dust catalogue. Genres can overlap. With anime dust, AniList popularity counts list users and reception marker size shows favourites. With movie dust, reception plots archived TMDB user scores and ranks computed by sorting the full sample by archived popularity. The Movie catalogue and High popularity magnet use the same snapshot. Movie posters and runtimes come from a separate TMDB details snapshot for those same titles.</p></article>
             <article><h3>A starting point</h3><p>These are text-based recommendations, not predictions of your enjoyment. Seasons, sequels, and the same animated film in both databases can appear separately. Genre labels are context, not an explanation of the model’s score.</p></article>
           </div>

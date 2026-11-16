@@ -516,3 +516,73 @@ cover three-decimal dust tooltips, left/field/right placement, focus images, thr
 successive empty-field clicks removing selections in reverse order, fallback focus,
 magnet/outside-click preservation, panel scroll behavior, and the existing desktop,
 mobile, touch, navigation, persistence, chart scope and failure-state scenarios.
+
+## Dust rank spacing and motion controls
+
+```sh
+node tests/dust-motion-replay.cjs
+NODE_PATH=/tmp/aniviz-browser/node_modules \
+  CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+  node tests/browser/dust-motion.cjs
+```
+
+The replay uses the published Float32 score matrix and the same sample in both
+simulations. It starts at the default magnet positions and moves the anchors
+over two seconds per waypoint. The baseline uses the committed geometry on
+`alfi` at `e50054f`. A second comparison against the Task 1 working tree at the
+start of this change matched all of the default metrics below.
+
+Pairwise agreement counts how often the higher-scoring title is closer to the
+winner among titles with the same winner and different winning scores. Equal
+radii count as half an agreement. The quartile gap is the median across magnet
+clouds of the weakest quartile's median radius minus the strongest quartile's
+median radius. Positive gaps put the strongest quartile closer to its winner.
+
+| 60-dot layout | Agreement, baseline → default | Quartile gap, baseline → default | Near-tie agreement, baseline → default |
+| --- | ---: | ---: | ---: |
+| Pictured Inception, Interstellar, The Matrix triangle | 45.84% → 73.62% | −21.92 → 31.96 px | 45.45% → 45.45% (22 pairs) |
+| Shallow triangle | 54.51% → 74.56% | 9.99 → 18.00 px | 68.18% → 50.00% (22 pairs) |
+| Straight line | 55.92% → 74.56% | 23.42 → 17.61 px | 50.00% → 50.00% (22 pairs) |
+| Past the straight line | 52.17% → 74.44% | 34.50 → 20.48 px | 45.45% → 50.00% (22 pairs) |
+| Close Inception and Interstellar pair | 32.88% → 76.00% | −50.32 → 20.10 px | 75.00% → 50.00% (4 pairs) |
+| Inception alone | 88.59% → 94.18% | 36.79 → 38.18 px | — |
+
+Near ties have a positive lead below 0.01 cosine or 0.04 percentile. Clear
+favorites lead by at least 0.04 cosine or 0.18 percentile. Every clear favorite
+in the default replays was nearest to its winning magnet. The published samples
+had zero exact ties for top magnet. A synthetic signed-score tie ended with
+the two distances within 0.04 px of each other. The simulation leaves near-tied
+titles room between magnets, and their pairwise agreement varies by layout.
+
+With a single magnet, the quartile gap was 4.59 px at 0% spread and
+38.18 px at the default 80%. In the close pair it grew from 10.14 to 20.10 px.
+In the pictured triangle the compact layout had a larger aggregate quartile
+gap of 63.87 px and lower agreement of 68.70%. Relative pull between magnets
+also affects the apparent spread.
+
+The 30/60/90-dot sweep covered 640 × 500 and 240 × 440 fields, title magnets,
+genre cohorts, and popularity blends in both directions. Across 120 profile
+runs, all 7,200 dot centers remained pickable in the geometry check. Minimum
+core-center distance was 30.73 px at defaults and 29.97 px across settings,
+with a 25 px core radius. Defaults kept every dot center more than 5 px
+inside the field limits. The 100% spread and 1.5× strength profile put up
+to two dots in that boundary band.
+
+Maximum travel was 5 px per frame at 60 Hz with the new geometry, including
+the drag through a line. The committed baseline peaked at 47.31 px. For the
+pictured triangle, the strict settle test took 4.55 s at defaults, 4.52 s
+at 0% spread, and 10.10 s / 3.47 s at 100% spread with 0.5× / 1.5× strength.
+At damping 6 and 16 it took 4.60 s and 11.35 s. The settle test requires 24
+consecutive frames below 0.015 px of movement. The shallow and straight layouts
+still had some movement after the 12 s replay limit at defaults. In the
+desktop/narrow sweep, all 30 default runs reached 24 frames below 0.1 px
+within 9.95 s, and 23 met the strict threshold by 12 s.
+
+Chrome checks exercised the labeled sliders and live numeric values, keyboard
+movement from the mirror, pointer drag, immediate reduced-motion layout,
+repeatable position reset, independent motion and filter resets, and settings
+restoration across reload and direction change. Color on and off produced
+identical positions. The browser checked dot-center hit testing at every
+dot count on desktop and mobile. The displayed sample, filters, selected
+titles, raw scores, and ranking survived motion changes. Hover, focus, and
+the ranking table exposed the same score evidence.

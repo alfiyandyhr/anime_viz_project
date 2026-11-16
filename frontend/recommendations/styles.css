@@ -140,15 +140,15 @@
 .dust-node.is-selected .dust-hit-area, .reception-selection-ring { stroke: white; stroke-width: 1; stroke-dasharray: 2 2; }
 .dust-node.is-preview .dust-grain, .dust-node:focus-visible .dust-grain { r: 7px; stroke: white; stroke-width: 2; }
 .dust-node:focus-visible .dust-hit-area { stroke: white; stroke-width: 1; stroke-dasharray: 2 2; }
-.dust-selected-link { stroke-width: 1; stroke-dasharray: 3 5; opacity: .4; pointer-events: none; }
+.dust-selected-link, .dust-preview-link { pointer-events: none; }
+.dust-selected-link { stroke-dasharray: 3 5; opacity: .7; }
 .dust-magnet { cursor: grab; outline: none; touch-action: none; }
 .dust-magnet:active { cursor: grabbing; }
-.magnet-halo { fill: none; stroke-width: 1; opacity: .14; }
+.magnet-halo { fill: none; stroke-width: 1; opacity: .14; pointer-events: none; }
 .magnet-core { fill: var(--bg-soft); stroke-width: 1.5; }
 .dust-magnet:hover .magnet-halo, .dust-magnet:focus-visible .magnet-halo { opacity: .8; stroke-width: 2; }
 .magnet-number { font-family: "Space Grotesk", sans-serif; font-size: 14px; font-weight: 700; pointer-events: none; }
 .magnet-title { fill: var(--text-soft); font-size: 10px; font-weight: 500; paint-order: stroke; stroke: var(--surface-solid); stroke-width: 5px; stroke-linejoin: round; pointer-events: none; }
-.dust-magnet[role="button"] .magnet-title { pointer-events: auto; }
 .dust-empty { min-height: 440px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 35px; color: var(--text-soft); }
 .dust-empty > span { font-size: 3rem; color: var(--cyan); }
 .dust-empty h4 { margin: 12px 0 0; color: var(--text); font-size: 1rem; }
@@ -569,8 +569,8 @@ body[data-chapter="recommendations"] .filterbar { display: none; }
   width: 100%; min-height: 2.75rem; padding: 6px 0; border: 0; background: transparent;
   color: inherit; font: inherit; text-align: left; overflow-wrap: anywhere;
 }
-.dust-member-score { color: var(--magnet-color); }
-.dust-member-selected { outline: 2px solid var(--magnet-color); outline-offset: -2px; }
+.dust-member-score { color: var(--dust-color); }
+.dust-member-selected { outline: 2px solid var(--dust-color); outline-offset: -2px; }
 .dust-member-selected .dust-member-title { color: var(--text); }
 
 @media (max-width: 1099px) {
@@ -620,6 +620,17 @@ body[data-chapter="dust-magnet"] #recommendation-status:empty { display: none; }
 #dust-limit-control { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 #dust-limit-control > span { margin: 0; }
 #dust-limit { width: auto; min-width: 0; color: var(--text); background: var(--bg-soft); border: 1px solid var(--border-strong); border-radius: 5px; padding: 5px; }
+.dust-motion-controls {
+  display: grid; gap: 4px; min-width: 0; margin: 0; padding: 6px 8px 8px;
+  border: 1px solid var(--border); border-radius: 6px; font-size: .8rem;
+}
+.dust-motion-setting { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0 8px; }
+.dust-motion-setting output { color: var(--text-soft); font-size: .72rem; font-variant-numeric: tabular-nums; }
+.dust-motion-setting input[type="range"] { grid-column: 1 / -1; height: 24px; margin: 0; border: 0; accent-color: var(--cyan); }
+.dust-motion-setting input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+#reset-dust-motion { width: 100%; min-height: 32px; }
+.dust-color-control { display: flex; align-items: center; gap: 8px; font-size: .8rem; }
+.dust-color-control input { flex: none; width: 1rem; height: 1rem; margin: 0; accent-color: var(--cyan); }
 .field-options-panel .filterbar { margin: 8px 0 0; padding: 8px; }
 .field-options-panel .filter-grid { grid-template-columns: minmax(0, 1fr); padding: 8px 0; }
 .field-options-panel .filter-grid > label:first-child { grid-column: auto; }
@@ -639,7 +650,6 @@ body[data-chapter="dust-magnet"] [data-dust-scope] { margin: 0; font-size: .72re
 body[data-chapter="dust-magnet"] .dust-legend { margin-left: auto; font-size: .68rem; }
 body[data-chapter="dust-magnet"] #recommendation-chart { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 body[data-chapter="dust-magnet"] .recommendation-score-note { margin: 4px 0 0; border: 0; padding: 0; font-size: .7rem; }
-body[data-chapter="dust-magnet"] #dust-layout-status { margin: 4px 0; }
 body[data-chapter="dust-magnet"] [data-dust-chips]:empty { display: none; }
 body[data-chapter="dust-magnet"] [data-dust-chips] { flex: none; }
 body[data-chapter="dust-magnet"] .recommendation-detail { position: static; padding: 20px; }

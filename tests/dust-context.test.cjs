@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { createContext, joinRecords, rankCorpus, createScoreAccessor, FORWARD, REVERSE, STORAGE_KEY } = require('../frontend/common/dust-context.js');
+const { createContext, joinRecords, rankCorpus, createScoreAccessor, FORWARD, REVERSE, STORAGE_KEY, DEFAULT_MOTION } = require('../frontend/common/dust-context.js');
 const ChartData = require('../frontend/common/chart-data.js');
 const { getDustMatches } = require('../frontend/recommendations/dust-magnet.js');
 const root = path.resolve(__dirname, '..');
@@ -70,6 +70,63 @@ test('layout, hover-free snapshots, ranking sort and selection do not resample c
     assert.deepEqual(context.snapshot().selectedKeys, before.displayedKeys.slice(0, 2));
   }
   assert.equal(context.getLayout().scrollY,1444);
+});
+test('dust coloring starts uniform and stores one display preference across direction sessions', () => {
+  const { context, memory, storage } = setup();
+  context.setSelection(context.snapshot().displayedKeys.slice(0, 2));
+  const before = context.snapshot();
+  assert.equal(before.colorByMagnet, false);
+  const enabled = context.setColorByMagnet(true);
+  assert.equal(enabled.colorByMagnet, true);
+  for (const key of ['candidateDust', 'displayedDust', 'ranking', 'filters', 'selectedKeys']) {
+    assert.equal(enabled[key], before[key]);
+  }
+  assert.equal(context.setDirection(REVERSE).colorByMagnet, true);
+  const restored = createContext({ storage });
+  assert.equal(restored.restore(), true);
+  assert.equal(restored.snapshot().colorByMagnet, true);
+  assert.equal(context.setColorByMagnet(false).colorByMagnet, false);
+  assert.equal(context.setDirection(FORWARD).colorByMagnet, false);
+
+  const saved = JSON.parse(memory.get(STORAGE_KEY));
+  delete saved.colorByMagnet;
+  memory.set(STORAGE_KEY, JSON.stringify(saved));
+  const older = createContext({ storage });
+  assert.equal(older.restore(), true);
+  assert.equal(older.snapshot().colorByMagnet, false);
+});
+test('motion settings round-trip independently of direction, dust evidence, and other resets', () => {
+  const { context, memory, storage } = setup();
+  const key = context.snapshot().displayedKeys.find(id => context.snapshot().lookup.get(id).record.genres.length);
+  context.setFilters({ genre: context.snapshot().lookup.get(key).record.genres[0] });
+  context.setSelection([key]);
+  context.setColorByMagnet(true);
+  const before = context.snapshot();
+  assert.deepEqual(before.motion, DEFAULT_MOTION);
+  const custom = { damping: 16, strength: 0.7, rankSpread: 0 };
+  const after = context.setMotion({ damping: 100, strength: 0.72, rankSpread: -10 });
+  assert.deepEqual(after.motion, custom);
+  assert.equal(context.setMotion(custom).revision, after.revision);
+  for (const field of ['candidateDust', 'displayedDust', 'ranking', 'filters', 'selectedKeys', 'colorByMagnet']) {
+    assert.equal(after[field], before[field], field);
+  }
+  context.resetPositions();
+  context.resetFilters();
+  assert.deepEqual(context.setDirection(REVERSE).motion, custom);
+  const restored = createContext({ storage });
+  assert.equal(restored.restore(), true);
+  assert.deepEqual(restored.snapshot().motion, custom);
+  assert.equal(restored.setMotion(DEFAULT_MOTION).colorByMagnet, true);
+
+  const saved = JSON.parse(memory.get(STORAGE_KEY));
+  delete saved.motion;
+  memory.set(STORAGE_KEY, JSON.stringify(saved));
+  assert.equal(restored.restore(), true);
+  assert.deepEqual(restored.snapshot().motion, DEFAULT_MOTION);
+  saved.motion = { damping: 'invalid', strength: null, rankSpread: 55 };
+  memory.set(STORAGE_KEY, JSON.stringify(saved));
+  restored.restore();
+  assert.deepEqual(restored.snapshot().motion, { ...DEFAULT_MOTION, rankSpread: 55 });
 });
 test('selection retention follows displayed membership, count/movie changes resample once', () => {
   const {context,notices} = setup();
@@ -323,11 +380,13 @@ test('a 2 × 3 movie-major fixture reads the correct row and column, including s
   context.setSources(fixture, matrix);
   const forward = context.setMagnets(['tmdb:1']);
   assert.deepEqual(forward.ranking.map(row => [row.key, row.score]), [['anilist:2', .25], ['anilist:1', -.5], ['anilist:3', -.5]]);
+  assert.deepEqual(forward.ranking.map(row => row.winnerPercentile), [1, .25, .25]);
   context.toggleSelection('anilist:1');
   const reverse = context.setDirection(REVERSE);
   assert.deepEqual(reverse.magnetKeys, ['anilist:1']);
   assert.deepEqual(reverse.selectedKeys, []);
   assert.deepEqual(reverse.ranking.map(row => [row.key, row.score]), [['tmdb:1', -.5], ['tmdb:2', -.5]]);
+  assert.deepEqual(reverse.ranking.map(row => row.winnerPercentile), [.5, .5]);
   assert.equal(reverse.lookup.get('tmdb:1').record.title, 'Movie One');
   assert.equal(reverse.lookup.has('anilist:1'), false);
   assert.equal(reverse.candidateDust[0].scores, reverse.ranking[0].scores);
@@ -351,6 +410,22 @@ test('published Attack on Titan column and Inception row agree, and Pacific Rim 
   assert.equal(reverse.ranking.find(row => row.key === 'tmdb:27205').score, 0.36754152178764343);
   assert.equal(reverse.ranking[0].record.title, 'Pacific Rim');
   assert.equal(reverse.ranking[0].score, 0.549102246761322);
+});
+
+test('winner percentiles use the full sample and stay fixed across dot counts and filters', () => {
+  const { context } = setup();
+  const full = context.setMagnets(['tmdb:27205']);
+  const match = full.candidateDust[20];
+  const weakerTitles = full.ranking.filter(row => row.score < match.score).length;
+  const tiedTitles = full.ranking.filter(row => row.score === match.score).length;
+  assert.equal(match.winnerPercentile, (weakerTitles + (tiedTitles - 1) / 2) / (full.ranking.length - 1));
+
+  context.setDustLimit(30);
+  const filtered = context.setFilters({ search: match.record.title });
+  assert.ok(filtered.displayedDust.length < filtered.candidateDust.length);
+  const retained = filtered.displayedDust.find(row => row.key === match.key);
+  assert.equal(retained.winnerPercentile, match.winnerPercentile);
+  assert.equal(retained.scores, match.scores);
 });
 
 test('genre cohorts average signed movie rows and anime columns, preserving ties and one vote per magnet', () => {
@@ -379,6 +454,7 @@ test('genre cohorts average signed movie rows and anime columns, preserving ties
   assert.deepEqual(overlap.magnetKeys, [actionMovies, 'tmdb:1', 'tmdb:2']);
   const mixed = context.setMagnets([actionMovies, 'tmdb:1']);
   assert.deepEqual(values(mixed), [['anilist:3', .5], ['anilist:2', 0], ['anilist:4', -.3125], ['anilist:1', -.5]]);
+  assert.deepEqual(mixed.ranking.map(row => [row.closest, row.winnerPercentile]), [[0, 1], [1, 2 / 3], [1, 1 / 3], [0, .5]]);
   context.setMetadata([{ id: 3, genres: ['Action'] }]);
   context.setDirection(REVERSE);
   const reverse = context.setMagnets([actionAnime, actionMovies]);
@@ -548,6 +624,7 @@ test('popularity uses midranks on one shared sample and preserves raw sorts for 
   ]);
   assert.equal(mixed.ranking[0].score, 2 / 3);
   assert.equal(mixed.ranking[0].closest, 1);
+  assert.deepEqual(mixed.ranking.map(row => row.winnerPercentile), [1, 1, .25, null]);
   assert.equal(mixed.ranking[3].score, null);
   assert.equal(mixed.candidateDust.length, 3);
   context.setFilters({ search: '2' });
