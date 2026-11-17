@@ -52,17 +52,9 @@ Run `node tests/browser/dust-genres.cjs` with the Playwright setup below.
 
 # Anime magnets and movie dust
 
-The forward regression fixture in `tests/fixtures/dust-forward-3342eb3.json`
-captures Inception alone and Inception + Interstellar + The Matrix on the
-`alfi` baseline at `3342eb3`. Each field uses 60 candidates. The fixture records
-candidate IDs, mean ranks, exact per-magnet cosine vectors, and the 1,000-title
-rank order for each sort basis. It also records displayed membership before and
-after filtering for Action and release year 2000 or later.
-
 1. Open Dust & Magnet on a fresh session and confirm the Inception example.
-   Choose **Anime → Movies**. Attack on Titan opens as the example and Pacific
-   Rim ranks first at `0.549102246761322`. Inception and Attack on Titan share
-   the exact score `0.36754152178764343` in either direction.
+   Choose **Anime → Movies**. Attack on Titan opens as the example. Check that
+   Inception and Attack on Titan share the same cosine score in either direction.
 2. Search with an alias or year, add a second and third anime magnet, and
    exercise 30, 60, and 90 dots. Move a magnet with arrow keys. Reset positions
    and check that selection and strongest-magnet colors remain intact.

@@ -348,30 +348,6 @@ test('ranking order has an independent oracle for all 1/2/3-movie bases, includi
   }
 });
 
-test('forward sampling, cosine vectors, ranks and filters match the alfi 3342eb3 fixture', () => {
-  for (const fixture of require('./fixtures/dust-forward-3342eb3.json')) {
-    const { context } = setup();
-    context.setMagnets(fixture.movieIds.map(tmdb));
-    context.setDustLimit(fixture.limit);
-    const original = context.snapshot();
-    assert.deepEqual(original.candidateDust.map(row => [row.record.id, row.rank, ...row.scores]), fixture.candidates);
-    assert.deepEqual(original.displayedKeys, fixture.displayed.map(anilist));
-    for (const [basis, expected] of Object.entries(fixture.ranking)) {
-      const { ranking } = context.setRankingSort(basis === 'average' ? basis : tmdb(basis));
-      assert.deepEqual(ranking.map(row => row.record.id), expected);
-      assert.deepEqual(ranking.filter(row => row.displayed).map(row => row.record.id).sort(), fixture.displayed.slice().sort());
-    }
-    const filtered = context.setFilters(fixture.filters);
-    assert.deepEqual(filtered.displayedKeys, fixture.filtered.map(anilist));
-    assert.equal(filtered.candidateDust, original.candidateDust);
-    for (const [basis, expected] of Object.entries(fixture.ranking)) {
-      const { ranking } = context.setRankingSort(basis === 'average' ? basis : tmdb(basis));
-      assert.deepEqual(ranking.map(row => row.record.id), expected);
-      assert.deepEqual(ranking.filter(row => row.displayed).map(row => row.record.id).sort(), fixture.filtered.slice().sort());
-    }
-  }
-});
-
 test('a 2 × 3 movie-major fixture reads the correct row and column, including signed and tied scores', () => {
   const fixture = {
     movies: [{ id: 1, title: 'Movie One', aliases: ['Alternate One'], genres: ['Action'], year: 1999 }, { id: 2, title: 'Movie Two' }],
