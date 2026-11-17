@@ -330,8 +330,7 @@ function bindDustControls() {
     const button = event.target.closest("[data-remove-magnet]");
     if (!button) return;
     const hadFocus = document.activeElement === button;
-    AnivizMain.setMagnets(AnivizMain.snapshot().magnetKeys.filter(key => key !== button.dataset.removeMagnet));
-    document.querySelector("#recommendation-status").textContent = "";
+    removeMagnet(button.dataset.removeMagnet);
     if (hadFocus) {
       const next = magnetList.querySelector("[data-remove-magnet]") || document.querySelector('#magnet-type input:checked');
       next.focus({ preventScroll: true });

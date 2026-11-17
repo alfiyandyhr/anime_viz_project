@@ -150,7 +150,10 @@ function bindRecommendationControls() {
   bindMovieSearch();
   document.querySelector("#movie-suggestions").addEventListener("click", event => {
     const button = event.target.closest("[data-magnet-key]");
-    if (button) addMagnet(button.dataset.magnetKey, "title", { restoreFocus: false });
+    if (!button) return;
+    const key = button.dataset.magnetKey;
+    if (AnivizMain.snapshot().magnetKeys.includes(key)) removeMagnet(key);
+    else addMagnet(key, "title", { restoreFocus: false });
   });
   document.querySelector("#magnet-type").addEventListener("change", updateMagnetPickerMode);
   const genreChoice = document.querySelector("#genre-magnet-choice");
@@ -340,6 +343,11 @@ function addMagnet(key, type, { status = document.querySelector("#recommendation
   document.querySelector("#movie-search").value = "";
   if (restoreFocus) focusMagnetPicker();
   closeMovieSearch();
+  document.querySelector("#recommendation-status").textContent = "";
+}
+
+function removeMagnet(key) {
+  AnivizMain.setMagnets(AnivizMain.snapshot().magnetKeys.filter(magnetKey => magnetKey !== key));
   document.querySelector("#recommendation-status").textContent = "";
 }
 

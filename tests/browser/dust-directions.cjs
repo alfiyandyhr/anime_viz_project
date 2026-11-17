@@ -14,7 +14,9 @@ const forward = 'movie-to-anime', reverse = 'anime-to-movies';
 async function assertMagnetSearchFocus(page) {
   const search = page.locator('#movie-search');
   const popup = page.locator('#movie-search-popup');
-  const favorite = page.locator('#movie-suggestions button').nth(1);
+  const favorites = page.locator('#movie-suggestions button');
+  const example = favorites.first();
+  const favorite = favorites.nth(1);
   const removals = page.locator('#movie-magnets [data-remove-magnet]');
   const assertSearchInactive = async () => {
     assert.equal(await page.locator('#movie-search:focus').count(), 0);
@@ -23,6 +25,14 @@ async function assertMagnetSearchFocus(page) {
 
   for (const direction of [forward, reverse]) {
     await page.selectOption('#dust-direction', direction);
+    assert.equal(await example.getAttribute('aria-pressed'), 'true');
+    await example.click();
+    assert.equal(await example.getAttribute('aria-pressed'), 'false');
+    assert.equal(await removals.count(), 0);
+    await example.press('Space');
+    assert.equal(await example.getAttribute('aria-pressed'), 'true');
+    assert.equal(await removals.count(), 1);
+
     await search.click();
     assert.equal(await popup.isVisible(), true);
     await search.press('Escape');
@@ -30,6 +40,13 @@ async function assertMagnetSearchFocus(page) {
     assert.equal(await favorite.getAttribute('aria-pressed'), 'true');
     await assertSearchInactive();
 
+    await favorite.click();
+    assert.equal(await favorite.getAttribute('aria-pressed'), 'false');
+    assert.equal(await example.getAttribute('aria-pressed'), 'true');
+    assert.equal(await removals.count(), 1);
+    await assertSearchInactive();
+
+    await favorite.click();
     await removals.last().press('Enter');
     assert.equal(await favorite.getAttribute('aria-pressed'), 'false');
     await assertSearchInactive();
