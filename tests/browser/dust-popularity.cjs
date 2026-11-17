@@ -2,6 +2,10 @@
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const archive = require('../../data/movie_popularity.json');
+const dashboard = require('../../data.json');
+const catalogue = require('../../data/movie_recommendations.json');
+const popularityIds = new Set(dashboard.anime.filter(row => Number.isFinite(row.popularity)).map(row => String(row.id)));
+const animeEligible = catalogue.anime.filter(row => popularityIds.has(row.id)).length;
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 const forward = 'movie-to-anime', reverse = 'anime-to-movies';
 const anime = 'anilist:popularity', movies = 'tmdb:popularity';
@@ -57,7 +61,8 @@ const state = page => page.evaluate(() => {
     await choosePopularity(page);
     await add(page).press('Enter');
     await mixed(page);
-    assert.match(await page.locator('#movie-magnets').innerText(), /AniList list users · 2026-09-29 UTC · 997 of 1000 eligible/);
+    const animeCoverage = `AniList list users · ${dashboard.meta.generated_at.slice(0, 10)} UTC · ${animeEligible} of ${catalogue.anime.length} eligible`;
+    assert.ok((await page.locator('#movie-magnets').innerText()).includes(animeCoverage));
     const combined = await state(page);
     assert.equal(combined.magnetKeys.length, 3);
     await add(page).click();
@@ -76,11 +81,14 @@ const state = page => page.evaluate(() => {
     assert.match(await page.locator('[data-coverage="connections"]').innerText(), /Attraction percentile · AniList list users/);
     assert.match(await page.locator('.dust-connection-score').first().getAttribute('title'), /AniList list users/);
     assert.match(await page.locator('.dust-member-score').first().innerText(), /Raw/);
-    await page.locator('[data-dust-page="99"]').click();
-    const missing = rank(page).locator('tr').last();
-    assert.match(await missing.locator('td').first().innerText(), /Unavailable/);
-    assert.match(await missing.locator('td').nth(4).innerText(), /Unavailable/);
-    assert.match(await missing.locator('td').nth(2).innerText(), /-?0\.\d+\s+Percentile Unavailable/);
+    assert.equal(combined.ranking.filter(row => row[3] === null).length, catalogue.anime.length - animeEligible);
+    if (animeEligible < catalogue.anime.length) {
+      await page.locator('[data-dust-page="99"]').click();
+      const missing = rank(page).locator('tr').last();
+      assert.match(await missing.locator('td').first().innerText(), /Unavailable/);
+      assert.match(await missing.locator('td').nth(4).innerText(), /Unavailable/);
+      assert.match(await missing.locator('td').nth(2).innerText(), /-?0\.\d+\s+Percentile Unavailable/);
+    }
     await page.locator('[data-dust-ranking-sort]').selectOption('tmdb:27205');
     assert.equal((await state(page)).ranking.filter(row => row[3] === null).length, 0);
     await page.locator('[data-dust-ranking-sort]').selectOption('average');
@@ -125,7 +133,8 @@ const state = page => page.evaluate(() => {
     await page.locator('#retry-popularity').click();
     await add(page).click();
     await mixed(page);
-    assert.match(await page.locator('#movie-magnets').innerText(), /TMDB popularity · 2026-10-11 UTC · 1000 of 1000 eligible/);
+    const movieCoverage = `TMDB popularity · ${archive.snapshot_date} UTC · ${archive.eligible_count} of ${catalogue.movies.length} eligible`;
+    assert.ok((await page.locator('#movie-magnets').innerText()).includes(movieCoverage));
     await assertTooltip(page, 'Attack on Titan');
     await dot(page).first().press('Enter');
     const movieBlend = await state(page);

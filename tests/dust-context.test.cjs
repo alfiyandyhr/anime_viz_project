@@ -23,12 +23,18 @@ function setup() {
   context.setSources(data, scores); context.setMetadata(dashboard.anime); context.setMagnets(movieKeys);
   return { context, memory, storage, notices };
 }
-test('string ID joins preserve the real 997/1000 overlap and unknown metrics', () => {
+test('string ID joins preserve shared catalogue IDs and unknown metrics', () => {
   const lookup = joinRecords(data.anime, dashboard.anime);
   assert.equal(lookup.size, 1000);
-  assert.equal([...lookup.values()].filter(row => row.metadata).length, 997);
   const missing = [...lookup.values()].filter(row => !row.metadata);
-  assert.equal(missing.length, 3);
+  if (data.meta.catalogue_snapshot || dashboard.meta.catalogue_snapshot) {
+    assert.ok(data.meta.catalogue_snapshot);
+    assert.equal(data.meta.catalogue_snapshot, dashboard.meta.catalogue_snapshot);
+    assert.deepEqual(new Set(lookup.keys()), new Set(dashboard.anime.map(row => String(row.id))));
+    assert.equal(missing.length, 0);
+  } else {
+    assert.equal(missing.length, 3);
+  }
   for (const row of missing) {
     assert.equal(row.anime.average_score, null); assert.equal(row.anime.popularity, null);
     assert.ok(row.anime.title); assert.equal(typeof row.anime.id, 'string');
@@ -221,7 +227,8 @@ test('lazy composition discards stale marks, renders latest revision and dispose
 });
 test('resource caches share in-flight requests and isolate metadata failure from similarity/history', async () => {
   const counts=new Map();let metadataFails=true;
-  const sandbox=vm.createContext({URL,document:{currentScript:{src:'https://example.com/repo/frontend/common/data-loader.js'}},fetch:async url=>{
+  const sandbox=vm.createContext({URL,document:{currentScript:{src:'https://example.com/repo/frontend/common/data-loader.js'}},fetch:async (url, options)=>{
+    assert.equal(options.cache, 'no-cache');
     const name=new URL(url).pathname;counts.set(name,(counts.get(name)||0)+1);
     return {ok:!(name.endsWith('/data.json')&&metadataFails),status:503,json:async()=>name.endsWith('/data.json')?{anime:[],meta:{}}:{kind:name}};
   }});
@@ -400,16 +407,18 @@ test('a 2 × 3 movie-major fixture reads the correct row and column, including s
   assert.equal(context.snapshot().lookup.get('anilist:1').record.title, 'Attack on Titan');
 });
 
-test('published Attack on Titan column and Inception row agree, and Pacific Rim leads the reverse ranking', () => {
+test('published Attack on Titan column and Inception row agree in both directions', () => {
   const { context } = setup();
+  const column = data.anime.findIndex(record => record.id === '16498');
+  const inception = data.movies.findIndex(record => record.id === '27205');
+  const expected = scores[inception * data.anime.length + column];
   const forward = context.setMagnets(['tmdb:27205']);
-  assert.equal(forward.ranking.find(row => row.key === 'anilist:16498').score, 0.36754152178764343);
+  assert.equal(forward.ranking.find(row => row.key === 'anilist:16498').score, expected);
   const reverse = context.setDirection(REVERSE);
   assert.equal(reverse.example, true);
   assert.deepEqual(reverse.magnetKeys, ['anilist:16498']);
-  assert.equal(reverse.ranking.find(row => row.key === 'tmdb:27205').score, 0.36754152178764343);
-  assert.equal(reverse.ranking[0].record.title, 'Pacific Rim');
-  assert.equal(reverse.ranking[0].score, 0.549102246761322);
+  assert.equal(reverse.ranking.find(row => row.key === 'tmdb:27205').score, expected);
+  assert.equal(reverse.ranking[0].score, Math.max(...data.movies.map((_, row) => scores[row * data.anime.length + column])));
 });
 
 test('winner percentiles use the full sample and stay fixed across dot counts and filters', () => {
@@ -502,20 +511,18 @@ test('cohort vectors are reused within a bundle and saved choices are revalidate
   assert.equal(unavailable.rankingSortKey, 'average');
 });
 
-test('published genre affinities match the matrix in both directions and change six Inception top-30 entries', () => {
+test('published genre affinities match the matrix in both directions', () => {
   const { context } = setup();
   const inception = context.setMagnets(['tmdb:27205']).ranking;
   const scienceFiction = 'tmdb:genre:Science Fiction';
   const combined = context.setMagnets(['tmdb:27205', scienceFiction]);
-  assert.equal(combined.magnets[1].memberIds.length, 214);
   const movieRows = data.movies.flatMap((movie, i) => movie.genres.includes('Science Fiction') ? [i] : []);
+  assert.deepEqual(combined.magnets[1].memberIds, movieRows.map(i => data.movies[i].id));
   for (const row of combined.ranking) {
     const mean = movieRows.reduce((sum, i) => sum + scores[i * data.anime.length + row.index], 0) / movieRows.length;
     assert.equal(row.scores[1], mean);
     assert.equal(row.score, (row.scores[0] + mean) / 2);
   }
-  const originalTop = new Set(inception.slice(0, 30).map(row => row.key));
-  assert.equal(combined.ranking.slice(0, 30).filter(row => !originalTop.has(row.key)).length, 6);
   context.setRankingSort(scienceFiction);
   assert.equal(context.setMagnets(['tmdb:27205']).rankingSortKey, 'average');
   assert.deepEqual(context.snapshot().ranking, inception);
@@ -523,7 +530,7 @@ test('published genre affinities match the matrix in both directions and change 
   context.setDirection(REVERSE);
   const reverse = context.setMagnets(['anilist:genre:Sci-Fi']);
   const animeColumns = data.anime.flatMap((anime, i) => anime.genres.includes('Sci-Fi') ? [i] : []);
-  assert.equal(reverse.magnets[0].memberIds.length, 165);
+  assert.deepEqual(reverse.magnets[0].memberIds, animeColumns.map(i => data.anime[i].id));
   for (const row of reverse.ranking) {
     const mean = animeColumns.reduce((sum, i) => sum + scores[row.index * data.anime.length + i], 0) / animeColumns.length;
     assert.equal(row.score, mean);
@@ -649,15 +656,19 @@ test('popularity sources, saved choices, and missing values remain independent b
   const scienceFiction = 'tmdb:genre:Science Fiction';
   const forwardKeys = ['tmdb:27205', scienceFiction, 'anilist:popularity'];
   const forward = context.setMagnets(forwardKeys);
-  assert.equal(forward.popularity.eligible, 997);
-  assert.equal(forward.ranking.filter(row => row.rank === null).length, 3);
+  const popularityIds = new Set(dashboard.anime.filter(row => Number.isFinite(row.popularity)).map(row => String(row.id)));
+  const eligible = data.anime.filter(row => popularityIds.has(row.id)).length;
+  assert.equal(forward.popularity.eligible, eligible);
+  assert.equal(forward.ranking.filter(row => row.rank === null).length, data.anime.length - eligible);
   const inceptionRow = data.movies.findIndex(movie => movie.id === movies[0]) * data.anime.length;
   assert.ok(forward.candidateDust.every(row => row.rawScores[0] === scores[inceptionRow + row.index]));
   context.setDirection(REVERSE);
   const reverseKeys = ['anilist:1', 'tmdb:popularity'];
   context.setMagnets(reverseKeys);
   context.setRankingSort('tmdb:popularity');
-  assert.equal(context.snapshot().ranking[0].key, 'tmdb:9016');
+  const reverseColumn = data.anime.findIndex(row => row.id === '1');
+  assert.equal(context.snapshot().ranking[0].score,
+    Math.max(...data.movies.map((_, row) => scores[row * data.anime.length + reverseColumn])));
 
   const restored = createContext({ storage });
   assert.ok(restored.restore());

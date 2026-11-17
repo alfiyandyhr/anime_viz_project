@@ -78,6 +78,6 @@ class FrontendRoutesTests(unittest.TestCase):
 
     def test_asset_routes_do_not_expose_other_data_files(self):
         with app.test_client() as client:
-            for url in ["/data/anilist_dashboard_cache.json", "/data/semantic_similarity/.env.local"]:
+            for url in ["/data/anilist_dashboard_cache.json", "/data/.env.local", "/data/semantic_similarity/.env.local"]:
                 with client.get(url) as response:
                     self.assertEqual(response.status_code, 404)

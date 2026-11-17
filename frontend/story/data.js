@@ -144,14 +144,17 @@ const StoryData = (() => {
       if (!Array.isArray(movie.matches) || movie.matches.length < Math.min(5, catalogue.anime.length)) {
         throw new Error(`Incomplete anime matches for movie ${movie.id}`);
       }
-      const matches = movie.matches.slice(0, 5).map(([index, score], rank) => {
+      const matches = [];
+      for (const [rank, [index, score]] of movie.matches.entries()) {
         const anime = catalogue.anime[index];
-        if (!Number.isInteger(index) || !Number.isInteger(anime?.year) || !Number.isFinite(score)
+        if (!Number.isInteger(index) || !anime || !Number.isFinite(score)
           || Math.abs(score) > 1 || (rank && score > movie.matches[rank - 1][1])) {
           throw new Error(`Invalid anime match for movie ${movie.id}`);
         }
-        return { work: { ...anime, description: anime.synopsis, site_url: anime.url }, score };
-      });
+        if (!Number.isInteger(anime.year)) continue;
+        matches.push({ work: { ...anime, description: anime.synopsis, site_url: anime.url }, score });
+        if (matches.length === 5) break;
+      }
       return { year, anchor: movie, top, matches };
     });
   }

@@ -91,8 +91,9 @@ the ID join and dust context, reusable chart instances, lazy composition,
 inline details/comparison and the extracted collaboration graph.
 
 Recommendation IDs are strings and metadata IDs are normalized before joining.
-The published datasets each contain 1,000 records, with 997 IDs in common; all
-recommendation records remain available even when richer metadata is missing.
+The refresh workflow builds Full Catalogue and Dust & Magnet from the same
+1,000 AniList and 1,000 TMDB records. Recommendation records remain available
+when the browser cannot load richer metadata.
 Unknown values stay unknown, with metric-specific coverage. Metadata failure
 leaves dust and similarity evidence usable; matrix failure offers Retry without
 invented scores. Detailed methods, data freshness and credits sit in About / Data.
@@ -103,7 +104,8 @@ observed outcomes and limitations.
 
 ## Configuration
 
-Sampling and runtime behaviour is controlled by `.env` at the project root (already tracked in the repo — copy and edit as needed):
+The root `.env` configures the Flask API. The published catalogue refresh
+always collects 1,000 unique titles from each source.
 
 | Variable | Default | Description |
 |---|---|---|
@@ -127,22 +129,108 @@ pip install -r backend/requirements.txt
 python backend/app.py
 ```
 
-Open http://localhost:5000. The backend fetches live data from AniList on the first request and caches it for `CACHE_TTL_HOURS` hours.
+Open http://localhost:5000. The website uses the same published JSON and binary
+files as GitHub Pages. The Flask `/api/dashboard` and `/api/story` endpoints
+also support their own cached AniList requests.
 
 ---
 
-## Refresh data for GitHub Pages
+## Refresh Full Catalogue and Dust & Magnet
 
-The live site is static — it serves `data.json` from this repo. To update it with fresh data from AniList:
+Run from the repository root with Python 3.10+ on macOS or Linux.
 
 ```bash
-python data/refresh_data.py
-git add data.json
-git commit -m "Refresh anime data"
-git push
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r backend/requirements.txt -r data/semantic_similarity/requirements-embeddings.txt
 ```
 
-GitHub Pages picks up the new data automatically after the push.
+Set `TMDB_READ_ACCESS_TOKEN` or `TMDB_API_KEY` in the Git-ignored
+`data/.env.local`. For a new setup, copy `data/.env.example` to that path. If
+your credential is still in `data/semantic_similarity/.env.local`, move it
+to `data/.env.local`. Credentials supplied through environment variables
+also work. AniList uses its public GraphQL API.
+
+1. **Collect and stage the catalogue.**
+
+   ```bash
+   python data/refresh_data.py --update-dataset
+   ```
+
+   The command uses the current popularity rankings with all release years and
+   non-adult titles. It keeps the first 1,000 unique AniList IDs across formats
+   and scans TMDB's popular list until 1,000 unique movies remain after matching.
+   Each same-version film found in both sources keeps its AniList entry, and the
+   next eligible movie fills its TMDB slot. The CSV records both candidate and
+   final sample ranks.
+
+   The matcher uses reviewed ID pairs and compares normalized titles and
+   aliases, format, release dates, runtime, and synopsis evidence for new
+   matches. Alternate cuts and adaptations have their own entries. The command
+   prints the path to `duplicate_report.json`, which lists excluded pairs and
+   ambiguous candidates retained in the sample. Missing or conflicting source
+   metadata can hide duplicates. If you confirm a new pair, add it to
+   `SAME_VERSION` or `DISTINCT_VERSIONS` in `data/refresh_data.py` and
+   rerun collection. [AniList media fields](https://docs.anilist.co/reference/object/media) · [TMDB alternative titles](https://developer.themoviedb.org/reference/movie-alternative-titles)
+
+   If an API request interrupts collection, repeat the command with `--resume`
+   to continue from its saved page. The collected files and reports are stored
+   under `data/semantic_similarity/output/catalogue/`.
+
+2. **Score the staged catalogue and write the web files.**
+
+   ```bash
+   python data/refresh_data.py --recompute-scores
+   ```
+
+   The existing Qwen/Qwen3-Embedding-4B model downloads weights on first use
+   and runs locally. You can pass `--batch-size 2` if memory is tight, or
+   `--device cpu` to select the CPU. The command checks that the staged
+   rosters and the complete 1,000 × 1,000 matrix agree before updating the
+   website files. It also refreshes History's annual movie matches against
+   the new movie sample, reusing the movie embeddings and scoring any annual
+   anime winners outside the matrix. Rerunning this step after an export
+   failure reuses the completed matrix for the staged catalogue.
+
+   Genre cohorts rebuild their membership from the refreshed genres in each
+   direction and average the new cosine scores. High popularity uses the
+   refreshed AniList list-user counts or TMDB popularity and recalculates
+   midrank percentiles when selected.
+
+The frontend reads the displayed dates from the published files. The Anime tab
+and Network show the AniList collection time, the Movie tab and popularity
+magnet show their source snapshot dates, and Dust & Magnet's **About / Data**
+shows when the similarity scores finished. Reload after the updated files are
+available to see the new dates.
+
+After both steps finish, open the two Catalogue tabs and try both Dust & Magnet
+directions with a title, a Genre cohort, and High popularity. Commit the web
+files together and push or merge into the branch configured for GitHub Pages.
+
+```bash
+git add data.json data/movie_recommendations.json data/movie_anime_scores.bin \
+  data/movie_popularity.json data/movie_details.json data/history_movie_matches.json
+git commit -m "Refresh shared anime and movie catalogue"
+```
+
+### Local output files
+
+`data/refresh_data.py` is the entry point for both steps. It calls the scorer
+and exporters for you. The standalone commands in `data/semantic_similarity/`
+are available for separate research runs.
+
+`data/semantic_similarity/output/` is Git-ignored working storage. The old
+`collect_anime.py` and `collect_movies.py` commands produced the CSVs and
+metadata in its root, and `compute_similarity.py` produced the embeddings,
+scores, and run metadata in `similarity/`. The current refresh uses
+`catalogue/` for checkpoints, staged inputs, duplicate reports, and completed
+score runs. The History exporter caches supplemental scores under `story/`.
+
+You can delete `output/` before starting a fresh collection. The site reads
+the published files listed above. Deleting the working directory discards the
+local archives and any staged run, so keep it between the two commands and
+while either command is running. The next `--update-dataset` recreates it.
+The refresh stores model weights in the Hugging Face cache.
 
 ## History
 
@@ -164,8 +252,8 @@ The selector keeps the current release year when available and moves to the
 nearest represented year otherwise. The active timeline moves to the left
 when switching perspectives. Movie Timeline loads the existing movie
 recommendation and popularity snapshots on first use. Both perspectives use
-the same History movie sample, which excludes TMDB Animation titles, records
-tagged with cartoon characters, and titles without genre metadata.
+the same History movie sample, which requires a release year and genre metadata
+and excludes TMDB Animation titles and records tagged with cartoon characters.
 
 History reads the published `story.json` and `data/history_movie_matches.json` on
 Flask and GitHub Pages. Regenerate them together so the annual winners and their
@@ -196,15 +284,15 @@ research snapshot.
 
 Open the root URL, choose **Dust & Magnet** in the dropdown, or visit
 `frontend/dust-magnet/index.html`. Start with a title search or pick **Genre cohort**.
-Try **Inception** with **Science Fiction movies** (214 TMDB movies), or **Sci-Fi anime**
-(165 AniList anime) in the reverse direction. Each cohort score averages the signed
+Try **Inception** with **Science Fiction movies**, or **Sci-Fi anime**
+in the reverse direction. Each cohort score averages the signed
 cosines to its sampled titles. A cohort occupies one slot and contributes one score
 to the combined average. Its membership stays fixed when you filter the dust.
 
 Choose **High popularity** to add one popularity magnet within the same three
-slots. With anime dust it uses AniList list users (997 of 1,000 anime in the
-2026-09-29 snapshot). With movie dust it uses TMDB popularity (1,000 of 1,000
-movies in the 2026-10-11 snapshot). Try **Inception**, **Science Fiction movies**,
+slots. With anime dust it uses AniList list users. With movie dust it uses TMDB
+popularity. The picker displays the snapshot date and eligible title count.
+Try **Inception**, **Science Fiction movies**,
 and **High anime popularity** together. Each magnet's raw values become
 midrank percentiles from 0 to 1 over the same titles with known popularity.
 The field and combined ranking use those percentiles. Individual ranking
@@ -266,34 +354,13 @@ Neither ranking sorts nor magnet movement alter the displayed anime membership. 
 matrix, without an embedding model or API token. Similarity measures semantic
 proximity, not a percentage or a prediction of enjoyment.
 
-After computing a new completed similarity run, regenerate the web bundle:
-
-```bash
-python3 data/export_recommendations.py
-```
-
-The exporter checks source hashes, record IDs, score ranges, and ranked matches.
-It exports movie/anime context, 20 top plus 20 bottom matches per movie, and a
-4 MB `data/movie_anime_scores.bin` file containing every score, from the existing
-`data/semantic_similarity/output/` files; bottom scores are read from all one
-million pairs in `all_pairs.csv.gz`. The global ranking sorts scores descending,
-breaking ties by anime record order; bottom records are stored in reverse rank
-order for selecting either cutoff. No model inference is rerun. The binary is movie-major, little-endian float32;
-its dimensions and SHA-256 hash are stored in the JSON metadata. The browser
-lazily loads and validates it for the magnet view and the full ranking. Commit both
-`data/movie_recommendations.json` and `data/movie_anime_scores.bin` along with
-frontend changes to deploy. The analysis outputs and model weights are not
-needed by the site.
-
-To rebuild the movie ratings and popularity snapshot from the archived TMDB CSV, run
-`python3 data/export_movie_popularity.py`. The exporter checks the input
-SHA-256 against the completed similarity run and requires exact coverage of the
-published TMDB IDs. It records the collection date, source, input hash, and
-eligible count in `data/movie_popularity.json`. Flask and static hosting serve
-the same file. The Movie catalogue, reception chart, and popularity magnet share
-this snapshot. The chart and table compute sample ranks by descending archived
-popularity, breaking ties by the original CSV order. The CSV's original rank
-records the order in which TMDB returned the movies during collection.
+The web bundle contains 20 top and 20 bottom matches per movie and a 4 MB
+movie-major, little-endian float32 matrix with every score. The browser
+validates the matrix dimensions and hash before using it for magnets and
+rankings. The Movie catalogue, reception chart, and popularity magnet share
+the TMDB ratings and popularity snapshot. Popularity ranks break ties by the
+retained movie order. See [the refresh workflow](#refresh-full-catalogue-and-dust--magnet)
+to regenerate the bundle and its metadata together.
 
 Run recommendation, story, network, and collector checks:
 

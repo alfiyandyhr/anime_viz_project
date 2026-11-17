@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from common import (
-    HERE, OUTPUT, CollectionError, JsonClient, bounded_limit, checkpoint_path,
+    OUTPUT, TMDB_ENV_FILE, CollectionError, JsonClient, bounded_limit, checkpoint_path,
     clean_text, complete_csv, json_cell, load_checkpoint, load_tmdb_credentials,
     request_interval, semantic_text, utc_now, write_json,
 )
@@ -49,7 +49,7 @@ def normalise_movie(movie, selection, rank, language):
 
 
 def collect_movies(output, limit=1000, language="en-US", include_adult=False,
-                   resume=False, interval=0.3, env_file=HERE / ".env.local", client=None):
+                   resume=False, interval=0.3, env_file=TMDB_ENV_FILE, client=None):
     output = Path(output)
     config = {"source": "tmdb", "limit": limit, "language": language,
               "include_adult": include_adult, "sort": "popularity.desc", "include_video": False}
@@ -115,7 +115,7 @@ def main():
     parser.add_argument("--include-adult", action="store_true", help="Include adult entries via discover/movie.")
     parser.add_argument("--resume", action="store_true", help="Reuse an interrupted ranking/sample checkpoint.")
     parser.add_argument("--interval", type=request_interval, default=0.3, help="Seconds between requests.")
-    parser.add_argument("--env-file", type=Path, default=HERE / ".env.local")
+    parser.add_argument("--env-file", type=Path, default=TMDB_ENV_FILE)
     args = parser.parse_args()
     try:
         collect_movies(args.output, args.limit, args.language, args.include_adult,

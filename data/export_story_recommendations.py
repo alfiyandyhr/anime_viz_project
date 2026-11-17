@@ -74,9 +74,9 @@ def select_years(archive):
 
 
 def history_movie_indices(movies):
-    """Use TMDB genres and exclude cartoon hybrids and unclassified records."""
+    """Use dated movies with TMDB genres and exclude animation and cartoon hybrids."""
     return [i for i, movie in enumerate(movies)
-            if movie["genres"] and "Animation" not in movie["genres"]
+            if type(movie["year"]) is int and movie["genres"] and "Animation" not in movie["genres"]
             and "cartoon characters" not in movie["tags"]]
 
 
@@ -169,7 +169,6 @@ def compute_missing(works, movies, args, corpus_hash):
     """Reuse verified full rows and encode only when explicitly requested."""
     cache = args.cache_dir
     records = fetch_missing_records(works, cache, args.offline or not args.compute_missing)
-    movie_records = prepare_records(movie_rows(movies), cache / "movies.csv", "tmdb")
     spec = model_spec()
     row_cache = cache / "scores"
     row_cache.mkdir(parents=True, exist_ok=True)
@@ -193,6 +192,29 @@ def compute_missing(works, movies, args, corpus_hash):
     import torch
     from sentence_transformers import SentenceTransformer
 
+    original_vectors = None
+    if args.similarity_dir:
+        folder = args.similarity_dir
+        meta = read_json(folder / "run_metadata.json")
+        records_path = folder / "movie_records.jsonl"
+        original_vectors = folder / "movie_embeddings.npy"
+        movie_records = [json.loads(line) for line in records_path.read_text(encoding="utf-8").splitlines()]
+        fields = ("title", "genres", "tags", "synopsis")
+        published = [(movie["id"], *(movie[field] for field in fields)) for movie in movies]
+        scored = [(record["source_id"], *(record[field] for field in fields)) for record in movie_records]
+        model = meta["model"]
+        if (meta["status"] != "complete" or model["id"] != spec["id"]
+                or model["requested_revision"] != spec["revision"]
+                or model["resolved_revision"] not in (None, spec["revision"])
+                or model["dimension"] != spec["dimension"] or model["max_tokens"] != spec["max_tokens"]
+                or meta["quality"]["movies"]["truncated_records"]
+                or meta["output_sha256"][records_path.name] != digest(records_path)
+                or meta["output_sha256"][original_vectors.name] != digest(original_vectors)
+                or scored != published):
+            raise ValueError("Original movie embeddings do not match the published movie corpus/model")
+    else:
+        movie_records = prepare_records(movie_rows(movies), cache / "movies.csv", "tmdb")
+
     vector_path = cache / "movie_embeddings.npy"
     vector_meta_path = cache / "movie_embeddings.meta.json"
     vector_spec = {"model": spec, "movie_corpus_sha256": corpus_hash,
@@ -202,18 +224,8 @@ def compute_missing(works, movies, args, corpus_hash):
         meta = read_json(vector_meta_path)
         if meta.get("provenance") == vector_spec and meta.get("sha256") == digest(vector_path):
             movie_vectors = np.load(vector_path, allow_pickle=False)
-    if movie_vectors is None and args.similarity_dir:
-        folder = args.similarity_dir
-        meta = read_json(folder / "run_metadata.json")
-        original_records = [json.loads(line) for line in (folder / "movie_records.jsonl").read_text().splitlines()]
-        original = folder / "movie_embeddings.npy"
-        if (meta["status"] != "complete" or meta["model"]["id"] != spec["id"]
-                or meta["model"]["resolved_revision"] != spec["revision"]
-                or meta["output_sha256"][original.name] != digest(original)
-                or [(r["source_id"], r["embedding_text"]) for r in original_records]
-                != [(r["source_id"], r["embedding_text"]) for r in movie_records]):
-            raise ValueError("Original movie embeddings do not match the published movie corpus/model")
-        movie_vectors = np.load(original, allow_pickle=False)
+    if movie_vectors is None and original_vectors is not None:
+        movie_vectors = np.load(original_vectors, allow_pickle=False)
     device = args.device
     if device == "auto":
         device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"

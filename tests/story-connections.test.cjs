@@ -1,5 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const { readFileSync, existsSync } = require('node:fs');
 const path = require('node:path');
 const story = require('../frontend/story/data.js');
@@ -43,10 +44,14 @@ test('bad optional recommendation data is rejected without accepting missing or 
 
 const snapshotPath = path.resolve(__dirname, '../data/story_movie_recommendations.json');
 test('published period recommendations preserve all reused scores and rank the complete movie corpus',
-  { skip: !existsSync(snapshotPath) }, () => {
+  { skip: !existsSync(snapshotPath) }, t => {
     const snapshot = movies.validate(JSON.parse(readFileSync(snapshotPath, 'utf8')));
     const archive = JSON.parse(readFileSync(path.resolve(__dirname, '../story.json'), 'utf8'));
-    const base = JSON.parse(readFileSync(path.resolve(__dirname, '../data/movie_recommendations.json'), 'utf8'));
+    const baseBytes = readFileSync(path.resolve(__dirname, '../data/movie_recommendations.json'));
+    if (snapshot.meta.sources.base_sha256 !== createHash('sha256').update(baseBytes).digest('hex')) {
+      return t.skip('The optional six-period research snapshot uses an earlier catalogue.');
+    }
+    const base = JSON.parse(baseBytes);
     const matrix = readFileSync(path.resolve(__dirname, '../data/movie_anime_scores.bin'));
     const indices = new Map(base.anime.map((anime, i) => [Number(anime.id), i]));
     let reused = 0, supplemental = 0;

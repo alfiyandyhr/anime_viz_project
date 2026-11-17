@@ -1,14 +1,8 @@
 # Anime–movie semantic analysis: local data collection
 
-This is an independent Python 3.10+ workflow. It adds files without changing the
-existing Flask/D3 dashboard, its refresh script, or `data.json`. No packages need
-to be installed: the collectors use the Python standard library.
-
-The current project uses `backend/anilist_service.py` to fetch popular anime,
-build dashboard statistics, and cache them. `data/refresh_data.py` writes the
-static site's `data.json`. That workflow includes descriptions and genres but
-does not request AniList tags. These collectors fetch directly from the live
-APIs instead of reusing the dashboard cache.
+For website updates, use the [shared catalogue refresh](../../README.md#refresh-full-catalogue-and-dust--magnet).
+The commands below collect standalone research samples using the Python 3.10+
+standard library. Each collector selects its own sample from its source.
 
 ## Scope and freshness
 
@@ -66,7 +60,7 @@ changed by this collection workflow.
 Run these commands from the repository root:
 
 ```bash
-cp data/semantic_similarity/.env.example data/semantic_similarity/.env.local
+cp data/.env.example data/.env.local
 ```
 
 Open the new `.env.local` file in your editor and fill **one** variable:
@@ -77,10 +71,9 @@ TMDB_READ_ACCESS_TOKEN=your_api_read_access_token
 TMDB_API_KEY=your_v3_api_key
 ```
 
-Do not put the credential in the root `.env`: that existing file is tracked by
-this repository. The new directory's `.gitignore` excludes `.env.local` and
-`output/`. Environment variables also work and take precedence over matching
-values in `.env.local`. An optional `--env-file /absolute/path/to/file` can select
+The repository tracks the root `.env` and ignores `data/.env.local` and
+`output/`. Environment variables take precedence over matching values in
+`data/.env.local`. An optional `--env-file /absolute/path/to/file` can select
 another file; parsing supports simple `KEY=value` lines, not shell expressions
 or interpolation. No credentials are stored in CSVs or checkpoints.
 

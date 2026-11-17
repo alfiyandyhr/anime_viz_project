@@ -10,8 +10,9 @@
     }));
     return requests.get(key);
   }
-  async function json(path, cache = "default") {
-    const response = await fetch(new URL(path, base), { headers: { Accept: "application/json" }, cache });
+  async function json(path) {
+    // The published paths stay the same across refreshes. Revalidate on each page load.
+    const response = await fetch(new URL(path, base), { headers: { Accept: "application/json" }, cache: "no-cache" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   }
@@ -32,7 +33,7 @@
           || movieIds.some(id => !Object.hasOwn(movies, id) || !movies[id] || typeof movies[id] !== "object")) {
           throw new Error("Invalid TMDB details for this movie sample");
         }
-        // Reception always comes from the archived popularity and ratings, collected separately.
+        // Reception uses the popularity and ratings sidecar.
         return Object.fromEntries(movieIds.map(id => {
           const { poster_path, backdrop_path, runtime } = movies[id];
           return [id, { poster_path, backdrop_path, runtime: Number.isInteger(runtime) && runtime > 0 ? runtime : null }];
@@ -43,7 +44,7 @@
       const movieIds = data.movies.map(movie => String(movie.id));
       return once(`movie-popularity:${movieIds.join(",")}`, async () => {
         const ids = new Set(movieIds);
-        const payload = await json("data/movie_popularity.json", "no-cache");
+        const payload = await json("data/movie_popularity.json");
         const { popularity, vote_average: ratings, snapshot_date: date } = payload || {};
         const entries = Object.entries(popularity || {});
         const validValues = (values, valid) => values && typeof values === "object" && !Array.isArray(values)
@@ -75,7 +76,9 @@
       const meta = data.meta.score_matrix;
       if (!meta || meta.dtype !== "float32-le" || meta.layout !== "movie-major"
         || meta.rows !== data.movies.length || meta.columns !== data.anime.length) throw new Error("Invalid similarity matrix metadata");
-      const response = await fetch(new URL(meta.file, new URL("data/movie_recommendations.json", base)));
+      const response = await fetch(new URL(meta.file, new URL("data/movie_recommendations.json", base)), {
+        cache: "no-cache"
+      });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const buffer = await response.arrayBuffer();
       if (buffer.byteLength !== meta.rows * meta.columns * 4) throw new Error("Incomplete similarity matrix");

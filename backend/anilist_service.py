@@ -26,19 +26,7 @@ CACHE_FILE = DATA_DIR / "anilist_dashboard_cache.json"
 
 ANILIST_URL = "https://graphql.anilist.co"
 
-ANILIST_QUERY = """
-query AnimeDashboardPage($page: Int!, $perPage: Int!) {
-  Page(page: $page, perPage: $perPage) {
-    pageInfo {
-      currentPage
-      hasNextPage
-      total
-    }
-    media(
-      type: ANIME
-      sort: [POPULARITY_DESC]
-      isAdult: false
-    ) {
+DASHBOARD_MEDIA_FIELDS = """
       id
       idMal
       title {
@@ -106,6 +94,22 @@ query AnimeDashboardPage($page: Int!, $perPage: Int!) {
           }
         }
       }
+"""
+
+ANILIST_QUERY = """
+query AnimeDashboardPage($page: Int!, $perPage: Int!) {
+  Page(page: $page, perPage: $perPage) {
+    pageInfo {
+      currentPage
+      hasNextPage
+      total
+    }
+    media(
+      type: ANIME
+      sort: [POPULARITY_DESC]
+      isAdult: false
+    ) {
+""" + DASHBOARD_MEDIA_FIELDS + """
     }
   }
 }
@@ -308,7 +312,7 @@ class AniListService:
 
             try:
                 raw_media = self._fetch_live_media()
-                dashboard = self._build_dashboard(raw_media)
+                dashboard = self.build_dashboard(raw_media)
                 self._write_cache(dashboard)
                 self._memory_cache = dashboard
 
@@ -573,7 +577,7 @@ class AniListService:
             "banner_image": media.get("bannerImage")
         }
 
-    def _build_dashboard(
+    def build_dashboard(
         self,
         raw_media: list[dict[str, Any]]
     ) -> dict[str, Any]:

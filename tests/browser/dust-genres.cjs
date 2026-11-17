@@ -1,6 +1,7 @@
 // Optional real-browser verification. See tests/journey-verification.md for setup.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
+const catalogue = require('../../data/movie_recommendations.json');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 const movies = 'tmdb:genre:Science Fiction', anime = 'anilist:genre:Sci-Fi';
 const forward = 'movie-to-anime', reverse = 'anime-to-movies';
@@ -35,13 +36,11 @@ const snapshot = page => page.evaluate(() => {
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(base);
     await dots(page).first().waitFor();
-    const inception = await snapshot(page);
     await selectGenre(page, movies);
-    assert.match(await choice(page).locator('option:checked').innerText(), /Science Fiction movies \(214\)/);
-    assert.match(await page.locator('#movie-magnets').innerText(), /Science Fiction movies\s+TMDB · 214 movies/);
+    const scienceFictionCount = catalogue.movies.filter(movie => movie.genres.includes('Science Fiction')).length;
+    assert.equal(await choice(page).locator('option:checked').innerText(), `Science Fiction movies (${scienceFictionCount})`);
+    assert.match(await page.locator('#movie-magnets').innerText(), new RegExp(`Science Fiction movies\\s+TMDB · ${scienceFictionCount} movies`));
     const combined = await snapshot(page);
-    const inceptionTop = new Set(inception.ranking.slice(0, 30).map(([key]) => key));
-    assert.equal(combined.ranking.slice(0, 30).filter(([key]) => !inceptionTop.has(key)).length, 6);
     await add(page).click();
     assert.match(await page.locator('#recommendation-status').innerText(), /already a magnet/);
     const actionMovies = 'tmdb:genre:Action';
@@ -103,7 +102,8 @@ const snapshot = page => page.evaluate(() => {
     await page.selectOption('#dust-direction', reverse);
     await remove(page, 'anilist:16498');
     await selectGenre(page, anime);
-    assert.match(await page.locator('#movie-magnets').innerText(), /Sci-Fi anime\s+AniList · 165 anime/);
+    const sciFiCount = catalogue.anime.filter(anime => anime.genres.includes('Sci-Fi')).length;
+    assert.match(await page.locator('#movie-magnets').innerText(), new RegExp(`Sci-Fi anime\\s+AniList · ${sciFiCount} anime`));
     assert.equal(await page.getByRole('columnheader', { name: 'M1 · Sci-Fi anime', exact: true }).count(), 1);
     const reverseCohort = await snapshot(page);
     assert.deepEqual(reverseCohort.magnetKeys, [anime]);

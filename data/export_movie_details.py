@@ -9,7 +9,7 @@ import sys
 from threading import local
 
 from semantic_similarity.common import (
-    HERE, CollectionError, JsonClient, atomic_write, load_tmdb_credentials, utc_now,
+    TMDB_ENV_FILE, CollectionError, JsonClient, atomic_write, load_tmdb_credentials, utc_now,
 )
 
 
@@ -46,7 +46,7 @@ def export_details():
     ids = [int(movie["id"]) for movie in recommendations["movies"]]
     if not ids or len(set(ids)) != len(ids) or min(ids) < 1:
         raise CollectionError("Published movie IDs must be positive, unique, and nonempty.")
-    token, key = load_tmdb_credentials(HERE / ".env.local")
+    token, key = load_tmdb_credentials(TMDB_ENV_FILE)
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     worker = local()
 

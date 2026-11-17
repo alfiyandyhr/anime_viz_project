@@ -342,7 +342,7 @@ def main() -> None:
                     "packages": {name: importlib.metadata.version(name) for name in
                                  ("numpy", "torch", "sentence-transformers", "transformers", "huggingface-hub")}},
         "output_sha256": {p.name: sha256(p) for p in sorted(output.iterdir()) if p.is_file()},
-        "notes": ["Same-work overlaps and franchise sequels are retained; IDs belong to different sources.",
+        "notes": ["Catalogue selection and cross-source matching are determined by the input CSVs.",
                   "Hardware/library changes can cause small floating-point differences."],
     }
     # Written LAST: its presence with status=complete marks a successful bundle.

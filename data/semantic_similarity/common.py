@@ -18,6 +18,7 @@ from urllib.request import Request, urlopen
 
 HERE = Path(__file__).resolve().parent
 OUTPUT = HERE / "output"
+TMDB_ENV_FILE = HERE.parent / ".env.local"
 FIELDS = [
     "source", "source_id", "popularity_rank", "title", "title_original",
     "title_english", "title_romaji", "title_native", "genres", "tags",
@@ -68,9 +69,14 @@ def atomic_write(path, writer):
             temporary.unlink()
 
 
-def write_json(path, value):
-    atomic_write(path, lambda handle: json.dump(value, handle, ensure_ascii=False,
-                                               indent=2, allow_nan=False))
+def write_json(path, value, *, compact=False):
+    def write(handle):
+        if compact:
+            json.dump(value, handle, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+            handle.write("\n")
+        else:
+            json.dump(value, handle, ensure_ascii=False, indent=2, allow_nan=False)
+    atomic_write(path, write)
 
 
 def checkpoint_path(output):
@@ -91,27 +97,29 @@ def load_checkpoint(output, config):
     return state
 
 
-def complete_csv(output, rows, state):
+def complete_csv(output, rows, state, *, extra_fields=(), ranking_note=None):
     expected = state["config"]["limit"]
     ids = [row["source_id"] for row in rows]
     if len(rows) != expected or len(set(ids)) != expected:
         raise CollectionError(f"Expected {expected} unique records; got {len(set(ids))}.")
     def write(handle):
-        writer = csv.DictWriter(handle, fieldnames=FIELDS)
+        writer = csv.DictWriter(handle, fieldnames=[*FIELDS, *extra_fields])
         writer.writeheader()
         writer.writerows(rows)
     # A failed collection never replaces an existing complete CSV.
     atomic_write(output, write)
     metadata = {
         "source": state["config"]["source"], "record_count": len(rows),
-        "started_at_utc": state["started_at_utc"], "completed_at_utc": utc_now(),
+        "started_at_utc": state["started_at_utc"], "completed_at_utc": state.get("completed_at_utc") or utc_now(),
         "settings": state["config"],
         "missing_fields": {
             field: sum(row[field] in ("", "[]") for row in rows)
             for field in ("title", "genres", "tags", "synopsis")
         },
-        "ranking_note": "First unique records in live popularity order. Paginated "
-                        "APIs are not transactional snapshots; rankings may move during collection.",
+        "ranking_note": ranking_note or (
+            "First unique records in live popularity order. Paginated "
+            "APIs are not transactional snapshots; rankings may move during collection."
+        ),
         "attribution": state["attribution"],
     }
     write_json(Path(output).with_suffix(".metadata.json"), metadata)
@@ -157,7 +165,7 @@ def load_tmdb_credentials(path):
     token = os.environ.get("TMDB_READ_ACCESS_TOKEN") or values.get("TMDB_READ_ACCESS_TOKEN")
     key = os.environ.get("TMDB_API_KEY") or values.get("TMDB_API_KEY")
     if not token and not key:
-        raise CollectionError("TMDB credential missing. Copy .env.example to .env.local "
+        raise CollectionError(f"TMDB credential missing. Copy .env.example to {path} "
                               "and set TMDB_READ_ACCESS_TOKEN or TMDB_API_KEY, "
                               "or set either environment variable.")
     return token, key

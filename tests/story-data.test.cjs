@@ -94,7 +94,7 @@ test('the anime timeline ranks the five highest-scoring live-action movies for e
   const catalogue = require('../data/movie_recommendations.json');
   const matrix = readFileSync(require.resolve('../data/movie_anime_scores.bin'));
   const animeIndices = new Map(catalogue.anime.map((anime, index) => [Number(anime.id), index]));
-  const excluded = movie => !movie.genres.length || movie.genres.includes('Animation')
+  const excluded = movie => !Number.isInteger(movie.year) || !movie.genres.length || movie.genres.includes('Animation')
     || movie.tags.includes('cartoon characters');
   const eligible = new Set(bundle.live_action_movie_ids);
   assert.deepEqual([...eligible], catalogue.movies.filter(movie => !excluded(movie)).map(movie => movie.id));
@@ -105,7 +105,7 @@ test('the anime timeline ranks the five highest-scoring live-action movies for e
     assert.deepEqual(top, model.topAnime(archive, { start: year, end: year }, 5));
     assert.equal(anime, top[0]);
     assert.equal(matches.length, 5);
-    assert.ok(matches.every(({ work, score }, rank) => work.synopsis && !excluded(work)
+    assert.ok(matches.every(({ work, score }, rank) => typeof work.synopsis === 'string' && !excluded(work)
       && (rank === 0 || score <= matches[rank - 1].score)));
     const index = animeIndices.get(anime.id);
     if (index === undefined) continue;
@@ -123,6 +123,7 @@ test('the movie timeline chooses live-action winners and links to the five highe
   const { live_action_movie_ids: ids } = require('../data/history_movie_matches.json');
   const eligible = new Set(ids);
   const movies = catalogue.movies.filter(movie => eligible.has(movie.id));
+  const dated = new Set(catalogue.anime.filter(anime => Number.isInteger(anime.year)).map(anime => anime.id));
   const pairs = model.movieYearPairs(catalogue, popularity, ids);
   const years = [...new Set(movies.map(movie => movie.year))].sort((a, b) => a - b);
   assert.deepEqual(pairs.map(pair => pair.year), years);
@@ -138,6 +139,7 @@ test('the movie timeline chooses live-action winners and links to the five highe
       [anime.id, matrix.readFloatLE((row * catalogue.anime.length + index) * 4)]);
     scores.sort((a, b) => b[1] - a[1]);
     assert.ok(matches.every(({ work }) => work.description === work.synopsis));
-    assert.deepEqual(matches.map(({ work, score }) => [work.id, Math.fround(score)]), scores.slice(0, 5));
+    assert.deepEqual(matches.map(({ work, score }) => [work.id, Math.fround(score)]),
+      scores.slice(0, 20).filter(([id]) => dated.has(id)).slice(0, 5));
   }
 });

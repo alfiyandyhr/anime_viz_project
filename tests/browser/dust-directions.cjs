@@ -1,12 +1,21 @@
 // Optional real-browser verification. See tests/journey-verification.md for setup.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
+const { readFileSync } = require('node:fs');
 const { movies, anime } = require('../../data/movie_recommendations.json');
 const { popularity, vote_average: ratings } = require('../../data/movie_popularity.json');
 const { movies: details } = require('../../data/movie_details.json');
 const popularityOrder = movies.map(movie => movie.id)
   .filter(id => Number.isFinite(popularity[id]))
   .sort((a, b) => popularity[b] - popularity[a]);
+const matrix = readFileSync(require.resolve('../../data/movie_anime_scores.bin'));
+const attackOnTitanColumn = anime.findIndex(record => record.id === '16498');
+const reverseRanks = movies.map((movie, row) => ({
+  movie, score: matrix.readFloatLE((row * anime.length + attackOnTitanColumn) * 4)
+})).sort((a, b) => b.score - a.score);
+const { movie: reverseLeader, score: reverseScore } = reverseRanks[0];
+const reverseKey = `tmdb:${reverseLeader.id}`;
+const leaderScore = reverseScore.toFixed(3);
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 const url = path => new URL(path, base).href;
 const forward = 'movie-to-anime', reverse = 'anime-to-movies';
@@ -197,15 +206,15 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     const firstFavorite = page.locator('#movie-suggestions button').first();
     assert.equal(await firstFavorite.innerText(), 'Attack on Titan');
     assert.equal(await firstFavorite.getAttribute('aria-pressed'), 'true');
-    assert.equal(await ranking.first().innerText(), 'Pacific Rim');
+    assert.equal(await ranking.first().innerText(), reverseLeader.title);
     await dot(0).focus();
-    assert.equal(await page.locator('#tooltip .dust-tooltip-score b').textContent(), '0.549');
+    assert.equal(await page.locator('#tooltip .dust-tooltip-score b').textContent(), leaderScore);
     await page.keyboard.press('Enter');
-    assert.equal(await page.locator('#dust-focus h3').innerText(), 'Pacific Rim');
-    const focusPoster = page.getByRole('img', { name: 'Poster for Pacific Rim' });
+    assert.equal(await page.locator('#dust-focus h3').innerText(), reverseLeader.title);
+    const focusPoster = page.getByRole('img', { name: `Poster for ${reverseLeader.title}` });
     await focusPoster.waitFor();
-    assert.equal(await focusPoster.getAttribute('src'), `https://image.tmdb.org/t/p/w185${details['68726'].poster_path}`);
-    assert.equal(await ranking.first().locator('img').getAttribute('src'), `https://image.tmdb.org/t/p/w92${details['68726'].poster_path}`);
+    assert.equal(await focusPoster.getAttribute('src'), `https://image.tmdb.org/t/p/w185${details[reverseLeader.id].poster_path}`);
+    assert.equal(await ranking.first().locator('img').getAttribute('src'), `https://image.tmdb.org/t/p/w92${details[reverseLeader.id].poster_path}`);
     const drawer = page.getByRole('dialog', { name: 'Movie details' });
     const posterSrc = (id, size) => `https://image.tmdb.org/t/p/${size}${details[id].poster_path}`;
     const assertDrawerPoster = async key => {
@@ -213,10 +222,10 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     };
     assert.match(await page.locator('#dust-focus').innerText(), /Keywords/);
     const focusScore = page.locator('#dust-focus .dust-detail-scores strong');
-    assert.equal(await focusScore.textContent(), '0.549');
-    assert.equal(await focusScore.getAttribute('title'), 'Cosine 0.549');
-    assert.equal(await focusScore.getAttribute('aria-label'), 'Cosine 0.549');
-    assert.equal(await page.locator('#dust-focus a').getAttribute('href'), 'https://www.themoviedb.org/movie/68726');
+    assert.equal(await focusScore.textContent(), leaderScore);
+    assert.equal(await focusScore.getAttribute('title'), `Cosine ${leaderScore}`);
+    assert.equal(await focusScore.getAttribute('aria-label'), `Cosine ${leaderScore}`);
+    assert.equal(await page.locator('#dust-focus a').getAttribute('href'), reverseLeader.url);
     const magnet = field.getByRole('button', { name: /^Attack on Titan magnet/ });
     const core = await magnet.locator('.magnet-core').boundingBox();
     const x = core.x + core.width / 2, y = core.y + core.height / 2;
@@ -226,30 +235,30 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     await page.mouse.move(x + 35, y, { steps: 5 });
     await page.mouse.up();
     assert.notDeepEqual(await positions(), beforeDrag);
-    assert.equal(await page.locator('#dust-focus h3').innerText(), 'Pacific Rim');
+    assert.equal(await page.locator('#dust-focus h3').innerText(), reverseLeader.title);
     await magnet.press('Space');
     assert.equal(await page.locator('#dust-focus h3').innerText(), 'Attack on Titan');
     assert.equal(await page.locator('#dust-focus').getAttribute('aria-label'), 'Anime in focus');
-    assert.deepEqual((await evidence()).selectedKeys, ['tmdb:68726']);
+    assert.deepEqual((await evidence()).selectedKeys, [reverseKey]);
     await receptionChart.scrollIntoViewIfNeeded();
-    const moviePoint = receptionChart.getByRole('button', { name: /^Pacific Rim: TMDB score/ });
+    const leaderRank = popularityOrder.indexOf(reverseLeader.id) + 1;
+    const receptionLabel = `${reverseLeader.title}: TMDB score ${ratings[reverseLeader.id]} / 10; TMDB popularity rank #${leaderRank}; genres ${reverseLeader.genres.join(', ')}`;
+    const moviePoint = receptionChart.getByRole('button', { name: receptionLabel, exact: true });
     await moviePoint.waitFor();
-    const pacificRimRank = popularityOrder.indexOf('68726') + 1;
-    assert.equal(await moviePoint.getAttribute('aria-label'), `Pacific Rim: TMDB score ${ratings['68726']} / 10; TMDB popularity rank #${pacificRimRank}; genres Action, Science Fiction, Adventure`);
     assert.ok(await receptionChart.getByText('TMDB popularity rank', { exact: true }).isVisible());
     await moviePoint.focus();
-    assert.ok((await page.locator('#tooltip').innerText()).includes(`TMDB popularity rank: #${pacificRimRank}`));
+    assert.ok((await page.locator('#tooltip').innerText()).includes(`TMDB popularity rank: #${leaderRank}`));
     assert.equal(await moviePoint.getAttribute('aria-pressed'), 'true');
     await moviePoint.press('Enter');
     assert.deepEqual((await evidence()).selectedKeys, []);
-    await assertDrawerPoster('tmdb:68726');
+    await assertDrawerPoster(reverseKey);
     await page.keyboard.press('Escape');
     assert.equal(await moviePoint.evaluate(node => node === document.activeElement), true);
     assert.equal(await page.locator('#tooltip.visible').count(), 0, 'restoring movie point focus leaves its tooltip hidden');
     await moviePoint.press('Space');
-    await assertDrawerPoster('tmdb:68726');
+    await assertDrawerPoster(reverseKey);
     await page.keyboard.press('Escape');
-    assert.equal(await page.locator('#dust-focus h3').innerText(), 'Pacific Rim');
+    assert.equal(await page.locator('#dust-focus h3').innerText(), reverseLeader.title);
     assert.equal(await receptionChart.locator('.reception-selection-ring').count(), 1);
 
     await assertTitleBrowse(page, 'anime', anime, 'anilist');
@@ -459,7 +468,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     await fallback.unroute('**/movie_anime_scores.bin');
     await retry.locator('#dust-retry').click();
     await retry.locator('.dust-node').first().waitFor();
-    assert.equal(await retry.locator('[data-dust-rank-id]').first().innerText(), 'Pacific Rim');
+    assert.equal(await retry.locator('[data-dust-rank-id]').first().innerText(), reverseLeader.title);
     assert.deepEqual(errors, []);
     console.log('Verified Attack on Titan in both layouts, three-decimal scores, movie charts, ranking drawer, direction sessions and Network fallback.');
   } finally { await browser.close(); }

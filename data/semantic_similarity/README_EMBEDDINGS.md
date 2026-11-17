@@ -1,15 +1,13 @@
 # Local anime-movie semantic similarity
 
-This adds an independent analysis step to the existing AniList/TMDB collectors.
-It reads the two CSVs in `output/` and does not modify them, the collectors,
-the dashboard, or `data.json`. The script has not been executed during authoring.
+For website updates, use the [shared catalogue refresh](../../README.md#refresh-full-catalogue-and-dust--magnet).
+The scorer can also be run directly to analyze standalone CSVs in `output/`.
 
 ## Model and method
 
-The default is **Qwen/Qwen3-Embedding-0.6B**: a free, Apache-2.0, multilingual
-text embedding model with 1,024 output dimensions. A specific Hugging Face
-commit is pinned in the script. It is a strong practical local choice, not a
-claim of being the universal best model for anime/movie similarity.
+The scorer uses **Qwen/Qwen3-Embedding-4B**, a multilingual text embedding
+model with 2,560 output dimensions. A specific Hugging Face commit is pinned
+in the script.
 
 Each record becomes one labeled text containing **title, genres, tags, and
 synopsis**, then one L2-normalized dense vector. Qwen's trained pipeline pools
@@ -46,12 +44,9 @@ python -m pip install -r data/semantic_similarity/requirements-embeddings.txt
 python data/semantic_similarity/compute_similarity.py
 ```
 
-No OpenAI package, paid API, or API key is required. The first run downloads
-model weights from Hugging Face (roughly 1.2 GB of BF16 weights; other files
-and cache need additional disk space). All inference happens locally. The
-script loads float32 weights, roughly 2.4 GB for weights alone; activations
-and Python require additional memory. Actual runtime and memory depend on
-your hardware, token lengths, and batch size; no timing is promised.
+The first run downloads model weights from Hugging Face. Inference runs
+locally in float16 and saves float32 vectors and scores. Runtime and memory
+depend on your hardware, token lengths, and batch size.
 
 `--device auto` selects CUDA, then Apple MPS, then CPU. If GPU memory is tight,
 lower `--batch-size` to 1 or 2; if your MPS runtime lacks an operation, use
@@ -85,8 +80,8 @@ The default destination is `data/semantic_similarity/output/similarity/`:
 
 | File | Meaning |
 | --- | --- |
-| `anime_embeddings.npy` | Float32 unit vectors, shape `(1000, 1024)` |
-| `movie_embeddings.npy` | Float32 unit vectors, shape `(1000, 1024)` |
+| `anime_embeddings.npy` | Float32 unit vectors, shape `(1000, 2560)` |
+| `movie_embeddings.npy` | Float32 unit vectors, shape `(1000, 2560)` |
 | `cosine_similarity.npy` | Float32 matrix, shape `(1000, 1000)`; anime rows, movie columns |
 | `anime_records.jsonl`, `movie_records.jsonl` | Zero-based row maps, source IDs, titles, cleaned fields, exact input text, token counts and missing/truncated-field flags |
 | `all_pairs.csv.gz` | All 1,000,000 pairs with indices, source IDs, and raw cosine score; gzip-compressed CSV |
@@ -94,7 +89,7 @@ The default destination is `data/semantic_similarity/output/similarity/`:
 | `top_anime_per_movie.csv` | Best 20 anime per movie by default, with titles and scores |
 | `run_metadata.json` | Model revision, hashes, parameters, actual package versions, quality counts, score statistics, completion marker |
 
-The binary arrays occupy approximately 12.2 MB total before file headers.
+The binary arrays occupy approximately 24.5 MB total before file headers.
 CSV/JSONL outputs add more space. The all-pairs CSV uses source IDs and index
 maps to avoid repeating long titles one million times. Ranks start at 1;
 array/record indices start at 0. `--top-k` changes the ranked-output size only,
@@ -125,16 +120,14 @@ different hardware or library versions.
 
 Check best matches, random pairs, and low-score pairs manually. Shared genres
 can inflate apparent similarity; different tag vocabularies and missing
-synopses can weaken it. Movie records can include the same animated work as
-the anime corpus, and franchises/seasons can dominate top results. These
-overlaps are retained, not inferred or automatically deleted across databases.
-The score measures the supplied text, not plot identity, personal preference,
-or causal influence. Future field-weighted scoring should be evaluated as a
-different method rather than mixed with these baseline scores.
+synopses can weaken it. The scorer compares every pair supplied in its two
+CSV inputs. The shared catalogue refresh handles cross-source duplicates
+before scoring. Franchises and seasons can still dominate top results.
+The score measures the semantic similarity of the supplied text.
 
 ## References
 
-- [Qwen3-Embedding-0.6B model card](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B)
+- [Qwen3-Embedding-4B model card](https://huggingface.co/Qwen/Qwen3-Embedding-4B)
 - [Qwen3 embedding technical report](https://arxiv.org/abs/2506.05176)
 - [BAAI BGE-M3 alternative](https://huggingface.co/BAAI/bge-m3)
 - [Google EmbeddingGemma alternative (license acceptance required)](https://huggingface.co/google/embeddinggemma-300m)
