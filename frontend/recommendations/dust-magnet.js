@@ -19,6 +19,8 @@ function defaultMagnetPositions(count, width, height) {
 }
 
 const DUST_HIT_RADIUS = 9;
+const DUST_POSTER_ZOOM = 6;
+const DUST_MAX_ZOOM = 12;
 const MAGNET_CORE_RADIUS = 25;
 const DUST_SPACING = 2 * DUST_HIT_RADIUS;
 const DUST_CLEARANCE = MAGNET_CORE_RADIUS + DUST_HIT_RADIUS;
@@ -423,12 +425,14 @@ function renderDustRecommendations() {
 
 function createDustView(container, matches, anchors, width, height, onMove, label, mixed) {
   const svg = d3.select(container).append("svg").attr("viewBox", `0 0 ${width} ${height}`)
-    .attr("width", width).attr("height", height).attr("class", "dust-map").attr("role", "group")
+    .attr("width", width).attr("height", height).attr("class", "dust-map").attr("role", "group").attr("tabindex", 0)
+    .attr("aria-description", "Use the zoom controls. When zoomed in, drag or use arrow keys to pan.")
     .attr("aria-label", `${label} ${mixed ? "attraction to" : "similarity to"} ${anchors.map(({ magnet }) => magnet.title).join(", ")}`);
-  const paths = svg.append("g").attr("aria-hidden", "true");
+  const scene = svg.append("g");
+  const paths = scene.append("g").attr("aria-hidden", "true");
   const selectedPaths = paths.append("g");
   const previewPaths = paths.append("g");
-  const mutedMagnets = svg.append("g").node();
+  const mutedMagnets = scene.append("g").node();
   const temperature = dustTemperature(mixed);
   let positions, hovered, focused;
   let selectedKeys = [];
@@ -454,7 +458,7 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
     const key = hovered || focused;
     drawLinks(previewPaths, "dust-preview-link", key && !selectedKeys.includes(key) ? [key] : []);
   }
-  const dots = svg.append("g").selectAll("g").data(matches, (match) => match.key).join("g")
+  const dots = scene.append("g").selectAll("g").data(matches, (match) => match.key).join("g")
     .attr("class", "dust-node").attr("data-match-id", (match) => match.key)
     .attr("role", "button").attr("tabindex", 0).attr("aria-controls", "dust-focus recommendation-detail")
     .attr("aria-label", (match) => `${match.record.title}. ${anchors.map(({ magnet }, index) => mixed ? AnivizDust.mixedEvidence(match, magnet, index)
@@ -491,7 +495,29 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
     });
   dots.append("circle").attr("class", "dust-hit-area").attr("r", DUST_HIT_RADIUS);
   const grains = dots.append("circle").attr("class", "dust-grain").attr("r", 4.5).attr("fill", AnivizMain.dustColor);
-  const activeMagnets = svg.append("g");
+  let posterImages, posterTitles;
+  function drawArtwork() {
+    const { lookup } = AnivizMain.snapshot();
+    posterImages?.each(function (match) {
+      const record = lookup.get(match.key)?.record || match.record;
+      const url = (match.key.startsWith("tmdb:")
+        ? AnivizArtwork.movieThumbnail(record) : AnivizArtwork.animeThumbnail(record)) || null;
+      if (url === this.getAttribute("src")) return;
+      this.hidden = !url;
+      d3.select(this).attr("src", url);
+    });
+  }
+  function addPosters() {
+    const cards = dots.append("foreignObject").attr("class", "dust-poster").attr("aria-hidden", "true")
+      .attr("x", -34).attr("y", -62).attr("width", 68).attr("height", 124)
+      .append("xhtml:div").attr("class", "dust-poster-card");
+    posterImages = cards.append("img").attr("alt", "").attr("decoding", "async").property("hidden", true)
+      .on("error", function () { this.hidden = true; });
+    posterTitles = cards.append("span").attr("class", "dust-poster-title")
+      .style("color", AnivizMain.dustColor).text(match => match.record.title);
+    drawArtwork();
+  }
+  const activeMagnets = scene.append("g");
   const magnets = activeMagnets.selectAll("g").data(anchors, anchor => anchor.magnet.key).join("g").attr("class", "dust-magnet")
     .attr("role", ({ magnet }) => magnet.kind === undefined ? "button" : "group").attr("tabindex", 0)
     .attr("aria-controls", ({ magnet }) => magnet.kind === undefined ? "dust-focus" : null)
@@ -516,11 +542,12 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
       hideTooltip();
     })
       .on("drag", (event, anchor) => onMove(anchor, event.x, event.y)));
-  magnets.append("circle").attr("class", "magnet-halo").attr("r", DUST_CLEARANCE).attr("stroke", (anchor) => anchor.color);
-  magnets.append("circle").attr("class", "magnet-core").attr("r", MAGNET_CORE_RADIUS).attr("stroke", (anchor) => anchor.color);
-  magnets.append("text").attr("class", "magnet-number").attr("text-anchor", "middle").attr("dy", 5)
+  const magnetArt = magnets.append("g").attr("class", "dust-magnet-art");
+  magnetArt.append("circle").attr("class", "magnet-halo").attr("r", DUST_CLEARANCE).attr("stroke", (anchor) => anchor.color);
+  magnetArt.append("circle").attr("class", "magnet-core").attr("r", MAGNET_CORE_RADIUS).attr("stroke", (anchor) => anchor.color);
+  magnetArt.append("text").attr("class", "magnet-number").attr("text-anchor", "middle").attr("dy", 5)
     .attr("fill", (anchor) => anchor.color).text((_, index) => `M${index + 1}`);
-  magnets.append("text").attr("class", "magnet-title").attr("text-anchor", "middle").attr("y", 49)
+  magnetArt.append("text").attr("class", "magnet-title").attr("text-anchor", "middle").attr("y", 49)
     .text((anchor) => truncate(anchor.magnet.title, width < 400 ? 16 : 23));
   magnets.append("title").text(({ magnet }) => {
     if (magnet.kind === "popularity") return magnet.title;
@@ -528,10 +555,67 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
     return `${magnet.title} (${description})`;
   });
 
+  const controls = d3.select(container).append("div").attr("class", "dust-zoom-controls")
+    .attr("role", "group").attr("aria-label", `${label} zoom controls`)
+    .html(`<button type="button" aria-label="Zoom out" title="Zoom out">−</button>
+      <button type="button" class="dust-zoom-reset" aria-label="Reset zoom" title="Reset zoom">1×</button>
+      <button type="button" aria-label="Zoom in" title="Zoom in">+</button>`);
+  const [zoomOut, resetZoom, zoomIn] = controls.selectAll("button").nodes();
+  const extent = [[0, 0], [width, height]];
+  const zoom = d3.zoom().extent(extent).translateExtent(extent).scaleExtent([1, DUST_MAX_ZOOM]).clickDistance(4)
+    .filter(event => {
+      if (event.type === "wheel") return !event.button;
+      if (event.ctrlKey || event.button || event.target.closest(".dust-magnet")) return false;
+      return event.type !== "mousedown" || d3.zoomTransform(svg.node()).k > 1;
+    })
+    .on("start", () => {
+      hovered = focused = null;
+      drawPreview();
+      hideTooltip();
+    })
+    .on("zoom", ({ transform }) => {
+      const { k } = transform;
+      const showPosters = k >= DUST_POSTER_ZOOM;
+      scene.attr("transform", transform);
+      scene.style("--dust-magnet-scale", Math.min(1, 2 / k));
+      svg.classed("is-zoomed", k > 1).classed("shows-posters", showPosters);
+      if (showPosters) {
+        if (!posterImages) addPosters();
+        scene.style("--dust-poster-scale", 1 / k);
+      }
+      zoomOut.disabled = resetZoom.disabled = k === 1;
+      zoomIn.disabled = k === DUST_MAX_ZOOM;
+      resetZoom.textContent = `${Number(k.toFixed(1))}×`;
+    });
+  svg.call(zoom).on("dblclick.zoom", null);
+  const zoomTouchMove = svg.on("touchmove.zoom");
+  if (zoomTouchMove) {
+    svg.on("touchmove.zoom", function (event, datum) {
+      // Let a single finger scroll the page in the overview while retaining pinch zoom.
+      if (event.touches.length > 1 || d3.zoomTransform(this).k > 1) zoomTouchMove.call(this, event, datum);
+    });
+  }
+  svg.on("keydown", event => {
+    if (event.target !== svg.node() || d3.zoomTransform(svg.node()).k === 1) return;
+    const delta = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[event.key];
+    if (!delta) return;
+    event.preventDefault();
+    const step = 48 / d3.zoomTransform(svg.node()).k;
+    svg.call(zoom.translateBy, delta[0] * step, delta[1] * step);
+  });
+  zoomOut.disabled = resetZoom.disabled = true;
+  zoomOut.addEventListener("click", () => svg.call(zoom.scaleBy, .5));
+  resetZoom.addEventListener("click", () => svg.call(zoom.transform, d3.zoomIdentity));
+  zoomIn.addEventListener("click", () => svg.call(zoom.scaleBy, 2));
+
   return {
+    drawArtwork,
     drawColors() {
       grains.attr("fill", AnivizMain.dustColor);
+      posterTitles?.style("color", AnivizMain.dustColor);
     },
+    getTransform: () => d3.zoomTransform(svg.node()),
+    setTransform: transform => svg.call(zoom.transform, transform),
     draw(nextPositions) {
       positions = nextPositions;
       dots.attr("transform", (match) => { const node = positions.get(match.key); return `translate(${node.x},${node.y})`; });
@@ -552,6 +636,7 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
 }
 
 function renderDustChart(container, mirror, magnets, matches, mixed) {
+  const previousChart = dustChart;
   // Clear the field before measuring so the old SVG cannot size the flex item.
   container.innerHTML = "";
   mirror.innerHTML = "";
@@ -620,6 +705,12 @@ function renderDustChart(container, mirror, magnets, matches, mixed) {
     if (frame === null) frame = requestAnimationFrame(animate);
   }
   draw();
+  views.forEach((view, index) => {
+    const previous = previousChart?.views?.[index].getTransform();
+    if (!previous || previous.k === 1) return;
+    view.setTransform(d3.zoomIdentity.translate(previous.x * width / previousChart.width,
+      previous.y * height / previousChart.height).scale(previous.k));
+  });
   if (!reducedMotion) wake();
 }
 

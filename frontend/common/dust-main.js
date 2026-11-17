@@ -173,8 +173,8 @@
     $('[data-dust-scope]').textContent = elements.filterSummary.textContent = `${count} / ${candidates} ${dustNoun()}`;
     $('#dust-limit').value = snapshot.dustLimit;
     $('#recommendation-score-note').textContent = snapshot.mixed
-      ? 'Hover or focus for attraction percentiles. Thicker links show a stronger pull for that dot. Select up to 3 dots.'
-      : 'Hover or focus for similarity scores. Thicker links show a stronger pull for that dot. Select up to 3 dots.';
+      ? 'Zoom in for posters. Hover or focus for attraction percentiles. Thicker links show a stronger pull. Select up to 3 titles.'
+      : 'Zoom in for posters. Hover or focus for similarity scores. Thicker links show a stronger pull. Select up to 3 titles.';
     const colorNote = snapshot.colorByMagnet ? ' Color identifies each title’s highest-scoring magnet.' : '';
     $('#dust-connection-method').textContent = `Select a magnet to rank the displayed titles by ${snapshot.mixed ? 'attraction percentile' : 'cosine similarity'}. Thicker curves show higher scores within that magnet’s range.${colorNote} Dust members lists the titles that score highest for the selected magnet. Scroll either list to see more titles.`;
     const notes = {
@@ -287,6 +287,7 @@
     movieDetailsRequest ??= AnivizData.movieDetails(recommendationState.data)
       .then(details => {
         context.setMovieDetails(details);
+        if (isReverse()) dustChart?.views?.forEach(view => view.drawArtwork());
         if (!isReverse() && focusedMagnetKey) renderFocus();
         if (isReverse() && elements.drawer.classList.contains('open')) {
           const drawer = elements.drawerContent.querySelector('.dust-movie-drawer');
