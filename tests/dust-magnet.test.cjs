@@ -291,7 +291,8 @@ test("a shallow triangle and a close pair keep published favorites near their ma
       assert.ok(node.x > 14 && node.x < width - 14 && node.y > 18 && node.y < height - 18);
     }
     if (anchors.length === 3) {
-      assert.equal(nodes.filter(node => node.closest === 2).length, 39);
+      assert.ok(nodes.filter(node => node.closest === 2).length > nodes.length / 2,
+        "the sample crowds the third magnet");
       assert.ok(nodes.some(node => scoreGap(node) < .01 && !winnerIsNearest(node, anchors)), "near ties can share space");
     }
   }

@@ -48,10 +48,15 @@ class RecommendationExportTests(unittest.TestCase):
                 exporter.read_bottom_matches(folder, anime, movies, count=1)
 
     def test_web_bundle_exactly_matches_completed_run(self):
-        if not (exporter.DEFAULT_INPUT / "similarity/run_metadata.json").exists():
-            self.skipTest("Local similarity analysis outputs are unavailable")
-        expected = exporter.build_bundle(exporter.DEFAULT_INPUT)
         bundled = json.loads(exporter.DEFAULT_OUTPUT.read_text(encoding="utf-8"))
+        dashboard = json.loads((ROOT / "data.json").read_text(encoding="utf-8"))
+        snapshot = dashboard["meta"].get("catalogue_snapshot")
+        folder = exporter.DEFAULT_INPUT / "catalogue" / snapshot if snapshot else exporter.DEFAULT_INPUT
+        if not (folder / "similarity/run_metadata.json").exists():
+            self.skipTest("Local similarity outputs for the published catalogue are unavailable")
+        expected = exporter.build_bundle(folder)
+        if snapshot:
+            expected["meta"]["catalogue_snapshot"] = snapshot
         self.assertEqual(bundled, expected)
         self.assertEqual(bundled["meta"]["pair_count"], 1_000_000)
 

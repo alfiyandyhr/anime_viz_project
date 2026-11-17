@@ -207,7 +207,8 @@ function stepDust(nodes, anchors, width, height, elapsed = 1 / 60, mixed = false
   const multiple = anchors.length > 1;
   const clearance = multiple ? DUST_MULTI_CLEARANCE : DUST_CLEARANCE;
   const rankScale = multiple ? .33 : 1;
-  const spacingForce = multiple ? 3700 : 2500;
+  const spacingForce = multiple ? 3700 : 3000;
+  const coreForce = multiple ? 2800 : 3700;
   const edgeForce = multiple ? 380 : 210;
   const before = nodes.map((node) => ({ x: node.x, y: node.y }));
   for (let step = 0; step < steps; step++) {
@@ -252,7 +253,7 @@ function stepDust(nodes, anchors, width, height, elapsed = 1 / 60, mixed = false
         if (distance2 >= clearance * clearance) continue;
         const distance = Math.sqrt(distance2);
         const direction = distance < 1e-6 ? dustCenterDirection(node) : { x: dx / distance, y: dy / distance };
-        const push = (clearance - distance) * 2800;
+        const push = (clearance - distance) * coreForce;
         forces[i].x += direction.x * push; forces[i].y += direction.y * push;
       }
     }
