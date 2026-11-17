@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { createContext, joinRecords, rankCorpus, createScoreAccessor, FORWARD, REVERSE, STORAGE_KEY, DEFAULT_MOTION } = require('../frontend/common/dust-context.js');
+const { createContext, joinRecords, rankCorpus, createScoreAccessor, FORWARD, REVERSE, STORAGE_KEY } = require('../frontend/common/dust-context.js');
 const ChartData = require('../frontend/common/chart-data.js');
 const { getDustMatches } = require('../frontend/recommendations/dust-magnet.js');
 const root = path.resolve(__dirname, '..');
@@ -101,38 +101,46 @@ test('dust coloring starts uniform and stores one display preference across dire
   assert.equal(older.restore(), true);
   assert.equal(older.snapshot().colorByMagnet, false);
 });
-test('motion settings round-trip independently of direction, dust evidence, and other resets', () => {
+test('magnet strengths follow magnet IDs and directions without recomputing dust evidence', () => {
   const { context, memory, storage } = setup();
   const key = context.snapshot().displayedKeys.find(id => context.snapshot().lookup.get(id).record.genres.length);
   context.setFilters({ genre: context.snapshot().lookup.get(key).record.genres[0] });
   context.setSelection([key]);
   context.setColorByMagnet(true);
   const before = context.snapshot();
-  assert.deepEqual(before.motion, DEFAULT_MOTION);
-  const custom = { damping: 16, strength: 0.7, rankSpread: 0 };
-  const after = context.setMotion({ damping: 100, strength: 0.72, rankSpread: -10 });
-  assert.deepEqual(after.motion, custom);
-  assert.equal(context.setMotion(custom).revision, after.revision);
+  assert.deepEqual(before.magnetStrengths, {});
+  const [first, second, third] = movieKeys;
+  context.setMagnetStrength(first, 10);
+  context.setMagnetStrength(second, -1);
+  const after = context.setMagnetStrength(third, .72);
+  const custom = { [first]: 2, [second]: 0, [third]: .7 };
+  assert.deepEqual(after.magnetStrengths, custom);
+  assert.equal(context.setMagnetStrength(third, .7).revision, after.revision);
   for (const field of ['candidateDust', 'displayedDust', 'ranking', 'filters', 'selectedKeys', 'colorByMagnet']) {
     assert.equal(after[field], before[field], field);
   }
   context.resetPositions();
   context.resetFilters();
-  assert.deepEqual(context.setDirection(REVERSE).motion, custom);
+  assert.deepEqual(context.setMagnets([third, first, second]).magnetStrengths, custom);
+  const reverse = context.setDirection(REVERSE);
+  assert.deepEqual(reverse.magnetStrengths, {});
+  context.setMagnetStrength(reverse.magnetKeys[0], 1.5);
+  assert.deepEqual(context.setDirection(FORWARD).magnetStrengths, custom);
   const restored = createContext({ storage });
   assert.equal(restored.restore(), true);
-  assert.deepEqual(restored.snapshot().motion, custom);
-  assert.equal(restored.setMotion(DEFAULT_MOTION).colorByMagnet, true);
+  assert.deepEqual(restored.snapshot().magnetStrengths, custom);
+  restored.setSources(data, scores);
+  restored.setMagnets([first, third]);
+  assert.deepEqual(restored.setMagnets(movieKeys).magnetStrengths, { [first]: 2, [third]: .7 });
+  assert.equal(restored.resetMagnetStrengths().colorByMagnet, true);
+  assert.deepEqual(restored.setDirection(REVERSE).magnetStrengths, { [reverse.magnetKeys[0]]: 1.5 });
 
   const saved = JSON.parse(memory.get(STORAGE_KEY));
-  delete saved.motion;
+  delete saved.sessions[REVERSE].state.magnetStrengths;
+  saved.motion = { damping: 12, strength: .7, rankSpread: 55 };
   memory.set(STORAGE_KEY, JSON.stringify(saved));
   assert.equal(restored.restore(), true);
-  assert.deepEqual(restored.snapshot().motion, DEFAULT_MOTION);
-  saved.motion = { damping: 'invalid', strength: null, rankSpread: 55 };
-  memory.set(STORAGE_KEY, JSON.stringify(saved));
-  restored.restore();
-  assert.deepEqual(restored.snapshot().motion, { ...DEFAULT_MOTION, rankSpread: 55 });
+  assert.deepEqual(restored.snapshot().magnetStrengths, {});
 });
 test('selection retention follows displayed membership, count/movie changes resample once', () => {
   const {context,notices} = setup();

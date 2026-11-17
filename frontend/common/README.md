@@ -35,9 +35,10 @@ by catalogue, for example `tmdb:27205`, `anilist:1`, and `tmdb:genre:Science Fic
 - `saveLayout(patch)`, `getLayout()`, and `resetPositions()` manage magnet and
   particle positions, colors, and scroll without advancing the analytical
   revision or notifying chart subscribers.
-- `setMotion(patch)` and `setColorByMagnet(value)` publish display preferences
-  shared across directions. Motion updates reuse the live particles and their
-  velocities. Both preferences reuse the current sample and ranking.
+- `setMagnetStrength(key, value)` and `resetMagnetStrengths()` update attraction
+  for the current direction while reusing the live particles and their velocities.
+  `setColorByMagnet(value)` shares the coloring preference across directions.
+  Both preferences reuse the current sample and ranking.
 
 The v2 session stores separate state and layout for both directions and remembers
 which is active. A compatible v1 session imports into Movie → Anime. If no saved

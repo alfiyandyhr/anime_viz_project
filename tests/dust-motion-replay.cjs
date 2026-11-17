@@ -4,7 +4,7 @@ const { execFileSync } = require('node:child_process');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { createContext, DEFAULT_MOTION, FORWARD, REVERSE } = require('../frontend/common/dust-context.js');
+const { createContext, FORWARD, REVERSE } = require('../frontend/common/dust-context.js');
 const current = require('../frontend/recommendations/dust-magnet.js');
 
 const root = path.resolve(__dirname, '..');
@@ -55,10 +55,10 @@ function rankMetrics(rows, winnerCount) {
     tiedScorePairs: tiedScoreGaps.length, tiedRadiusGap: tiedRadiusGap === null ? null : rounded(tiedRadiusGap) };
 }
 
-function replay(engine, matches, width, height, waypoints, mixed, motion) {
-  const anchors = waypoints[0].map(([x, y]) => ({ x, y }));
+function replay(engine, matches, width, height, waypoints, mixed, strengths = []) {
+  const anchors = waypoints[0].map(([x, y], index) => ({ x, y, strength: strengths[index] ?? 1 }));
   const nodes = engine.createDustNodes(matches, anchors, width, height, null, mixed);
-  const tick = () => engine.stepDust(nodes, anchors, width, height, 1 / 60, mixed, motion);
+  const tick = () => engine.stepDust(nodes, anchors, width, height, 1 / 60, mixed);
   let maxTravel = 0;
   function settle() {
     let quiet = 0, frames = 0, smallFrames = 0, smallSeconds = null, travel = 0;
@@ -126,27 +126,22 @@ const primary = [
   ['close pair', 640, 500, titles.slice(0, 2), [[[416, 244], [526, 244]]]],
   ['single', 640, 500, titles.slice(0, 1), []]
 ];
-const compact = { ...DEFAULT_MOTION, rankSpread: 0 };
-const broadWeak = { ...DEFAULT_MOTION, rankSpread: 100, strength: .5 };
-const broadStrong = { ...DEFAULT_MOTION, rankSpread: 100, strength: 1.5 };
+const profiles = [['default', []], ['first magnet doubled', [2]], ['first magnet muted', [0]]];
 for (const [name, width, height, keys, moves] of primary) {
   const { displayedDust, mixed } = sample(FORWARD, keys, 60);
   const start = current.defaultMagnetPositions(keys.length, width, height).map(({ x, y }) => [x, y]);
-  for (const [profile, engine, motion] of [
-    ['baseline', baseline.exports, undefined], ['default', current, DEFAULT_MOTION],
-    ['compact', current, compact], ['broad weak', current, broadWeak], ['broad strong', current, broadStrong],
-    ['light damping', current, { ...DEFAULT_MOTION, damping: 6 }],
-    ['heavy damping', current, { ...DEFAULT_MOTION, damping: 16 }]
+  for (const [profile, engine, strengths] of [
+    ['baseline', baseline.exports], ...profiles.map(([name, strengths]) => [name, current, strengths])
   ]) {
     console.log(JSON.stringify({ name, profile, width, height, count: 60,
-      ...replay(engine, displayedDust, width, height, [start, ...moves], mixed, motion) }));
+      ...replay(engine, displayedDust, width, height, [start, ...moves], mixed, strengths) }));
   }
 }
 
 const tiedScore = { key: 'tie', scores: [-.1, -.1], winnerPercentile: .8, closest: 0 };
-for (const [profile, engine, motion] of [['baseline', baseline.exports, undefined], ['default', current, DEFAULT_MOTION]]) {
+for (const [profile, engine] of [['baseline', baseline.exports], ['default', current]]) {
   console.log(JSON.stringify({ name: 'exact signed tie', profile, width: 640, height: 500, count: 1,
-    ...replay(engine, [tiedScore], 640, 500, [[[100, 250], [540, 250]]], false, motion) }));
+    ...replay(engine, [tiedScore], 640, 500, [[[100, 250], [540, 250]]], false) }));
 }
 
 const variants = [
@@ -161,10 +156,9 @@ for (const [name, direction, keys] of variants) {
     const anchors = current.defaultMagnetPositions(keys.length, width, height).map(({ x, y }) => [x, y]);
     for (const count of [30, 60, 90]) {
       const { displayedDust, mixed } = sample(direction, keys, count);
-      for (const [profile, motion] of [['default', DEFAULT_MOTION], ['compact', compact],
-        ['broad weak', broadWeak], ['broad strong', broadStrong]]) {
+      for (const [profile, strengths] of profiles) {
         console.log(JSON.stringify({ name, profile, width, height, count, mixed,
-          ...replay(current, displayedDust, width, height, [anchors], mixed, motion) }));
+          ...replay(current, displayedDust, width, height, [anchors], mixed, strengths) }));
       }
     }
   }

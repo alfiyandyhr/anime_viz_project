@@ -126,28 +126,14 @@
               <option value="90">90 · explore</option>
             </select>
           </label>
-          <fieldset class="dust-motion-controls">
-            <legend>Field motion</legend>
-            <div class="dust-motion-setting">
-              <label for="dust-motion-damping">Motion damping</label>
-              <output for="dust-motion-damping" aria-hidden="true"></output>
-              <input id="dust-motion-damping" data-dust-motion="damping" type="range">
-            </div>
-            <div class="dust-motion-setting">
-              <label for="dust-magnet-strength">Magnet strength</label>
-              <output for="dust-magnet-strength" aria-hidden="true"></output>
-              <input id="dust-magnet-strength" data-dust-motion="strength" type="range">
-            </div>
-            <div class="dust-motion-setting">
-              <label for="dust-rank-spread">Rank spread</label>
-              <output for="dust-rank-spread" aria-hidden="true"></output>
-              <input id="dust-rank-spread" data-dust-motion="rankSpread" type="range">
-            </div>
-            <button id="reset-dust-motion" class="small-button ghost" type="button">Reset motion settings</button>
+          <fieldset class="dust-motion-controls" hidden>
+            <legend>Magnet strength</legend>
+            <div id="dust-magnet-strengths"></div>
+            <button id="reset-dust-motion" class="small-button ghost" type="button">Reset strengths</button>
           </fieldset>
           <label class="dust-color-control">
             <input id="dust-color-by-magnet" type="checkbox">
-            Color dust by strongest magnet
+            <span id="dust-color-label">Color dust by highest similarity score</span>
           </label>
           <button id="reset-magnets" class="small-button ghost" type="button">Reset positions</button>
           <details class="field-options" data-field-options>
@@ -303,10 +289,10 @@
             <article><h3>One million comparisons</h3><p id="recommendation-method-data">1,000 popular AniList anime × 1,000 popular TMDB movies. Both directions use the same pair scores from the complete score matrix.</p></article>
             <article><h3>Story similarity</h3><p id="recommendation-method-model">Qwen3-Embedding-4B embeds titles, genres, tags, and synopses. Cosine similarity compares the normalized vectors; ratings and popularity do not affect the score.</p></article>
             <article><h3>Genre cohorts</h3><p>Genre magnets use mean cosine similarity. For each dust title, the score is the arithmetic mean of its signed cosine similarities to every sampled title with that genre in the magnet catalogue. A title can belong to multiple cohorts and contribute to each of their scores. Each magnet contributes one score to the combined average. Filters narrow the dust while the cohorts stay fixed.</p></article>
-            <article><h3>High popularity</h3><p>One popularity magnet can use AniList list users for anime or the TMDB popularity metric for movies. The picker shows the snapshot date and sample coverage. With popularity active, each magnet’s raw scores become attraction percentiles from 0 to 1 over the same titles with known popularity. Ties share the average rank and a sample of one gets 0.5. Magnets contribute equally to the average attraction percentile. Dot count and filters leave the reference sample fixed. The full ranking retains titles with unavailable popularity and supports sorting by raw evidence.</p></article>
+            <article><h3>High popularity</h3><p>One popularity magnet can use AniList list users for anime or the TMDB popularity metric for movies. With popularity active, each magnet’s raw scores become attraction percentiles from 0 to 1 over the same titles with known popularity. Ties share the average rank and a sample of one gets 0.5. Magnets contribute equally to the average attraction percentile. Dot count and filters leave the reference sample fixed. The full ranking retains titles with unavailable popularity and supports sorting by raw evidence.</p></article>
 
-            <article><h3>Reading the magnets</h3><p>The field samples each magnet’s strongest matches, then fills remaining slots by average cosine or average attraction percentile. Similar scores draw a dot into the space between magnets. Nearby dots can shift it to make room. Hover, focus, or select a dot to see its links. Thicker links show which magnets pull more strongly on that dot. Enable Color dust by strongest magnet to see each title’s highest-scoring magnet at a glance. Hover or focus a dot, or use the full ranking table, to compare scores. Select up to three dots with a click, tap, Enter, or Space. Select again to remove a title, or click empty space to remove the latest selection.</p></article>
-            <article><h3>Adjusting field motion</h3><p>Raise Motion damping to slow the dust and reduce overshoot. Magnet strength changes how strongly dots are pulled toward their preferred positions. Rank spread controls how much room separates stronger and weaker matches. At 0%, the clouds use the compact layout. The space available depends on the field size and how close the magnets are. Reset motion settings restores the three sliders.</p></article>
+            <article><h3>Reading the magnets</h3><p>The field samples each magnet’s strongest matches, then fills remaining slots by average cosine or average attraction percentile. Similar scores draw a dot into the space between magnets. Nearby dots can shift it to make room. Hover, focus, or select a dot to see its links. Thicker links show which magnets pull more strongly on that dot. Coloring uses each title’s highest similarity score, or its highest attraction percentile when a popularity magnet is active. Hover or focus a dot, or use the full ranking table, to compare scores. Select up to three dots with a click, tap, Enter, or Space. Select again to remove a title, or click empty space to remove the latest selection.</p></article>
+            <article><h3>Adjusting magnet strength</h3><p>Each magnet’s strength ranges from 0× to 2×. At 0× the magnet exerts no pull. Higher values draw dots closer when their scores are similar across magnets. Scores and dust selection use equal weights. Reset strengths restores each magnet to 1×.</p></article>
             <article><h3>Reading the charts</h3><p>Charts use the displayed titles. The full ranking uses the entire dust catalogue. Genres can overlap. With anime dust, AniList popularity counts list users and reception marker size shows favourites. With movie dust, reception plots archived TMDB user scores and ranks computed by sorting the full sample by archived popularity. The Movie catalogue and High popularity magnet use the same snapshot. Movie posters and runtimes come from a separate TMDB details snapshot for those same titles.</p></article>
             <article><h3>A starting point</h3><p>These are text-based recommendations, not predictions of your enjoyment. Seasons, sequels, and the same animated film in both databases can appear separately. Genre labels are context, not an explanation of the model’s score.</p></article>
           </div>

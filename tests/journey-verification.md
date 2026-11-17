@@ -1,20 +1,20 @@
 # High-popularity magnets
 
 1. Keep **Inception** in **Movie → Anime**. Add **Science Fiction movies** and
-   **High anime popularity**. The popularity chip reports 997 of 1,000 titles
-   with AniList list-user counts from 2026-09-29 UTC.
+   **High anime popularity**. Check that the popularity chip shows the title
+   and that Magnet strength has three sliders, each at 1×.
 2. Focus a dot and compare two dots. Check the raw cosine, raw popularity, and
    the attraction percentiles in the tooltip, mirror, focus card, comparison,
    and connections. Change dot count, filter, and move a magnet. The full
    ranking and the reference percentiles stay fixed.
-3. On the last page of the combined ranking, check the three titles with
-   unavailable popularity and combined ranks. Sort by Inception and confirm
-   all 1,000 titles have a raw similarity rank. Remove popularity to restore
-   cosine scores.
+3. Set one strength to 0× and another to 2×. Check that dots move, including in
+   the mirror, and that the displayed titles and ranking stay fixed. Sort by
+   Inception and confirm all 1,000 titles have a raw similarity rank. Remove
+   popularity to restore cosine scores.
 4. Switch to **Anime → Movies** and add **High movie popularity** alongside
-   Attack on Titan. The separate TMDB snapshot covers 1,000 movies and is dated
-   2026-10-11 UTC. Switch directions and reload to check saved magnets, sorts,
-   and selections.
+   Attack on Titan. Check that the movie popularity chip shows the title.
+   Switch directions and reload to check saved magnets,
+   strengths, sorts, and selections.
 5. Block the dashboard or movie popularity request and reload a saved
    popularity magnet. The chip is inactive and the remaining magnets still
    work. Restore the request and use **Retry popularity data** to reactivate it.

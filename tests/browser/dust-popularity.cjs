@@ -38,12 +38,13 @@ const state = page => page.evaluate(() => {
     const errors = [];
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     page.on('pageerror', error => errors.push(error.message));
-    let animeFails = false, movieRequests = 0, movieResponse = 'ok';
+    let animeFails = false, movieRequests = 0, movieResponse = 'ok', movieURL;
     await page.route('**/data.json', route => animeFails ? route.fulfill({ status: 503 }) : route.continue());
-    await page.route('**/movie_popularity.json', async route => {
+    await page.route('**/movie_popularity.json*', async route => {
       movieRequests++;
+      movieURL = new URL(route.request().url());
       if (movieResponse === 'missing') return route.fulfill({ status: 404 });
-      if (movieResponse === 'wrong IDs') {
+      if (!movieURL.searchParams.has('snapshot') || movieResponse === 'wrong IDs') {
         const response = await route.fetch();
         const payload = await response.json();
         delete payload.popularity[Object.keys(payload.popularity)[0]];
@@ -54,6 +55,9 @@ const state = page => page.evaluate(() => {
     });
     await page.goto(base);
     await ready(page);
+    const colorBySimilarity = page.getByRole('checkbox', { name: 'Color dust by highest similarity score' });
+    const colorByPercentile = page.getByRole('checkbox', { name: 'Color dust by highest attraction percentile' });
+    assert.ok(await colorBySimilarity.isVisible());
     await page.getByRole('radio', { name: 'Genre cohort' }).check();
     await page.selectOption('#genre-magnet-choice', 'tmdb:genre:Science Fiction');
     await page.locator('#add-genre-magnet').click();
@@ -61,8 +65,10 @@ const state = page => page.evaluate(() => {
     await choosePopularity(page);
     await add(page).press('Enter');
     await mixed(page);
-    const animeCoverage = `AniList list users · ${dashboard.meta.generated_at.slice(0, 10)} UTC · ${animeEligible} of ${catalogue.anime.length} eligible`;
-    assert.ok((await page.locator('#movie-magnets').innerText()).includes(animeCoverage));
+    await colorByPercentile.check();
+    assert.doesNotMatch(await page.locator('#movie-magnets').innerText(), /AniList list users|eligible/);
+    assert.ok(await page.locator('#popularity-magnet-source').isHidden());
+    assert.equal(await page.getByRole('slider', { name: 'High anime popularity strength' }).inputValue(), '1');
     const combined = await state(page);
     assert.equal(combined.magnetKeys.length, 3);
     await add(page).click();
@@ -103,6 +109,7 @@ const state = page => page.evaluate(() => {
     await page.locator('#recommendation-chart .dust-magnet').last().press('ArrowRight');
     assert.deepEqual((await state(page)).ranking, combined.ranking);
     await page.locator(`[data-remove-magnet="${anime}"]`).click();
+    assert.ok(await colorBySimilarity.isChecked());
     assert.deepEqual((await state(page)).ranking, cosine.ranking);
     await add(page).click();
     await mixed(page);
@@ -127,14 +134,19 @@ const state = page => page.evaluate(() => {
     const reverseExample = await state(page);
     await choosePopularity(page);
     await page.locator('#retry-popularity').waitFor();
+    assert.equal(movieURL.searchParams.get('snapshot'), catalogue.meta.catalogue_snapshot);
     assert.ok(await add(page).isDisabled());
     assert.deepEqual((await state(page)).ranking, reverseExample.ranking);
     movieResponse = 'ok';
     await page.locator('#retry-popularity').click();
     await add(page).click();
     await mixed(page);
-    const movieCoverage = `TMDB popularity · ${archive.snapshot_date} UTC · ${archive.eligible_count} of ${catalogue.movies.length} eligible`;
-    assert.ok((await page.locator('#movie-magnets').innerText()).includes(movieCoverage));
+    assert.ok(movieURL.searchParams.has('retry'));
+    assert.ok(await colorByPercentile.isChecked());
+    assert.equal(await page.getByRole('slider', { name: 'High movie popularity strength' }).inputValue(), '1');
+    assert.doesNotMatch(await page.locator('#movie-magnets').innerText(), /TMDB popularity|eligible/);
+    assert.ok(await page.locator('#popularity-magnet-source').isHidden());
+    assert.equal(await page.locator('#recommendation-chart .dust-magnet').last().locator('title').textContent(), 'High movie popularity');
     await assertTooltip(page, 'Attack on Titan');
     await dot(page).first().press('Enter');
     const movieBlend = await state(page);
@@ -146,16 +158,16 @@ const state = page => page.evaluate(() => {
     assert.equal(rawPopularity, archive.popularity[interstellarId]);
     const reception = await page.evaluate(key => AnivizMain.snapshot().lookup.get(key).record, interstellarKey);
     assert.equal(reception.vote_average, archive.vote_average[interstellarId]);
-    const catalogue = await browser.newPage();
-    await catalogue.goto(new URL('frontend/explorer/index.html', base).href);
-    await catalogue.getByRole('button', { name: 'Movie', exact: true }).click();
-    await catalogue.locator('#movie-table-body tr').first().waitFor();
-    await catalogue.fill('#search-input', 'Interstellar');
-    const cells = await catalogue.locator(`[data-movie-id="${interstellarId}"] td`).allTextContents();
+    const cataloguePage = await browser.newPage();
+    await cataloguePage.goto(new URL('frontend/explorer/index.html', base).href);
+    await cataloguePage.getByRole('button', { name: 'Movie', exact: true }).click();
+    await cataloguePage.locator('#movie-table-body tr').first().waitFor();
+    await cataloguePage.fill('#search-input', 'Interstellar');
+    const cells = await cataloguePage.locator(`[data-movie-id="${interstellarId}"] td`).allTextContents();
     assert.equal(Number(cells[1]), reception.popularity_rank);
     assert.equal(Number(cells[5]), reception.vote_average);
     assert.equal(Number(cells[6]), rawPopularity);
-    await catalogue.close();
+    await cataloguePage.close();
     await switchTo(page, forward);
     assert.deepEqual((await state(page)).selectedKeys, selectedAnime);
     await switchTo(page, reverse);
@@ -179,6 +191,7 @@ const state = page => page.evaluate(() => {
     await choosePopularity(phone);
     await add(phone).tap();
     await mixed(phone);
+    assert.ok(await phone.getByRole('checkbox', { name: 'Color dust by highest attraction percentile' }).isVisible());
     await dot(phone).first().press('Enter');
     assert.match(await phone.locator('#dust-focus').innerText(), /AniList list users/);
     assert.ok(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));

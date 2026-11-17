@@ -182,7 +182,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
 
     await page.goto(url(''));
     await ready();
-    await page.getByRole('checkbox', { name: 'Color dust by strongest magnet' }).check();
+    await page.getByRole('checkbox', { name: 'Color dust by highest similarity score' }).check();
     await ranking.first().locator('img').waitFor();
     assert.match(await ranking.first().locator('img').getAttribute('src'), /^https:\/\/s4\.anilist\.co\//);
     assert.match(await page.locator('#movie-magnets').innerText(), /Inception.*Example/);

@@ -198,8 +198,8 @@ also work. AniList uses its public GraphQL API.
    midrank percentiles when selected.
 
 The frontend reads the displayed dates from the published files. The Anime tab
-and Network show the AniList collection time, the Movie tab and popularity
-magnet show their source snapshot dates, and Dust & Magnet's **About / Data**
+and Network show the AniList collection time, the Movie tab shows its source
+snapshot date, and Dust & Magnet's **About / Data**
 shows when the similarity scores finished. Reload after the updated files are
 available to see the new dates.
 
@@ -291,7 +291,7 @@ to the combined average. Its membership stays fixed when you filter the dust.
 
 Choose **High popularity** to add one popularity magnet within the same three
 slots. With anime dust it uses AniList list users. With movie dust it uses TMDB
-popularity. The picker displays the snapshot date and eligible title count.
+popularity.
 Try **Inception**, **Science Fiction movies**,
 and **High anime popularity** together. Each magnet's raw values become
 midrank percentiles from 0 to 1 over the same titles with known popularity.
@@ -301,11 +301,11 @@ stay in the full ranking with an unavailable combined rank. Remove the
 popularity magnet to return to cosine scores.
 
 Choose 30, 60, or 90 dots and use **Reset positions** directly in the left panel.
-Under **Field motion**, adjust **Motion damping** (6–16 per second),
-**Magnet strength** (0.5×–1.5×), or **Rank spread** (0–100% of the available
-spacing). At 0%, the field uses the compact layout. **Reset motion settings**
-restores 10 per second, 1.0×, and 80%. The sliders and dust coloring are saved
-for the current browser session and shared across directions.
+Under **Magnet strength**, each active magnet has a slider from 0× to 2×.
+Higher strengths increase the magnet’s pull, and 0× turns it off.
+**Reset strengths** restores each strength in the current direction to 1×.
+The browser session saves strengths separately for each direction. Dust coloring
+is shared across directions.
 Open **Filter** to narrow the displayed titles. Drag magnets, or focus
 one and use arrow keys, to rearrange the field. Hover or keyboard-focus an anime
 for its title and cosine scores rounded to three decimals. Click or press Enter
@@ -320,9 +320,10 @@ The dust field defaults to **60 dots**, with 30 and 90 options. It reserves half
 the candidate budget equally for each magnet's strongest matches, then fills
 remaining slots with the highest average attraction scores, deduplicating overlap.
 The reference sample stays fixed when dot count or filters change. Dots share
-one color by default. Turn on **Color dust by strongest magnet** next to the
-dot count to see each title's highest-scoring magnet in the field, mirror,
-and linked charts. White outlines mark selected anime. Hover, keyboard-focus,
+one color by default. **Color dust by highest similarity score** colors each
+title by its highest-scoring magnet in the field, mirror, and linked charts.
+With a popularity magnet active, the control uses the highest attraction
+percentile. White outlines mark selected anime. Hover, keyboard-focus,
 or select a dot to see its links. Thicker links show a stronger pull for that
 dot. Hover or focus a dot to see its scores.
 

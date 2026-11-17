@@ -40,11 +40,16 @@
         }));
       });
     },
-    moviePopularity: data => {
+    moviePopularity: (data, { retry = false } = {}) => {
       const movieIds = data.movies.map(movie => String(movie.id));
-      return once(`movie-popularity:${movieIds.join(",")}`, async () => {
+      const snapshot = data.meta?.catalogue_snapshot || data.meta?.generated_at;
+      return once(`movie-popularity:${snapshot}:${movieIds.join(",")}`, async () => {
         const ids = new Set(movieIds);
-        const payload = await json("data/movie_popularity.json");
+        // Separate catalogue revisions in HTTP caches and bypass a stale response on an explicit retry.
+        const url = new URL("data/movie_popularity.json", base);
+        if (snapshot) url.searchParams.set("snapshot", snapshot);
+        if (retry) url.searchParams.set("retry", Date.now());
+        const payload = await json(url);
         const { popularity, vote_average: ratings, snapshot_date: date } = payload || {};
         const entries = Object.entries(popularity || {});
         const validValues = (values, valid) => values && typeof values === "object" && !Array.isArray(values)

@@ -230,11 +230,13 @@ function renderPopularityPicker() {
   button.disabled = !popularity.eligible;
   button.textContent = `Add ${popularity.title.toLowerCase()} magnet`;
   document.querySelector("#retry-popularity").hidden = popularity.status !== "unavailable";
-  const status = popularity.eligible ? popularityDescription(popularity)
+  const status = popularity.eligible ? ""
     : ["loading", "idle"].includes(popularity.status) ? `Loading ${popularity.metric}…`
     : popularity.status === "unavailable" ? `${popularity.metric} could not be loaded or validated. Retry to use this magnet.`
     : `${popularityDescription(popularity)}. No values are available for this sample.`;
-  document.querySelector("#popularity-magnet-source").textContent = status;
+  const source = document.querySelector("#popularity-magnet-source");
+  source.textContent = status;
+  source.hidden = !status;
 }
 
 function focusMagnetPicker() {

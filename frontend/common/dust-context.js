@@ -14,21 +14,7 @@
     [FORWARD]: { magnet: "tmdb", dust: "anilist", example: "Inception" },
     [REVERSE]: { magnet: "anilist", dust: "tmdb", example: "Attack on Titan" }
   };
-  const MOTION_RANGES = {
-    damping: { min: 6, max: 16, step: 1 },
-    strength: { min: .5, max: 1.5, step: .1 },
-    rankSpread: { min: 0, max: 100, step: 5 }
-  };
-  const DEFAULT_MOTION = Object.freeze({ damping: 10, strength: 1, rankSpread: 80 });
-  function readMotion(settings) {
-    return Object.freeze(Object.fromEntries(Object.entries(MOTION_RANGES).map(([key, { min, max, step }]) => {
-      const value = settings?.[key];
-      if (!Number.isFinite(value)) return [key, DEFAULT_MOTION[key]];
-      const bounded = Math.max(min, Math.min(max, value));
-      const snapped = min + Math.round((bounded - min) / step) * step;
-      return [key, Number(snapped.toFixed(2))];
-    })));
-  }
+  const normalizeStrength = value => Number.isFinite(value) ? Math.round(Math.max(0, Math.min(2, value)) * 10) / 10 : 1;
   const keyFor = (catalogue, id) => `${catalogue}:${id}`;
   const catalogueFor = (data, catalogue) => (catalogue === "tmdb" ? data?.movies : data?.anime) || [];
   const magnetScoreLabel = magnet => magnet.kind === "popularity" ? magnet.metric
@@ -148,7 +134,8 @@
       return { record, key: keyFor(DIRECTIONS[direction].dust, record.id), index, scores,
         rawScores: mixed ? rawColumns.map(column => column[index]) : scores,
         score: available ? scores.reduce((sum, value) => sum + value, 0) / scores.length : null,
-        closest, winnerPercentile: available ? percentiles[closest][index] : null, group: "dust" };
+        closest, winnerPercentile: available ? percentiles[closest][index] : null,
+        magnetPercentiles: percentiles.map(column => column[index]), group: "dust" };
     });
   }
 
@@ -191,7 +178,7 @@
   }
 
   const dustLimit = value => [30, 60, 90].includes(Number(value)) ? Number(value) : 60;
-  const blankState = direction => ({ magnetKeys: [], dustLimit: 60, candidateKeys: [], displayedKeys: [],
+  const blankState = direction => ({ magnetKeys: [], magnetStrengths: {}, dustLimit: 60, candidateKeys: [], displayedKeys: [],
     rankingSortKey: "average", rankingOrder: "ascending", filters: defaults(direction), selectedKeys: [], example: false });
   const blankLayout = () => ({ magnetPositions: {}, magnetColors: {}, particles: null, scrollY: 0 });
 
@@ -199,9 +186,12 @@
     const state = blankState(direction), value = saved.state;
     const { magnet, dust } = DIRECTIONS[direction];
     const typedIds = (values, catalogue) => ids(Array.isArray(values) ? values : []).filter(key => key.startsWith(`${catalogue}:`));
+    const magnetKeys = ids(Array.isArray(value.magnetKeys) ? value.magnetKeys : [])
+      .filter(key => key.startsWith(`${magnet}:`) || key === popularityKey(direction)).slice(0, 3);
     return {
-      state: { ...state, magnetKeys: ids(Array.isArray(value.magnetKeys) ? value.magnetKeys : [])
-        .filter(key => key.startsWith(`${magnet}:`) || key === popularityKey(direction)).slice(0, 3),
+      state: { ...state, magnetKeys,
+        magnetStrengths: Object.fromEntries(magnetKeys.map(key => [key, normalizeStrength(value.magnetStrengths?.[key])])
+          .filter(([, strength]) => strength !== 1)),
         selectedKeys: typedIds(value.selectedKeys, dust).slice(0, 3),
         dustLimit: dustLimit(value.dustLimit), rankingSortKey: typeof value.rankingSortKey === "string" ? value.rankingSortKey : "average",
         rankingOrder: value.rankingOrder === "descending" ? "descending" : "ascending",
@@ -244,7 +234,7 @@
     let cohorts = [];
     let catalogue = new Map(), lookup = new Map(), magnets = [], vectors = [], candidates = [], displayed = [], ranking = [];
     let popularity;
-    let persistent = true, warned = false, revision = 0, colorByMagnet = false, motion = DEFAULT_MOTION;
+    let persistent = true, warned = false, revision = 0, colorByMagnet = false;
     const listeners = new Set();
     function storageFailure() {
       persistent = false;
@@ -259,7 +249,7 @@
       if (!data) return;
       try {
         if (!storage) { storageFailure(); return; }
-        const serialized = JSON.stringify({ version: VERSION, direction, colorByMagnet, motion, sessions: Object.fromEntries(sessions) });
+        const serialized = JSON.stringify({ version: VERSION, direction, colorByMagnet, sessions: Object.fromEntries(sessions) });
         storage.setItem(STORAGE_KEY, serialized);
         if (storage.getItem(STORAGE_KEY) !== serialized) storageFailure();
       } catch (_) { storageFailure(); }
@@ -267,7 +257,7 @@
     function snapshot() {
       const state = session.state;
       const visible = new Set(state.displayedKeys);
-      return { ...state, version: VERSION, direction, revision, colorByMagnet, motion, magnets, genreCohorts: cohorts, candidateDust: candidates, displayedDust: displayed,
+      return { ...state, version: VERSION, direction, revision, colorByMagnet, magnets, genreCohorts: cohorts, candidateDust: candidates, displayedDust: displayed,
         ranking, lookup, metadataStatus, persistent, popularity, mixed: magnets.some(magnet => magnet.kind === "popularity"),
         activeMagnetKeys: magnets.map(magnet => magnet.key),
         missingMetadataIds: direction === FORWARD ? state.candidateKeys.filter(key => !lookup.get(key)?.metadata) : [],
@@ -355,7 +345,6 @@
           }
           direction = saved.direction;
           colorByMagnet = saved.colorByMagnet === true;
-          motion = readMotion(saved.motion);
         } else {
           const legacy = read(LEGACY_KEY);
           if (legacy?.version !== 1 || legacy.state?.version !== 1 || !Array.isArray(legacy.state.movieIds)) return false;
@@ -428,6 +417,8 @@
         const keys = validMagnets(values);
         if (keys.length === session.state.magnetKeys.length && keys.every((key, index) => key === session.state.magnetKeys[index])) return snapshot();
         session.state.magnetKeys = keys;
+        session.state.magnetStrengths = Object.fromEntries(Object.entries(session.state.magnetStrengths)
+          .filter(([key]) => keys.includes(key)));
         session.state.example = false;
         return derive({ rescore: true });
       },
@@ -440,10 +431,17 @@
         colorByMagnet = value === true;
         return publish();
       },
-      setMotion(patch) {
-        const next = readMotion({ ...motion, ...patch });
-        if (Object.keys(MOTION_RANGES).every(key => next[key] === motion[key])) return snapshot();
-        motion = next;
+      setMagnetStrength(key, value) {
+        const strengths = session.state.magnetStrengths;
+        const strength = normalizeStrength(value);
+        if (!magnets.some(magnet => magnet.key === key) || strength === (strengths[key] ?? 1)) return snapshot();
+        session.state.magnetStrengths = { ...strengths, [key]: strength };
+        if (strength === 1) delete session.state.magnetStrengths[key];
+        return publish();
+      },
+      resetMagnetStrengths() {
+        if (!Object.keys(session.state.magnetStrengths).length) return snapshot();
+        session.state.magnetStrengths = {};
         return publish();
       },
       setFilters(patch) {
@@ -478,7 +476,7 @@
     };
     return api;
   }
-  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, DIRECTIONS, DEFAULT_MOTION, MOTION_RANGES, keyFor, catalogueFor, magnetScoreLabel, cohortDescription,
+  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, DIRECTIONS, keyFor, catalogueFor, magnetScoreLabel, cohortDescription,
     averageLabel, formatPercentile, formatRawScore, mixedEvidence, defaults, joinRecords,
     passesFilters, createScoreAccessor, forwardVectors, rankCorpus, sampleDust, createContext };
 });

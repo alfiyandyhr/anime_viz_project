@@ -2,7 +2,6 @@
 // Connect one directional dust snapshot to the field, details and analysis.
 (function (root) {
   let context, composition, latest, rankingPage = 0, rankingSignature = "";
-  let syncMotionControls;
   let scrollRestored = false, pendingNotice = "", metadataLoading = false;
   let movieDetailsRequest, focusedMagnetKey = null, inspectedMovieKey = null;
   const $ = selector => document.querySelector(selector);
@@ -129,11 +128,13 @@
   function publish(snapshot) {
     const switched = latest.direction !== snapshot.direction;
     const recolor = latest.colorByMagnet !== snapshot.colorByMagnet;
-    const motionChanged = latest.motion !== snapshot.motion;
+    const colorMetricChanged = latest.mixed !== snapshot.mixed;
+    const magnetsChanged = switched || latest.activeMagnetKeys.join('|') !== snapshot.activeMagnetKeys.join('|');
+    const strengthOnly = latest.magnetStrengths !== snapshot.magnetStrengths && latest.magnets === snapshot.magnets;
     latest = snapshot;
-    if (motionChanged) {
-      syncMotionControls(snapshot.motion);
-      dustChart?.setMotion?.(snapshot.motion);
+    if (strengthOnly) {
+      syncMotionControls();
+      dustChart?.setMagnetStrengths?.(snapshot.magnetStrengths);
       return;
     }
     if (switched || !snapshot.activeMagnetKeys.includes(focusedMagnetKey)) focusedMagnetKey = null;
@@ -146,8 +147,13 @@
       magnetColors.set(key, value);
       used.add(value);
     });
+    if (magnetsChanged) renderMotionControls();
     if (switched) updateDirectionControls();
     $('#dust-color-by-magnet').checked = snapshot.colorByMagnet;
+    if (colorMetricChanged) {
+      $('#dust-color-label').textContent = snapshot.mixed
+        ? 'Color dust by highest attraction percentile' : 'Color dust by highest similarity score';
+    }
     if (recolor) refreshDustColors();
     const records = snapshot.displayedKeys.map(key => snapshot.lookup.get(key).record);
     const dustColors = new Map(snapshot.displayedDust.map(match => [
@@ -267,10 +273,12 @@
   }
   async function loadPopularity() {
     if (!isReverse()) { void loadMetadata(); return; }
-    if (!['idle', 'unavailable'].includes(latest.popularity.status)) return;
+    const { status } = latest.popularity;
+    if (!['idle', 'unavailable'].includes(status)) return;
     context.setMoviePopularity(null, 'loading');
     renderRecommendations();
-    const payload = await AnivizData.moviePopularity(recommendationState.data).catch(() => null);
+    const payload = await AnivizData.moviePopularity(recommendationState.data, { retry: status === 'unavailable' })
+      .catch(() => null);
     context.setMoviePopularity(payload, payload ? 'ready' : 'unavailable');
     if (isReverse()) renderRecommendations();
     restoreScroll();
@@ -297,8 +305,11 @@
     context = AnivizDust.createContext({ storage, onNotice: notice });
     context.restore();
     latest = context.snapshot();
-    syncMotionControls = bindMotionControls();
-    syncMotionControls(latest.motion);
+    $('#dust-magnet-strengths').addEventListener('input', event => {
+      const input = event.target;
+      context.setMagnetStrength(input.dataset.magnetStrength, input.valueAsNumber);
+    });
+    $('#reset-dust-motion').addEventListener('click', () => context.resetMagnetStrengths());
     composition = AnivizComposition.create({ onError: error => console.error(error) });
     document.querySelectorAll('[data-dust-chart]').forEach(container => {
       const kind = container.dataset.dustChart;
@@ -334,28 +345,28 @@
     bindRecommendationControls();
     void loadMetadata();
   }
-  function bindMotionControls() {
-    const formats = {
-      damping: value => [`${value} s⁻¹`, `${value} per second`],
-      strength: value => [`${value.toFixed(1)}×`, `${value.toFixed(1)} times`],
-      rankSpread: value => [`${value}%`, `${value} percent`]
-    };
-    const controls = Object.entries(AnivizDust.MOTION_RANGES).map(([key, range]) => {
-      const input = $(`[data-dust-motion="${key}"]`);
-      const output = $(`output[for="${input.id}"]`);
-      Object.assign(input, range);
-      input.addEventListener('input', () => context.setMotion({ [key]: input.valueAsNumber }));
-      return { key, input, output };
-    });
-    $('#reset-dust-motion').addEventListener('click', () => context.setMotion(AnivizDust.DEFAULT_MOTION));
-    return motion => {
-      for (const { key, input, output } of controls) {
-        const [visible, spoken] = formats[key](motion[key]);
-        input.value = motion[key];
-        input.setAttribute('aria-valuetext', spoken);
-        output.value = visible;
-      }
-    };
+  function renderMotionControls() {
+    const controls = $('#dust-magnet-strengths');
+    controls.closest('fieldset').hidden = !latest.magnets.length;
+    controls.innerHTML = latest.magnets.map(({ key, title }, index) => {
+      const id = `dust-magnet-strength-${index + 1}`;
+      return `<div class="dust-motion-setting" style="--magnet-color:${color(key)}">
+        <label for="${id}">M${index + 1} · ${escapeHTML(title)}</label>
+        <output for="${id}" aria-hidden="true"></output>
+        <input id="${id}" data-magnet-strength="${escapeAttribute(key)}" type="range" min="0" max="2" step="0.1"
+          aria-label="${escapeAttribute(title)} strength">
+      </div>`;
+    }).join('');
+    syncMotionControls();
+  }
+  function syncMotionControls() {
+    for (const input of $('#dust-magnet-strengths').querySelectorAll('input')) {
+      const strength = latest.magnetStrengths[input.dataset.magnetStrength] ?? 1;
+      const value = strength.toFixed(1);
+      input.value = value;
+      input.setAttribute('aria-valuetext', `${value} times`);
+      input.previousElementSibling.value = `${value}×`;
+    }
   }
   function loadLayout() {
     const layout = context.getLayout();

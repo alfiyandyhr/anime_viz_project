@@ -4,7 +4,7 @@ const { readFileSync } = require("node:fs");
 const { createHash } = require("node:crypto");
 const vm = require("node:vm");
 const DustContext = require("../frontend/common/dust-context.js");
-const { createContext, DEFAULT_MOTION } = DustContext;
+const { createContext } = DustContext;
 const { getDustMatches, defaultMagnetPositions, dustAttraction, createDustNodes, stepDust, layoutDust } = require("../frontend/recommendations/dust-magnet.js");
 const data = JSON.parse(readFileSync(require.resolve("../data/movie_recommendations.json"), "utf8"));
 const binary = readFileSync(require.resolve("../data/movie_anime_scores.bin"));
@@ -128,45 +128,49 @@ test("one magnet gives stronger published matches a smaller settled radius", () 
   assertReadable(nodes, [anchor], 640, 500);
 });
 
-test("motion settings scale the pull and damping independently of clearance and collisions", () => {
-  const anchors = [{ x: 320, y: 250 }];
-  const settings = (patch) => ({ ...DEFAULT_MOTION, ...patch });
-  const step = (nodes, patch) => stepDust(nodes, anchors, 640, 500, 1 / 120, false, settings(patch));
+test("magnet strength scales its pull while dust collisions still work at zero", () => {
+  const step = (nodes, strength) => stepDust(nodes, [{ x: 320, y: 250, strength }], 640, 500, 1 / 120);
   const weakPull = grain([.5], 200, 250);
   const strongPull = { ...weakPull };
-  step([weakPull], { strength: .5 });
-  step([strongPull], { strength: 1.5 });
-  assert.ok(Math.abs(strongPull.vx / weakPull.vx - 3) < 1e-10);
+  step([weakPull], .5);
+  step([strongPull], 2);
+  assert.ok(Math.abs(strongPull.vx / weakPull.vx - 4) < 1e-10);
 
-  const drifting = { ...grain([-.1], 200, 250), vx: 120 };
-  const damped = { ...drifting };
-  step([drifting], { damping: 6 });
-  step([damped], { damping: 16 });
-  assert.ok(Math.abs(damped.vx / drifting.vx - Math.exp(-10 / 120)) < 1e-10);
-
-  const contacts = [grain([-.1], 349, 250), grain([-.2], 356, 250)];
+  const contacts = [grain([.5], 349, 250), grain([.6], 356, 250)];
   const other = contacts.map(node => ({ ...node }));
-  step(contacts, { strength: .5 });
-  step(other, { strength: 1.5 });
+  step(contacts, 0);
+  stepDust(other, [], 640, 500, 1 / 120);
   assert.deepEqual(other, contacts);
   assert.ok(contacts[0].vx < contacts[1].vx);
 });
 
-test("changing rank spread refreshes preferred distances in place and zero removes the rank force", () => {
-  const anchors = [{ x: 320, y: 250 }];
-  const starting = { ...grain([.5], 370, 250), winnerPercentile: .5, vx: 15 };
-  const node = { ...starting };
-  const step = rankSpread => stepDust([node], anchors, 640, 500, 1 / 120, false, { ...DEFAULT_MOTION, rankSpread });
-  step(100);
-  const extended = node.scoreLayout.preferredRadius;
-  assert.ok(node.vx > starting.vx);
-  Object.assign(node, starting);
-  step(80);
-  assert.ok(node.scoreLayout.preferredRadius < extended);
-  Object.assign(node, starting);
-  step(0);
-  assert.equal(node.scoreLayout.preferredRadius, null);
-  assert.ok(node.vx < starting.vx);
+test("a stronger magnet wins near ties and uses its own distance percentile", () => {
+  for (const mixed of [false, true]) {
+    const values = mixed ? [.51, .50] : [-.1, -.11];
+    const anchors = [{ x: 100, y: 250, strength: 1 }, { x: 540, y: 250, strength: 1 }];
+    const node = { ...grain(values, 320, 250), magnetPercentiles: [.9, .6], winnerPercentile: .9 };
+    stepDust([node], anchors, 640, 500, 1 / 60, mixed);
+    assert.equal(node.scoreLayout.winner, 0);
+    const originalRadius = node.scoreLayout.preferredRadius;
+    anchors[1].strength = 2;
+    simulate([node], anchors, 640, 500, 480, mixed);
+    assert.equal(node.scoreLayout.winner, 1);
+    assert.ok(node.scoreLayout.preferredRadius > originalRadius);
+    assert.ok(distanceTo(node, anchors[1]) < distanceTo(node, anchors[0]));
+    assert.deepEqual(node.scores, values);
+  }
+});
+
+test("a zero-strength magnet exerts no pull, spread, or core repulsion", () => {
+  const anchors = [{ x: 200, y: 250, strength: 0 }, { x: 440, y: 250, strength: .8 }];
+  const muted = { ...grain([.9, .5], 204, 250), magnetPercentiles: [.99, .7] };
+  const single = { ...grain([.5], 204, 250), magnetPercentiles: [.7] };
+  const motion = ({ x, y, vx, vy }) => [x, y, vx, vy];
+  for (let tick = 0; tick < 120; tick++) {
+    stepDust([muted], anchors, 640, 500);
+    stepDust([single], [anchors[1]], 640, 500);
+    assert.deepEqual(motion(muted), motion(single));
+  }
 });
 
 function distanceTo(node, anchor) {
