@@ -94,7 +94,7 @@ async function verifyZoom(page, selector, movie, dust) {
     await page.locator('#recommendation-chart .dust-node').first().waitFor();
     const dust = '[data-dust-chart="reception"]';
     await verifyZoom(page, dust, false, true);
-    await page.selectOption('#dust-direction', 'anime-to-movies');
+    await page.selectOption('#dust-type', 'movie-titles');
     await page.locator('#recommendation-chart [data-match-id^="tmdb:"]').first().waitFor();
     await verifyZoom(page, dust, true, true);
 

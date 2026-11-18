@@ -1,8 +1,10 @@
 # Dust context and chart interfaces
 
-Open `frontend/dust-magnet/index.html` to exercise both directions. The shared
-four-view disclosure in `navigation.js` supports keyboard shortcuts and
-dismissal. Legacy URLs redirect through `redirect.js`.
+Open `frontend/dust-magnet/index.html` and select **Anime titles** or **Movie titles**
+under **Dust type**. `dust-main.js` maps these options to the existing direction
+keys used by the context and session storage. The shared four-view disclosure in
+`navigation.js` supports keyboard shortcuts and dismissal. Legacy URLs redirect
+through `redirect.js`.
 
 ## Ownership
 

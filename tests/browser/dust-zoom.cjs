@@ -130,7 +130,7 @@ async function assertTouchZoom(browser) {
     await button(mainView, 'Zoom out').click();
     assert.equal(await mainView.locator('.dust-grain').first().isVisible(), true);
 
-    await page.selectOption('#dust-direction', 'anime-to-movies');
+    await page.selectOption('#dust-type', 'movie-titles');
     assert.equal((await camera(mainView)).k, 1);
     await zoomToPosters(mirrorView);
     assert.equal(await mirrorView.locator('.dust-poster img[src]').count(), 0);

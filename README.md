@@ -8,18 +8,18 @@ A visual story discovery tool built with Python/Flask, AniList GraphQL API, and 
 
 ## Four views
 
-The root URL opens **Dust & Magnet** with an **Example** Inception magnet.
-Switch Direction to **Anime → Movies** for the **Example** Attack on Titan magnet. Use **Title** to search by title, alias, or year. Use **Genre cohort** to add a group of titles by genre. Use **Popularity** or **Score** to attract dust by audience size or rating. Fill up to three slots and remove any magnet with ×.
+The root URL opens **Dust & Magnet** with **Anime titles** as dust and Inception as the example magnet.
+Set **Dust type** to **Movie titles** for movie dots and Attack on Titan as the first-use example. Choose the **Movie** magnet type with anime dust or **Anime** with movie dust to search by title, alias, or year. **Genre cohort** also draws from the other catalogue. Use **Popularity** or **Score** to attract dust by audience size or rating. Fill up to three slots and remove any magnet with ×.
 The compact dropdown contains exactly four destinations:
 
 | View | Data and interactions |
 | --- | --- |
-| Dust & Magnet | Choose either direction and a field of 30, 60, or 90 dots. Both directions include similarity connections, a field mirror, reception, genres, release years, and a full ranking. Select a dust dot or a title magnet to see it in the In Focus panel. Anime dust also shows studio charts. |
+| Dust & Magnet | Choose anime or movie titles and a field of 30, 60, or 90 dots. Both dust types include similarity connections, a field mirror, reception, genres, release years, and a full ranking. Select a dust dot or a title magnet to see it in the In Focus panel. Anime dust also shows studio charts. |
 | History | Scroll a pair of release timelines to see each year’s most popular anime and its closest movie match. Both titles have synopses and the connection shows cosine similarity. |
 | Network | Actor/character/work collaboration graph, defaulting to Current dust when a saved anime-dust context exists, otherwise Catalogue. A local selector switches scopes without changing other views. The 35-work display cap and sampled Japanese cast credits are disclosed. |
 | Full Catalogue | The loaded 1,000-title metadata sample, with its own search, filters, sorting, pagination, details and automatic shortlist comparison. Saved movies never narrow its scope. |
 
-Direction, the magnet picker, removable magnets, dot count, and **Reset positions** sit in the left panel.
+The dust type, magnet picker, removable magnets, dot count, and **Reset positions** sit in the left panel.
 The right panel follows the latest selected title. Anime details include AniList
 images, synopsis, tags, and sampled Japanese cast. Movie details show TMDB
 posters, the archived synopsis, genres, keywords, and a TMDB link. The movie
@@ -68,15 +68,15 @@ modes to local `scope=dust` / `scope=catalogue`; unavailable dust falls back to
 Catalogue. Other query parameters are preserved. Flask also serves `/history`
 and `/catalogue`, plus the legacy clean paths with or without trailing slashes.
 
-Session storage uses `aniviz-dust-session-v2` to keep the active direction and
+Session storage uses `aniviz-dust-session-v2` to keep the active dust type and
 separate magnets, filters, dot counts, sorts, selections, positions, and scroll
-for each direction. A saved session preserves an explicitly empty field. The
-previous v1 session imports into Movie → Anime. Otherwise, a resolvable
-`aniviz_seed_movie.tmdbId` takes priority over the Inception example. The current
-matrix recomputes dust membership on restore. Anime → Movies starts with Cowboy
-Bebop on first entry. Catalogue filters
-use `aniviz-catalogue-filters`; History's annual data and Network's local controls
-stay independent. Storage failure permits in-memory use with one concise notice.
+for each type, using the existing direction keys. A saved session preserves an
+explicitly empty field. The previous v1 session imports into **Anime titles**.
+Otherwise, a resolvable `aniviz_seed_movie.tmdbId` takes priority over the
+Inception example. The current matrix recomputes dust membership on restore.
+**Movie titles** uses Attack on Titan on first entry. Catalogue filters use
+`aniviz-catalogue-filters`, while History's annual data and Network's local
+controls stay independent. Storage failure permits in-memory use with one concise notice.
 Explicit section links take priority over saved scroll on entry; reload and
 Back/Forward restore the saved location, including anchored URLs.
 
@@ -284,10 +284,11 @@ research snapshot.
 
 Open the root URL, choose **Dust & Magnet** in the dropdown, or visit
 `frontend/dust-magnet/index.html`. Start with a title search or pick **Genre cohort**.
-Try **Inception** with **Science Fiction movies**, or **Sci-Fi anime**
-in the reverse direction. Each cohort score averages the signed
-cosines to its sampled titles. A cohort occupies one slot and contributes one score
-to the combined average. Its membership stays fixed when you filter the dust.
+With **Anime titles**, try **Inception** with **Science Fiction movies**.
+With **Movie titles**, try **Attack on Titan** with **Sci-Fi anime**. Each cohort
+score averages the signed cosines to its sampled titles. A cohort occupies one
+slot and contributes one score to the combined average. Its membership stays
+fixed when you filter the dust.
 
 Choose **Popularity** to use AniList list-user counts for anime or TMDB
 popularity for movies. Choose **Score** to use AniList ratings out of 100 or
@@ -303,9 +304,9 @@ ranking with an unavailable combined rank.
 Choose 30, 60, or 90 dots and use **Reset positions** directly in the left panel.
 Under **Magnet strength**, each active magnet has a slider from 0× to 2×.
 Higher strengths increase the magnet’s pull, and 0× turns it off.
-**Reset strengths** restores each strength in the current direction to 1×.
-The browser session saves strengths separately for each direction. Dust coloring
-is shared across directions.
+**Reset strengths** restores each strength for the selected dust type to 1×.
+The browser session saves strengths separately for each dust type. Dust coloring
+is shared across types.
 Open **Filter** to narrow the displayed titles. Drag magnets, or focus
 one and use arrow keys, to rearrange the field. Hover or keyboard-focus an anime
 for its title and cosine scores rounded to three decimals. Click or press Enter

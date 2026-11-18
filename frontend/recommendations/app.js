@@ -168,7 +168,7 @@ function bindRecommendationControls() {
     });
     document.querySelector(`#retry-${type}`).addEventListener("click", () => AnivizMain.loadMetricData());
   }
-  document.querySelector("#dust-direction").addEventListener("change", event => AnivizMain.switchDirection(event.target.value));
+  document.querySelector("#dust-type").addEventListener("change", event => AnivizMain.switchDustType(event.target.value));
   document.querySelector("#recommendation-retry").addEventListener("click", () => {
     recommendationState.error = null;
     renderRecommendations();
@@ -185,6 +185,7 @@ function pickerCatalogue() {
 function resetMagnetPicker() {
   const { direction, magnet, example, records, label } = pickerCatalogue();
   const { genreCohorts } = AnivizMain.snapshot();
+  document.querySelector("#title-magnet-label").textContent = humanize(label);
   const search = document.querySelector("#movie-search");
   search.value = "";
   search.placeholder = `Search ${label} titles or aliases`;
@@ -275,10 +276,10 @@ async function loadRecommendations() {
     document.querySelector("#footer-cache").textContent = "Data mode: published similarity snapshot";
     document.querySelector("#movie-search").disabled = false;
     AnivizMain.initialize(data);
-    document.querySelector("#dust-direction").disabled = false;
+    document.querySelector("#dust-type").disabled = false;
     document.querySelector("#magnet-type").disabled = false;
     document.querySelector("#recommendation-method-data").textContent =
-      `${numberFormatter.format(data.meta.anime_count)} AniList anime × ${numberFormatter.format(data.meta.movie_count)} TMDB movies: ${numberFormatter.format(data.meta.pair_count)} pairs. Both directions read the same cosine for each movie–anime pair. Use up to three magnets from titles, genre cohorts, Popularity, and Score. Computed ${formatDate(data.meta.generated_at)}.`;
+      `${numberFormatter.format(data.meta.anime_count)} AniList anime × ${numberFormatter.format(data.meta.movie_count)} TMDB movies: ${numberFormatter.format(data.meta.pair_count)} pairs. Anime and movie dust use the same cosine for each movie–anime pair. Use up to three magnets from titles, genre cohorts, Popularity, and Score. Computed ${formatDate(data.meta.generated_at)}.`;
     document.querySelector("#recommendation-method-model").textContent =
       `${data.meta.model} embeds titles, genres, tags, and synopses. Cosine similarity compares the normalized story vectors.`;
   } catch (error) {

@@ -18,7 +18,7 @@ const reverseKey = `tmdb:${reverseLeader.id}`;
 const leaderScore = reverseScore.toFixed(3);
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 const url = path => new URL(path, base).href;
-const forward = 'movie-to-anime', reverse = 'anime-to-movies';
+const animeTitles = 'anime-titles', movieTitles = 'movie-titles';
 
 async function assertMagnetSearchFocus(page) {
   const search = page.locator('#movie-search');
@@ -32,8 +32,8 @@ async function assertMagnetSearchFocus(page) {
     assert.equal(await popup.isVisible(), false);
   };
 
-  for (const direction of [forward, reverse]) {
-    await page.selectOption('#dust-direction', direction);
+  for (const dustType of [animeTitles, movieTitles]) {
+    await page.selectOption('#dust-type', dustType);
     assert.equal(await example.getAttribute('aria-pressed'), 'true');
     await example.click();
     assert.equal(await example.getAttribute('aria-pressed'), 'false');
@@ -108,7 +108,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     await search.click();
     await search.press('Tab');
   } else {
-    await page.getByText('Direction', { exact: true }).tap();
+    await page.getByText('Dust type', { exact: true }).tap();
   }
   assert.equal(await popup.isVisible(), false);
   await filter.evaluate(node => { node.open = false; });
@@ -131,7 +131,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     const field = page.locator('#recommendation-chart');
     const dot = index => field.locator('.dust-node').nth(index);
     const ready = () => dot(0).waitFor();
-    const direction = value => page.selectOption('#dust-direction', value);
+    const dustTypePicker = page.getByRole('combobox', { name: 'Dust type', exact: true });
     const ranking = page.locator('[data-dust-rank-id]');
     const fieldOptions = page.locator('[data-field-options]');
     const evidence = () => page.evaluate(() => {
@@ -183,6 +183,15 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
 
     await page.goto(url(''));
     await ready();
+    assert.deepEqual(await dustTypePicker.locator('option').allTextContents(), ['Anime titles', 'Movie titles']);
+    assert.equal(await dustTypePicker.inputValue(), animeTitles);
+    assert.equal(await page.getByRole('radio', { name: 'Movie', exact: true }).isChecked(), true);
+    const radioTextStyle = locator => locator.evaluate(node => {
+      const { color, fontSize, fontWeight, marginBottom } = getComputedStyle(node);
+      return { color, fontSize, fontWeight, marginBottom };
+    });
+    assert.deepEqual(await radioTextStyle(page.locator('#title-magnet-label')),
+      await radioTextStyle(page.locator('#magnet-type label').filter({ hasText: 'Genre cohort' })));
     await page.getByRole('checkbox', { name: 'Color dust by highest similarity score' }).check();
     await ranking.first().locator('img').waitFor();
     assert.match(await ranking.first().locator('img').getAttribute('src'), /^https:\/\/s4\.anilist\.co\//);
@@ -200,7 +209,8 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     await receptionChart.scrollIntoViewIfNeeded();
     await receptionChart.locator('svg').waitFor();
     await page.evaluate(() => scrollTo(0, 0));
-    await direction(reverse);
+    await dustTypePicker.selectOption(movieTitles);
+    assert.equal(await page.getByRole('radio', { name: 'Anime', exact: true }).isChecked(), true);
     assert.equal(await page.locator('[data-anime-chart] svg').count(), 0);
     await ready();
     assert.match(await page.locator('#movie-magnets').innerText(), /Attack on Titan.*Example/);
@@ -366,14 +376,14 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     const savedReverse = await evidence();
     await page.evaluate(() => scrollTo(0, 620));
     const reverseScroll = await page.evaluate(() => scrollY);
-    const switchWithoutScrolling = value => page.evaluate(direction => {
-      const select = document.querySelector('#dust-direction');
-      select.value = direction;
+    const switchWithoutScrolling = value => page.evaluate(dustType => {
+      const select = document.querySelector('#dust-type');
+      select.value = dustType;
       select.dispatchEvent(new Event('change'));
     }, value);
-    await switchWithoutScrolling(forward);
+    await switchWithoutScrolling(animeTitles);
     assert.deepEqual(await evidence(), inception);
-    await switchWithoutScrolling(reverse);
+    await switchWithoutScrolling(movieTitles);
     assert.deepEqual(await evidence(), savedReverse);
     assert.ok(Math.abs(await page.evaluate(() => scrollY) - reverseScroll) < 5);
     assert.deepEqual(await positions(), moved);
@@ -411,11 +421,11 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     await page.locator(`[data-remove-magnet="${savedReverse.magnetKeys[1]}"]`).click();
     assert.equal((await evidence()).rankingSortKey, 'average');
     for (const key of (await evidence()).magnetKeys) await page.locator(`[data-remove-magnet="${key}"]`).click();
-    await direction(forward);
+    await dustTypePicker.selectOption(animeTitles);
     assert.deepEqual(await evidence(), inception);
-    await direction(reverse);
+    await dustTypePicker.selectOption(movieTitles);
     assert.deepEqual((await evidence()).magnetKeys, []);
-    await direction(forward);
+    await dustTypePicker.selectOption(animeTitles);
     if (!(await fieldOptions.evaluate(node => node.open))) await fieldOptions.locator('summary').click();
     await page.locator('#search-input').fill('No anime matches this string 2562');
     await page.goto(url('frontend/network/index.html?scope=dust'));
@@ -436,7 +446,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     const mobile = await phone.newPage();
     mobile.on('pageerror', error => errors.push(error.message));
     await mobile.goto(url(''));
-    await mobile.selectOption('#dust-direction', reverse);
+    await mobile.selectOption('#dust-type', movieTitles);
     const mobileDot = mobile.locator('#recommendation-chart .dust-node');
     await mobileDot.first().waitFor();
     await assertTitleBrowse(mobile, 'anime', anime, 'anilist', true);
@@ -455,7 +465,8 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     }), true);
     await mobile.reload();
     await mobileDot.first().waitFor();
-    assert.equal(await mobile.inputValue('#dust-direction'), reverse);
+    assert.equal(await mobile.inputValue('#dust-type'), movieTitles);
+    assert.equal(await mobile.getByRole('radio', { name: 'Anime', exact: true }).isChecked(), true);
     assert.match(await mobile.locator('#recommendation-detail').innerText(), /Comparing 2 movies/);
     const fallback = await browser.newContext({ reducedMotion: 'reduce' });
     await fallback.route('**/data.json', route => route.fulfill({ status: 503 }));
@@ -464,13 +475,13 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     retry.on('pageerror', error => errors.push(error.message));
     await retry.goto(url(''));
     await retry.locator('#dust-retry').waitFor();
-    await retry.selectOption('#dust-direction', reverse);
+    await retry.selectOption('#dust-type', movieTitles);
     assert.equal(await retry.locator('.dust-node').count(), 0);
     await fallback.unroute('**/movie_anime_scores.bin');
     await retry.locator('#dust-retry').click();
     await retry.locator('.dust-node').first().waitFor();
     assert.equal(await retry.locator('[data-dust-rank-id]').first().innerText(), reverseLeader.title);
     assert.deepEqual(errors, []);
-    console.log('Verified Attack on Titan in both layouts, three-decimal scores, movie charts, ranking drawer, direction sessions and Network fallback.');
+    console.log('Verified Attack on Titan in both layouts, three-decimal scores, movie charts, ranking drawer, dust type sessions and Network fallback.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

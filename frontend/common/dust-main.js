@@ -5,6 +5,10 @@
   let scrollRestored = false, pendingNotice = "", metadataLoading = false;
   let movieDetailsRequest, focusedMagnetKey = null, inspectedMovieKey = null;
   const $ = selector => document.querySelector(selector);
+  const dustTypeByDirection = {
+    [AnivizDust.FORWARD]: 'anime-titles',
+    [AnivizDust.REVERSE]: 'movie-titles'
+  };
   const magnetColors = new Map();
   const isReverse = () => latest.direction === AnivizDust.REVERSE;
   const dustNoun = () => isReverse() ? "movies" : "anime";
@@ -148,7 +152,7 @@
       used.add(value);
     });
     if (magnetsChanged) renderMotionControls();
-    if (switched) updateDirectionControls();
+    if (switched) updateDustTypeControls();
     $('#dust-color-by-magnet').checked = snapshot.colorByMagnet;
     if (colorMetricChanged) {
       $('#dust-color-label').textContent = snapshot.mixed
@@ -381,9 +385,9 @@
     dustChart = positions.length && particles.width > 0 && particles.height > 0
       ? { ...particles, positions: new Map(positions.map(node => [node.key, node])), stop() {} } : null;
   }
-  function updateDirectionControls() {
+  function updateDustTypeControls() {
     const reverse = isReverse();
-    $('#dust-direction').value = latest.direction;
+    $('#dust-type').value = dustTypeByDirection[latest.direction];
     $('#dust-limit-control span').textContent = reverse ? 'Movie dots' : 'Anime dots';
     $('#filter-title').textContent = `Filter ${dustNoun()}`;
     $('#dust-filter-search-label').textContent = reverse ? 'Search titles or aliases' : 'Search titles, studios, or actors';
@@ -423,7 +427,7 @@
     initialize(data) {
       loadLayout();
       context.setSources(data, null, { seedExample: true });
-      updateDirectionControls();
+      updateDustTypeControls();
       if (isReverse()) {
         void loadMetricData();
         loadMovieDetails();
@@ -431,8 +435,9 @@
       restoreScroll();
     },
     setScores(scores) { context.setSources(recommendationState.data, scores); restoreScroll(); },
-    switchDirection(direction) {
-      if (direction === latest.direction || !Object.hasOwn(AnivizDust.DIRECTIONS, direction)) return;
+    switchDustType(dustType) {
+      const direction = Object.keys(dustTypeByDirection).find(key => dustTypeByDirection[key] === dustType);
+      if (!direction || direction === latest.direction) return;
       stopDustChart();
       saveLayout();
       closeDrawer();

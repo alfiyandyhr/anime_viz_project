@@ -7,13 +7,13 @@ const catalogue = require('../../data/movie_recommendations.json');
 const popularityIds = new Set(dashboard.anime.filter(row => Number.isFinite(row.popularity)).map(row => String(row.id)));
 const animeEligible = catalogue.anime.filter(row => popularityIds.has(row.id)).length;
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
-const forward = 'movie-to-anime', reverse = 'anime-to-movies';
+const animeTitles = 'anime-titles', movieTitles = 'movie-titles';
 const anime = 'anilist:popularity', movies = 'tmdb:popularity';
 const average = /Average attraction percentile/;
 const dot = page => page.locator('#recommendation-chart .dust-node');
 const add = page => page.locator('#add-popularity-magnet');
 const rank = page => page.locator('[data-dust-ranking-body]');
-const switchTo = (page, direction) => page.selectOption('#dust-direction', direction);
+const switchTo = (page, direction) => page.selectOption('#dust-type', direction);
 const choosePopularity = page => page.getByRole('radio', { name: 'Popularity' }).check();
 const ready = page => dot(page).first().waitFor();
 const mixed = page => page.waitForFunction(() => AnivizMain.snapshot().mixed && AnivizMain.snapshot().ranking.length === 1000);
@@ -129,7 +129,7 @@ const state = page => page.evaluate(() => {
 
     assert.equal(movieRequests, 0, 'anime reception uses AniList data');
     movieResponse = 'missing';
-    await switchTo(page, reverse);
+    await switchTo(page, movieTitles);
     await ready(page);
     const reverseExample = await state(page);
     await choosePopularity(page);
@@ -168,9 +168,9 @@ const state = page => page.evaluate(() => {
     assert.equal(Number(cells[5]), reception.vote_average);
     assert.equal(Number(cells[6]), rawPopularity);
     await cataloguePage.close();
-    await switchTo(page, forward);
+    await switchTo(page, animeTitles);
     assert.deepEqual((await state(page)).selectedKeys, selectedAnime);
-    await switchTo(page, reverse);
+    await switchTo(page, movieTitles);
     assert.deepEqual(await state(page), movieBlend);
 
     movieResponse = 'wrong IDs';

@@ -144,9 +144,9 @@ async function setup(page, errors) {
     assert.deepEqual(await transforms(page), resetField);
     assert.deepEqual(await evidence(page), before);
     assert.deepEqual(await settings(page), custom);
-    await page.selectOption('#dust-direction', 'anime-to-movies');
+    await page.selectOption('#dust-type', 'movie-titles');
     assert.deepEqual(await settings(page), [defaultStrength]);
-    await page.selectOption('#dust-direction', 'movie-to-anime');
+    await page.selectOption('#dust-type', 'anime-titles');
     await page.reload();
     await dots(page).first().waitFor();
     assert.deepEqual(await settings(page), custom);

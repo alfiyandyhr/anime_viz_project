@@ -10,7 +10,7 @@
 
   <meta
     name="description"
-    content="Explore stories in either direction with up to three title, genre cohort, and popularity magnets."
+    content="Explore anime or movie titles with up to three magnets based on titles, genre cohorts, popularity, or score."
   >
 
   <title>AnIViz — Dust &amp; Magnet</title>
@@ -76,16 +76,16 @@
 
         <div class="dust-playground">
         <aside class="recommendation-picker" aria-label="Magnets and field controls">
-          <label class="dust-direction-label" for="dust-direction">
-            <span>Direction</span>
-            <select id="dust-direction" disabled>
-              <option value="movie-to-anime">Movie → Anime</option>
-              <option value="anime-to-movies">Anime → Movies</option>
+          <label class="picker-select-label" for="dust-type">
+            <span>Dust type</span>
+            <select id="dust-type" disabled>
+              <option value="anime-titles">Anime titles</option>
+              <option value="movie-titles">Movie titles</option>
             </select>
           </label>
           <fieldset class="magnet-type-picker" id="magnet-type" disabled>
             <legend>Magnet type</legend>
-            <label><input type="radio" name="magnet-type" value="title" checked> Title</label>
+            <label><input type="radio" name="magnet-type" value="title" checked> <span id="title-magnet-label">Movie</span></label>
             <label><input type="radio" name="magnet-type" value="genre"> Genre cohort</label>
             <label><input type="radio" name="magnet-type" value="popularity"> Popularity</label>
             <label><input type="radio" name="magnet-type" value="score"> Score</label>
@@ -107,7 +107,7 @@
           </div>
           <div id="movie-suggestions" class="movie-suggestions" aria-label="Suggested magnets"></div>
           <div id="genre-magnet-picker" hidden>
-            <label class="dust-direction-label" for="genre-magnet-choice">
+            <label class="picker-select-label" for="genre-magnet-choice">
               <span>Choose a genre</span>
               <select id="genre-magnet-choice" aria-describedby="genre-magnet-source"></select>
             </label>
@@ -294,7 +294,7 @@
         <details class="methodology">
           <summary>About / Data</summary>
           <div class="method-grid">
-            <article><h3>One million comparisons</h3><p id="recommendation-method-data">1,000 popular AniList anime × 1,000 popular TMDB movies. Both directions use the same pair scores from the complete score matrix.</p></article>
+            <article><h3>One million comparisons</h3><p id="recommendation-method-data">1,000 popular AniList anime × 1,000 popular TMDB movies. Anime and movie dust use the same pair scores from the complete score matrix.</p></article>
             <article><h3>Story similarity</h3><p id="recommendation-method-model">Qwen3-Embedding-4B embeds titles, genres, tags, and synopses. Cosine similarity compares the normalized vectors; ratings and popularity do not affect the score.</p></article>
             <article><h3>Genre cohorts</h3><p>Genre magnets use mean cosine similarity. For each dust title, the score is the arithmetic mean of its signed cosine similarities to every sampled title with that genre in the magnet catalogue. A title can belong to multiple cohorts and contribute to each of their scores. Each magnet contributes one score to the combined average. Filters narrow the dust while the cohorts stay fixed.</p></article>
             <article><h3>Popularity and score</h3><p>Popularity uses AniList list users for anime and TMDB popularity for movies. Score uses AniList ratings out of 100 and TMDB ratings out of 10. With either magnet active, each magnet’s raw values become attraction percentiles from 0 to 1. The reference sample includes titles with values for every active metric. Ties share the average rank and a sample of one gets 0.5. Dot count and filters leave the reference sample fixed. The full ranking keeps titles with missing values and supports sorting by each magnet’s raw values.</p></article>

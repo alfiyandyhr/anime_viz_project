@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const catalogue = require('../../data/movie_recommendations.json');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 const movies = 'tmdb:genre:Science Fiction', anime = 'anilist:genre:Sci-Fi';
-const forward = 'movie-to-anime', reverse = 'anime-to-movies';
+const animeTitles = 'anime-titles', movieTitles = 'movie-titles';
 const field = page => page.locator('#recommendation-chart');
 const dots = page => field(page).locator('.dust-node');
 const remove = (page, key) => page.locator(`[data-remove-magnet="${key}"]`).click();
@@ -36,6 +36,7 @@ const snapshot = page => page.evaluate(() => {
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(base);
     await dots(page).first().waitFor();
+    const inception = await snapshot(page);
     await selectGenre(page, movies);
     const scienceFictionCount = catalogue.movies.filter(movie => movie.genres.includes('Science Fiction')).length;
     assert.equal(await choice(page).locator('option:checked').innerText(), `Science Fiction movies (${scienceFictionCount})`);
@@ -51,7 +52,7 @@ const snapshot = page => page.evaluate(() => {
     await choice(page).selectOption('tmdb:genre:Horror');
     await add(page).click();
     assert.match(await page.locator('#recommendation-status').innerText(), /Three magnets are in place/);
-    await page.getByRole('radio', { name: 'Title', exact: true }).check();
+    await page.getByRole('radio', { name: 'Movie', exact: true }).check();
     await page.locator('#movie-suggestions').getByRole('button', { name: 'Interstellar' }).click();
     assert.match(await page.locator('#recommendation-status').innerText(), /Three magnets are in place/);
     assert.deepEqual(await snapshot(page), mixed);
@@ -99,7 +100,7 @@ const snapshot = page => page.evaluate(() => {
     assert.deepEqual((await snapshot(page)).magnetKeys, combined.magnetKeys);
     assert.equal(await sort.inputValue(), movies);
     assert.equal(await anchor.getAttribute('transform'), dragged);
-    await page.selectOption('#dust-direction', reverse);
+    await page.selectOption('#dust-type', movieTitles);
     await remove(page, 'anilist:16498');
     await selectGenre(page, anime);
     const sciFiCount = catalogue.anime.filter(anime => anime.genres.includes('Sci-Fi')).length;
@@ -123,17 +124,17 @@ const snapshot = page => page.evaluate(() => {
     await page.reload();
     await dots(page).first().waitFor();
     assert.deepEqual(await snapshot(page), allGenres);
-    await page.selectOption('#dust-direction', forward);
+    await page.selectOption('#dust-type', animeTitles);
     await remove(page, movies);
     assert.equal(await sort.inputValue(), 'average');
     assert.deepEqual(await snapshot(page), inception);
-    await page.selectOption('#dust-direction', reverse);
+    await page.selectOption('#dust-type', movieTitles);
     assert.deepEqual(await snapshot(page), allGenres);
 
     const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
     mobile.on('pageerror', error => errors.push(error.message));
     await mobile.goto(base);
-    await mobile.selectOption('#dust-direction', reverse);
+    await mobile.selectOption('#dust-type', movieTitles);
     await selectGenre(mobile, anime);
     await dots(mobile).first().waitFor();
     const mobileAnchor = field(mobile).getByRole('group', { name: /Sci-Fi anime magnet/ });

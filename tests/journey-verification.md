@@ -1,7 +1,7 @@
 # Popularity magnets
 
-1. Keep **Inception** in **Movie → Anime**. Add **Science Fiction movies** and
-   **Popularity**. Check that the popularity chip shows the title
+1. With **Dust type** set to **Anime titles**, keep **Inception**. Add
+   **Science Fiction movies** and **Popularity**. Check that the popularity chip shows the title
    and that Magnet strength has three sliders, each at 1×.
 2. Focus a dot and compare two dots. Check the raw cosine, raw popularity, and
    the attraction percentiles in the tooltip, mirror, focus card, comparison,
@@ -11,9 +11,9 @@
    the mirror, and that the displayed titles and ranking stay fixed. Sort by
    Inception and confirm all 1,000 titles have a raw similarity rank. Remove
    popularity to restore cosine scores.
-4. Switch to **Anime → Movies** and add **Popularity** alongside
+4. Switch to **Movie titles** and add **Popularity** alongside
    Attack on Titan. Check that the movie popularity chip shows the title.
-   Switch directions and reload to check saved magnets,
+   Switch dust types and reload to check saved magnets,
    strengths, sorts, and selections.
 5. Block the dashboard or movie popularity request and reload a saved
    popularity magnet. The chip is inactive and the remaining magnets still
@@ -29,21 +29,21 @@ geometry refresh after a score change.
 
 # Genre cohort magnets
 
-1. In **Movie → Anime**, keep Inception and add **Genre cohort → Science Fiction movies**.
+1. With **Anime titles**, keep Inception and add **Genre cohort → Science Fiction movies**.
    Its chip shows **TMDB · 214 movies**. The combined full-ranking top 30 has six
    new titles compared with Inception alone.
 2. Focus a dot in the field or mirror, compare two dots, select the cohort in
    Similarity connections, and inspect the full ranking. Each labels the score
    **Science Fiction movies**. Sort by the cohort and remove it.
    The ranking returns to average similarity with the remaining magnets.
-3. Switch to **Anime → Movies** and add **Sci-Fi anime** (165 AniList anime).
+3. Switch to **Movie titles** and add **Sci-Fi anime** (165 AniList anime).
    Try it on its own. The **Science Fiction** dust genre filter narrows the movie
    dots while the cohort scores and 1,000-row ranking stay fixed.
 4. Move the cohort magnet and reload. Verify the position and magnets restore
-   for each direction. On a narrow viewport, add and remove a cohort, move it
+   for each dust type. On a narrow viewport, add and remove a cohort, move it
    with the arrow keys, and select a dot with Enter to read its scores.
 5. Add Action and Romance to the Sci-Fi anime cohort for a three-cohort field.
-   Reload and switch directions to verify all three restore together. Try a
+   Reload and switch dust types to verify all three restore together. Try a
    fourth magnet and confirm the picker reports the shared three-slot limit.
 
 Run `node tests/browser/dust-genres.cjs` with the Playwright setup below.
@@ -53,8 +53,9 @@ Run `node tests/browser/dust-genres.cjs` with the Playwright setup below.
 # Anime magnets and movie dust
 
 1. Open Dust & Magnet on a fresh session and confirm the Inception example.
-   Choose **Anime → Movies**. Attack on Titan opens as the example. Check that
-   Inception and Attack on Titan share the same cosine score in either direction.
+   Set **Dust type** to **Movie titles**. Attack on Titan opens as the example.
+   Check that Inception and Attack on Titan share the same cosine score with
+   either dust type.
 2. Search with an alias or year, add a second and third anime magnet, and
    exercise 30, 60, and 90 dots. Move a magnet with arrow keys. Reset positions
    and check that selection and strongest-magnet colors remain intact.
@@ -65,7 +66,7 @@ Run `node tests/browser/dust-genres.cjs` with the Playwright setup below.
    field, mirror, connections, chart counts, and displayed ranking flags.
    Open the legacy Content, Reception, and Creators links. Reception and
    Creators show coverage notes for the movie sample.
-5. Switch back to Movie → Anime and return to Anime → Movies. Check separate
+5. Switch back to **Anime titles** and return to **Movie titles**. Check separate
    selections, filters, ranking sorts, magnet positions, and scroll. Remove
    every anime magnet and confirm that switching preserves the empty field.
 6. Open a legacy Current dust link while movie dust is active. Network falls
