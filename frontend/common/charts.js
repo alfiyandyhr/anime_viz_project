@@ -117,7 +117,7 @@
         .attr("height", y.bandwidth())
         .attr("width", (item) => x(metricValue(item)) - margin.left)
         .attr("rx", 5)
-        .attr("stroke", item => item.selectedCount ? "white" : "none")
+        .attr("stroke", item => item.selectedCount ? "var(--text)" : "none")
         .attr("stroke-width", 2)
         .attr("fill", "var(--purple)")
         .attr("fill-opacity", 0.8)
@@ -141,7 +141,7 @@
         .attr("class", "value")
         .attr("x", (item) => x(metricValue(item)) + 5)
         .attr("y", (item) => y(item.genre) + y.bandwidth() / 2 + 4)
-        .attr("fill", "#d9def0")
+        .attr("fill", "var(--chart-label)")
         .attr("font-size", 10)
         .text((item) => {
           const value = metricValue(item);
@@ -208,9 +208,9 @@
           height - margin.bottom - yCount(item.count)
         ))
         .attr("rx", 3)
-        .attr("stroke", item => item.selectedCount ? "white" : "none")
+        .attr("stroke", item => item.selectedCount ? "var(--text)" : "none")
         .attr("stroke-width", 2)
-        .attr("fill", "rgba(157,123,255,0.42)")
+        .attr("fill", "color-mix(in srgb, var(--color-primary-strong) 42%, transparent)")
         .on("mouseenter", (event, item) => {
           showTooltip(event, `
             <strong>${item.year}</strong>
@@ -268,7 +268,7 @@
       svg.append("path")
         .datum(lineData)
         .attr("fill", "none")
-        .attr("stroke", "#43d9e6")
+        .attr("stroke", "var(--color-secondary-strong)")
         .attr("stroke-width", 2.5)
         .attr(
           "d",
@@ -284,8 +284,8 @@
         .attr("cx", (item) => x(item.year) + x.bandwidth() / 2)
         .attr("cy", (item) => yScore(item.averageScore))
         .attr("r", 3.5)
-        .attr("fill", "#43d9e6")
-        .attr("stroke", "#08101c")
+        .attr("fill", "var(--color-secondary-strong)")
+        .attr("stroke", "var(--surface-solid)")
         .attr("stroke-width", 1.5);
 
       svg.append("g")
@@ -298,7 +298,7 @@
         .attr("x", width - margin.right)
         .attr("y", 13)
         .attr("text-anchor", "end")
-        .attr("fill", "#43d9e6")
+        .attr("fill", "var(--color-secondary-strong)")
         .text(context.movieRankLimit ? "TMDB score / 10" : "Average score");
     }
 
@@ -344,7 +344,7 @@
         .attr("r", (item) => radius(item.count))
         .attr("fill", "var(--purple)")
         .attr("fill-opacity", 0.8)
-        .attr("stroke", "white")
+        .attr("stroke", "var(--text)")
         .attr("stroke-width", item => item.selectedCount ? 3 : 1)
         .on("mouseenter", (event, item) => {
           showTooltip(event, `
@@ -421,9 +421,9 @@
         .range([margin.top, height - margin.bottom])
         .padding(0.08);
 
-      const color = d3.scaleSequential()
+      const intensity = d3.scaleLinear()
         .domain([0, d3.max(cells, (item) => item.count) || 1])
-        .interpolator(d3.interpolatePurples);
+        .range([15, 100]);
 
       svg.append("g")
         .selectAll("rect")
@@ -436,10 +436,10 @@
         .attr("rx", 5)
         .attr("fill", (item) => (
           item.count === 0
-            ? "rgba(255,255,255,0.025)"
-            : color(item.count)
+            ? "var(--bg-soft)"
+            : `color-mix(in srgb, var(--color-primary-strong) ${intensity(item.count)}%, var(--surface-solid))`
         ))
-        .attr("stroke", item => item.selectedCount ? "white" : "rgba(255,255,255,0.055)")
+        .attr("stroke", item => item.selectedCount ? "var(--text)" : "var(--border)")
         .attr("stroke-width", item => item.selectedCount ? 2 : 1)
         .on("mouseenter", (event, item) => {
           showTooltip(event, `
@@ -579,7 +579,7 @@
         trendline = svg.append("path")
           .attr("class", "chart-trendline")
           .attr("fill", "none")
-          .attr("stroke", "rgba(255,255,255,0.42)")
+          .attr("stroke", "var(--chart-label)")
           .attr("stroke-dasharray", "5 5")
           .attr("stroke-width", 1.4)
           .attr("pointer-events", "none")
@@ -645,7 +645,7 @@
 
       if (filmography) {
         dots.attr("fill-opacity", 0.8)
-          .attr("stroke", item => filled(item) ? "white" : color(item))
+          .attr("stroke", item => filled(item) ? "var(--text)" : color(item))
           .attr("stroke-width", 1);
       } else {
         dots.attr("fill-opacity", 0.65)
@@ -811,7 +811,7 @@
         const nextSelection = JSON.stringify(selectedIds);
         if (anime !== dataIdentity || nextSelection !== selectionKey) cached.clear();
         dataIdentity = anime; selectionKey = nextSelection;
-        context = { onSelect() {}, dustColor: () => "#9d7bff", hasSelection: Boolean(value.selectedIds),
+        context = { onSelect() {}, dustColor: () => "var(--color-primary-strong)", hasSelection: Boolean(value.selectedIds),
           ...value, anime, filmography, selectedIds };
         renderers[kind]();
         if (kind !== "reception") {

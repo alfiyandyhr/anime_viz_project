@@ -26,7 +26,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-medium);
   background:
-    radial-gradient(circle at top right, rgba(157, 123, 255, 0.13), transparent 60%),
+    radial-gradient(circle at top right, var(--primary-tint), transparent 60%),
     var(--surface);
 }
 
@@ -48,13 +48,13 @@
   padding: clamp(14px, 2.3vw, 24px);
   border: 1px solid var(--border);
   border-radius: var(--radius-large);
-  background: rgba(14, 19, 36, 0.72);
+  background: var(--surface);
 }
 .insight-strip h2 { margin: 0 0 18px; font: 700 1.2rem "Space Grotesk", sans-serif; }
 .insight-card {
   padding: 17px;
   border-radius: 13px;
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--bg-soft);
 }
 .insight-card span {
   color: var(--cyan);
@@ -174,13 +174,13 @@
 
 .page-btn:hover:not(:disabled) {
   border-color: var(--purple);
-  color: white;
-  background: rgba(157, 123, 255, 0.1);
+  color: var(--text);
+  background: var(--primary-tint);
 }
 
 .page-btn.is-active {
   border-color: var(--purple);
-  color: white;
+  color: var(--button-primary-text);
   background: var(--purple-dark);
   cursor: default;
 }
@@ -226,7 +226,7 @@ th {
   top: 0;
   z-index: 2;
   color: var(--text-muted);
-  background: #11172b;
+  background: var(--surface-solid);
   font-size: 0.71rem;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -243,7 +243,7 @@ tbody tr {
 }
 
 tbody tr:hover {
-  background: rgba(157, 123, 255, 0.075);
+  background: var(--primary-tint);
 }
 
 .anime-cell {
@@ -263,7 +263,7 @@ tbody tr:hover {
 .anime-cell strong {
   max-width: 300px;
   display: block;
-  color: white;
+  color: var(--text);
 }
 
 .anime-cell small {
@@ -274,7 +274,7 @@ tbody tr:hover {
   padding: 6px 9px;
   border-radius: 999px;
   color: var(--green);
-  background: rgba(107, 230, 168, 0.1);
+  background: var(--success-tint);
   font-weight: 800;
 }
 
@@ -326,7 +326,7 @@ body[data-chapter="explorer"] .range-control { grid-column: span 2; }
 
 .catalogue-tools { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; }
 .catalogue-switch { display: flex; gap: 6px; flex: 1 1 100%; }
-.catalogue-switch button[aria-pressed="false"] { border: 1px solid var(--border-strong); background: transparent; }
+.catalogue-switch button[aria-pressed="false"] { border: 1px solid var(--border-strong); color: var(--text); background: transparent; }
 body:not([data-catalogue-view="movie"]) [data-catalogue-only="movie"],
 body[data-catalogue-view="movie"] [data-catalogue-only="anime"] { display: none !important; }
 .catalogue-search { flex: 1 1 240px; max-width: 480px; }

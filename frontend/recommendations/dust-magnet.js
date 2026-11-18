@@ -1,7 +1,7 @@
 "use strict";
 
-const MAGNET_COLORS = ["#43d9e6", "#ff6fae", "#ffcc70"];
-const DUST_UNIFORM_COLOR = "#c3cbe1";
+const MAGNET_COLORS = ["var(--color-secondary-strong)", "var(--color-primary-strong)", "var(--color-accent-strong)"];
+const DUST_UNIFORM_COLOR = "var(--dust-uniform)";
 const DUST_ENGINE = typeof module !== "undefined" && module.exports ? require("../common/dust-context.js") : AnivizDust;
 let dustChart = null;
 

@@ -1,6 +1,6 @@
 body[data-chapter="story"] {
-  --anime-color: #bda5ff;
-  --movie-color: #74e1ed;
+  --anime-color: var(--color-primary-strong);
+  --movie-color: var(--color-secondary-strong);
   --history-display: "Space Grotesk", Inter, sans-serif;
   overflow-x: clip;
 }
@@ -126,7 +126,7 @@ body[data-chapter="story"] {
   background: var(--surface-solid);
   color: var(--text);
   font-size: .85rem;
-  color-scheme: dark;
+  color-scheme: inherit;
 }
 
 .history-controls button { min-width: 36px; }
@@ -146,8 +146,8 @@ body[data-chapter="story"] {
 .history-pair {
   --left-track-color: var(--anime-color);
   --right-track-color: var(--movie-color);
-  --left-track-glow: #1c1736;
-  --right-track-glow: #102a36;
+  --left-track-glow: var(--primary-tint);
+  --right-track-glow: var(--secondary-tint);
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(180px, .78fr) minmax(0, 1fr);
   grid-template-areas: "anime timelines movie";
@@ -159,13 +159,13 @@ body[data-chapter="story"] {
   border: 1px solid var(--border-strong);
   border-radius: 14px;
   background: radial-gradient(ellipse at 0 50%, var(--left-track-glow) 0%, transparent 54%),
-    radial-gradient(ellipse at 100% 50%, var(--right-track-glow) 0%, transparent 54%), #0d1221;
+    radial-gradient(ellipse at 100% 50%, var(--right-track-glow) 0%, transparent 54%), var(--bg-soft);
 }
 .history-pair[data-perspective="movie"] {
   --left-track-color: var(--movie-color);
   --right-track-color: var(--anime-color);
-  --left-track-glow: #102a36;
-  --right-track-glow: #1c1736;
+  --left-track-glow: var(--secondary-tint);
+  --right-track-glow: var(--primary-tint);
   grid-template-areas: "movie timelines anime";
 }
 
@@ -175,7 +175,7 @@ body[data-chapter="story"] {
   border: 1px solid var(--border-strong);
   border-top: 2px solid var(--track-color);
   border-radius: 9px;
-  background: #101527;
+  background: var(--surface-solid);
   overflow-wrap: anywhere;
 }
 
@@ -267,7 +267,7 @@ body[data-chapter="story"] {
 .movie-track { transform: translateX(198px); }
 [data-perspective="movie"] .anime-track { transform: translateX(198px); }
 [data-perspective="movie"] .movie-track { transform: translateX(66px); }
-.history-axis, .history-tick { stroke: #63708d; stroke-width: 1; }
+.history-axis, .history-tick { stroke: var(--chart-label); stroke-width: 1; }
 .history-tick-label { fill: var(--text-soft); }
 .history-connection, .history-highlight-line { fill: none; stroke: url(#history-link-gradient); }
 .history-connection { stroke-width: 2.5; opacity: .56; transition: opacity .15s ease; }
@@ -276,16 +276,16 @@ body[data-chapter="story"] {
 .has-highlight .is-highlighted .history-connection { opacity: 1; }
 .history-highlight-line {
   stroke-width: 4;
-  filter: drop-shadow(0 0 3px #e3efff80);
+  filter: drop-shadow(0 0 3px var(--secondary-tint));
   pointer-events: none;
 }
 .history-connection-target { cursor: pointer; }
 .history-connection-hit { fill: none; stroke: transparent; stroke-width: 10; }
-.history-point { stroke: #0d1221; stroke-width: 2; }
+.history-point { stroke: var(--bg-soft); stroke-width: 2; }
 #history-timeline .history-point-label {
   font-size: 13px;
   paint-order: stroke;
-  stroke: #0d1221;
+  stroke: var(--bg-soft);
   stroke-width: 4px;
   stroke-linejoin: round;
 }
@@ -305,7 +305,7 @@ body[data-chapter="story"] {
   background: var(--surface-solid);
   color: var(--text);
 }
-.history-dialog::backdrop { background: rgb(6 9 19 / .8); }
+.history-dialog::backdrop { background: var(--overlay); }
 .history-dialog[open] { animation: history-dialog-enter .2s ease-out; }
 @keyframes history-dialog-enter {
   from { opacity: 0; transform: translateY(8px) scale(.98); }
@@ -327,14 +327,14 @@ html:has(.history-zoom[open]) { overflow-y: hidden; scrollbar-gutter: stable; }
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--zoom-accent) 45%, var(--border-strong));
   border-radius: 16px;
-  background: #0d1221;
-  box-shadow: 0 24px 90px #030510b3;
+  background: var(--bg-soft);
+  box-shadow: var(--shadow);
   color: var(--text);
 }
 .history-zoom[data-track="movie"] { --zoom-accent: var(--movie-color); }
 .history-zoom[open] { display: grid; grid-template-rows: auto minmax(0, 1fr); }
 .history-zoom::backdrop {
-  background: rgb(6 9 19 / .76);
+  background: var(--overlay);
   animation: history-zoom-backdrop .3s ease-out both;
 }
 .history-zoom[data-closing]::backdrop { animation: history-zoom-backdrop-out .22s ease-in both; }
@@ -368,7 +368,7 @@ html:has(.history-zoom[open]) { overflow-y: hidden; scrollbar-gutter: stable; }
   position: relative;
   overflow-y: auto;
   overscroll-behavior-y: contain;
-  scrollbar-color: var(--zoom-accent) #0d1221;
+  scrollbar-color: var(--zoom-accent) var(--bg-soft);
   outline-offset: -3px;
 }
 .history-zoom-year {
