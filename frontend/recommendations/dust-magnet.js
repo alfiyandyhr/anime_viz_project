@@ -19,8 +19,6 @@ function defaultMagnetPositions(count, width, height) {
 }
 
 const DUST_HIT_RADIUS = 9;
-const DUST_POSTER_ZOOM = 6;
-const DUST_MAX_ZOOM = 12;
 const MAGNET_CORE_RADIUS = 25;
 const DUST_SPACING = 2 * DUST_HIT_RADIUS;
 const DUST_CLEARANCE = MAGNET_CORE_RADIUS + DUST_HIT_RADIUS;
@@ -425,8 +423,7 @@ function renderDustRecommendations() {
 
 function createDustView(container, matches, anchors, width, height, onMove, label, mixed) {
   const svg = d3.select(container).append("svg").attr("viewBox", `0 0 ${width} ${height}`)
-    .attr("width", width).attr("height", height).attr("class", "dust-map").attr("role", "group").attr("tabindex", 0)
-    .attr("aria-description", "Use the zoom controls. When zoomed in, drag or use arrow keys to pan.")
+    .attr("width", width).attr("height", height).attr("class", "dust-map")
     .attr("aria-label", `${label} ${mixed ? "attraction to" : "similarity to"} ${anchors.map(({ magnet }) => magnet.title).join(", ")}`);
   const scene = svg.append("g");
   const paths = scene.append("g").attr("aria-hidden", "true");
@@ -497,24 +494,22 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
   const grains = dots.append("circle").attr("class", "dust-grain").attr("r", 4.5).attr("fill", AnivizMain.dustColor);
   let posterImages, posterTitles;
   function drawArtwork() {
+    if (!posterImages) return;
     const { lookup } = AnivizMain.snapshot();
-    posterImages?.each(function (match) {
+    AnivizPosterZoom.drawArtwork(posterImages, match => {
       const record = lookup.get(match.key)?.record || match.record;
-      const url = (match.key.startsWith("tmdb:")
-        ? AnivizArtwork.movieThumbnail(record) : AnivizArtwork.animeThumbnail(record)) || null;
-      if (url === this.getAttribute("src")) return;
-      this.hidden = !url;
-      d3.select(this).attr("src", url);
+      return match.key.startsWith("tmdb:")
+        ? AnivizArtwork.movieThumbnail(record) : AnivizArtwork.animeThumbnail(record);
     });
   }
   function addPosters() {
-    const cards = dots.append("foreignObject").attr("class", "dust-poster").attr("aria-hidden", "true")
-      .attr("x", -34).attr("y", -62).attr("width", 68).attr("height", 124)
-      .append("xhtml:div").attr("class", "dust-poster-card");
-    posterImages = cards.append("img").attr("alt", "").attr("decoding", "async").property("hidden", true)
-      .on("error", function () { this.hidden = true; });
-    posterTitles = cards.append("span").attr("class", "dust-poster-title")
-      .style("color", AnivizMain.dustColor).text(match => match.record.title);
+    const posters = dots.append("foreignObject").attr("class", "dust-poster").attr("aria-hidden", "true")
+      .attr("x", -34).attr("y", -62);
+    const { images, titles } = AnivizPosterZoom.addCards(posters, {
+      title: match => match.record.title, color: AnivizMain.dustColor
+    });
+    posterImages = images;
+    posterTitles = titles;
     drawArtwork();
   }
   const activeMagnets = scene.append("g");
@@ -555,58 +550,23 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
     return `${magnet.title} (${description})`;
   });
 
-  const controls = d3.select(container).append("div").attr("class", "dust-zoom-controls")
-    .attr("role", "group").attr("aria-label", `${label} zoom controls`)
-    .html(`<button type="button" aria-label="Zoom out" title="Zoom out">−</button>
-      <button type="button" class="dust-zoom-reset" aria-label="Reset zoom" title="Reset zoom">1×</button>
-      <button type="button" aria-label="Zoom in" title="Zoom in">+</button>`);
-  const [zoomOut, resetZoom, zoomIn] = controls.selectAll("button").nodes();
-  const extent = [[0, 0], [width, height]];
-  const zoom = d3.zoom().extent(extent).translateExtent(extent).scaleExtent([1, DUST_MAX_ZOOM]).clickDistance(4)
-    .filter(event => {
-      if (event.type === "wheel") return !event.button;
-      if (event.ctrlKey || event.button || event.target.closest(".dust-magnet")) return false;
-      return event.type !== "mousedown" || d3.zoomTransform(svg.node()).k > 1;
-    })
-    .on("start", () => {
+  const camera = AnivizPosterZoom.attach({
+    container, svg, d3, label, extent: [[0, 0], [width, height]],
+    canDragFrom: target => !target.closest(".dust-magnet"),
+    onStart() {
       hovered = focused = null;
       drawPreview();
       hideTooltip();
-    })
-    .on("zoom", ({ transform }) => {
-      const { k } = transform;
-      const showPosters = k >= DUST_POSTER_ZOOM;
+    },
+    onZoom(transform, showPosters) {
       scene.attr("transform", transform);
-      scene.style("--dust-magnet-scale", Math.min(1, 2 / k));
-      svg.classed("is-zoomed", k > 1).classed("shows-posters", showPosters);
+      scene.style("--dust-magnet-scale", Math.min(1, 2 / transform.k));
       if (showPosters) {
         if (!posterImages) addPosters();
-        scene.style("--dust-poster-scale", 1 / k);
+        scene.style("--dust-poster-scale", 1 / transform.k);
       }
-      zoomOut.disabled = resetZoom.disabled = k === 1;
-      zoomIn.disabled = k === DUST_MAX_ZOOM;
-      resetZoom.textContent = `${Number(k.toFixed(1))}×`;
-    });
-  svg.call(zoom).on("dblclick.zoom", null);
-  const zoomTouchMove = svg.on("touchmove.zoom");
-  if (zoomTouchMove) {
-    svg.on("touchmove.zoom", function (event, datum) {
-      // Let a single finger scroll the page in the overview while retaining pinch zoom.
-      if (event.touches.length > 1 || d3.zoomTransform(this).k > 1) zoomTouchMove.call(this, event, datum);
-    });
-  }
-  svg.on("keydown", event => {
-    if (event.target !== svg.node() || d3.zoomTransform(svg.node()).k === 1) return;
-    const delta = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[event.key];
-    if (!delta) return;
-    event.preventDefault();
-    const step = 48 / d3.zoomTransform(svg.node()).k;
-    svg.call(zoom.translateBy, delta[0] * step, delta[1] * step);
+    }
   });
-  zoomOut.disabled = resetZoom.disabled = true;
-  zoomOut.addEventListener("click", () => svg.call(zoom.scaleBy, .5));
-  resetZoom.addEventListener("click", () => svg.call(zoom.transform, d3.zoomIdentity));
-  zoomIn.addEventListener("click", () => svg.call(zoom.scaleBy, 2));
 
   return {
     drawArtwork,
@@ -614,8 +574,7 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
       grains.attr("fill", AnivizMain.dustColor);
       posterTitles?.style("color", AnivizMain.dustColor);
     },
-    getTransform: () => d3.zoomTransform(svg.node()),
-    setTransform: transform => svg.call(zoom.transform, transform),
+    ...camera,
     draw(nextPositions) {
       positions = nextPositions;
       dots.attr("transform", (match) => { const node = positions.get(match.key); return `translate(${node.x},${node.y})`; });

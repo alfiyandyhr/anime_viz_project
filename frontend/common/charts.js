@@ -1,11 +1,12 @@
 "use strict";
 // Instances own their container and latest snapshot. No page-global controls or selectors.
 (function (root) {
+  let nextClipId = 0;
   function create(kind, { container, d3, helpers, transforms = root.AnivizChartData }) {
     if (!container) throw new Error("A chart container is required");
     const { clearChart, renderEmpty, showTooltip, moveTooltip, hideTooltip, escapeHTML,
       formatNumber, truncate, compactFormatter } = helpers;
-    let context, dataIdentity, selectionKey;
+    let context, dataIdentity, selectionKey, receptionCamera;
     const cached = new Map();
     function metricData(key, compute) {
       if (!cached.has(key)) cached.set(key, compute());
@@ -469,10 +470,12 @@
     function drawPopularityAxes(data, { popularity, score, label, popularityLabel, rankLimit }) {
       const width = Math.max(container.clientWidth, 320);
       const height = Math.max(container.clientHeight, 473);
-      const margin = { top: 28, right: 28, bottom: 58, left: 62 };
+      const margin = { top: 52, right: 28, bottom: 58, left: 62 };
+      const extent = [[margin.left, margin.top], [width - margin.right, height - margin.bottom]];
 
       const svg = d3.select(container)
         .append("svg")
+        .attr("class", "reception-plot")
         .attr("viewBox", [0, 0, width, height])
         .attr("aria-label", label);
 
@@ -494,37 +497,33 @@
         .nice()
         .range([height - margin.bottom, margin.top]);
 
-      const xAxis = d3.axisBottom(x).ticks(width < 450 ? 5 : 7, "~s");
-      if (rankLimit) {
-        const ticks = x.ticks(width < 450 ? 4 : 6).filter(value => Number.isInteger(value) && value > 1);
-        xAxis.tickValues([...ticks, 1]).tickFormat(d3.format("d"));
-      }
-
-      svg.append("g")
+      const xGrid = svg.append("g")
         .attr("class", "grid")
-        .attr("transform", `translate(0,${height - margin.bottom})`)
-        .call(d3.axisBottom(x).ticks(7).tickValues(xAxis.tickValues())
+        .attr("transform", `translate(0,${height - margin.bottom})`);
+      const yGrid = svg.append("g")
+        .attr("class", "grid")
+        .attr("transform", `translate(${margin.left},0)`);
+      const xTicks = svg.append("g")
+        .attr("class", "axis")
+        .attr("transform", `translate(0,${height - margin.bottom})`);
+      const yTicks = svg.append("g")
+        .attr("class", "axis")
+        .attr("transform", `translate(${margin.left},0)`);
+
+      function updateAxes(viewX, viewY) {
+        const xAxis = d3.axisBottom(viewX).ticks(width < 450 ? 5 : 7, "~s");
+        if (rankLimit) {
+          const ticks = viewX.ticks(width < 450 ? 4 : 6).filter(value => Number.isInteger(value) && value > 1);
+          if (viewX.domain()[1] <= 1 + 1e-9) ticks.push(1);
+          xAxis.tickValues(ticks).tickFormat(d3.format("d"));
+        }
+        xGrid.call(d3.axisBottom(viewX).ticks(7).tickValues(xAxis.tickValues())
           .tickSize(-(height - margin.top - margin.bottom)).tickFormat(""));
-
-      svg.append("g")
-        .attr("class", "grid")
-        .attr("transform", `translate(${margin.left},0)`)
-        .call(
-          d3.axisLeft(y)
-            .ticks(6)
-            .tickSize(-(width - margin.left - margin.right))
-            .tickFormat("")
-        );
-
-      svg.append("g")
-        .attr("class", "axis")
-        .attr("transform", `translate(0,${height - margin.bottom})`)
-        .call(xAxis);
-
-      svg.append("g")
-        .attr("class", "axis")
-        .attr("transform", `translate(${margin.left},0)`)
-        .call(d3.axisLeft(y).ticks(6));
+        yGrid.call(d3.axisLeft(viewY).ticks(6)
+          .tickSize(-(width - margin.left - margin.right)).tickFormat(""));
+        xTicks.call(xAxis);
+        yTicks.call(d3.axisLeft(viewY).ticks(6));
+      }
 
       svg.append("text")
         .attr("class", "axis-label")
@@ -541,37 +540,46 @@
         .attr("text-anchor", "middle")
         .text(rankLimit ? "TMDB score / 10" : "Average score / 100");
 
-      if (rankLimit) return { svg, x, y, correlation: null };
+      const clipId = `reception-plot-clip-${++nextClipId}`;
+      svg.append("clipPath").attr("id", clipId).append("rect")
+        .attr("x", margin.left).attr("y", margin.top)
+        .attr("width", width - margin.left - margin.right)
+        .attr("height", height - margin.top - margin.bottom);
+      const clip = `url(#${clipId})`;
 
-      const { correlation, regression } = metricData("popularityTrend", () => {
+      const { correlation, regression } = rankLimit ? { correlation: null } : metricData("popularityTrend", () => {
         const points = data.map(item => [Math.log10(popularity(item)), score(item)]);
         return { correlation: transforms.correlation(points), regression: linearRegression(points) };
       });
 
+      let trendline;
       if (correlation !== null && regression) {
         svg.append("text")
           .attr("class", "chart-correlation")
-          .attr("x", (margin.left + width - margin.right) / 2)
-          .attr("y", 16)
-          .attr("text-anchor", "middle")
+          .attr("x", margin.left)
+          .attr("y", 28)
           .attr("font-size", 12)
           .attr("fill", "var(--text-soft)")
           .text(`Pearson r = ${correlation.toFixed(3)}`);
 
-        svg.append("path")
+        trendline = svg.append("path")
           .attr("class", "chart-trendline")
-          .datum(x.domain())
           .attr("fill", "none")
           .attr("stroke", "rgba(255,255,255,0.42)")
           .attr("stroke-dasharray", "5 5")
           .attr("stroke-width", 1.4)
           .attr("pointer-events", "none")
-          .attr("d", d3.line()
-            .x(popularity => x(popularity))
-            .y(popularity => y(regression.intercept + regression.slope * Math.log10(popularity))));
+          .attr("clip-path", clip);
       }
 
-      return { svg, x, y, correlation };
+      return { svg, x, y, correlation, clip, extent, draw(transform) {
+        const viewX = transform.rescaleX(x);
+        const viewY = transform.rescaleY(y);
+        updateAxes(viewX, viewY);
+        trendline?.attr("d", d3.line()
+          .x(value => viewX(value))
+          .y(value => viewY(regression.intercept + regression.slope * Math.log10(value)))(viewX.domain()));
+      } };
     }
 
     function renderScatterplot() {
@@ -585,17 +593,19 @@
       clearChart(container);
 
       if (!data.length) {
+        receptionCamera = null;
         context.onCorrelation?.(null, 0);
         renderEmpty(container, rankLimit ? "No displayed movies have a TMDB score and popularity rank."
           : "No scored anime match the current filters.");
         return;
       }
 
-      const { svg, x, y, correlation } = drawPopularityAxes(data, {
+      const chart = drawPopularityAxes(data, {
         popularity, score, rankLimit,
         label: rankLimit ? "TMDB score versus popularity rank scatterplot" : "Score versus popularity scatterplot",
         popularityLabel: rankLimit ? "TMDB popularity rank" : "Popularity — AniList list users (log scale)"
       });
+      const { svg, x, y, correlation, clip, extent } = chart;
       context.onCorrelation?.(correlation, data.length);
 
       const radius = d3.scaleSqrt()
@@ -605,20 +615,21 @@
       const pointRadius = item => rankLimit ? 5 : item.favourites > 0 ? radius(item.favourites) : 4;
       const filled = item => rankLimit || item.favourites > 0;
 
-      svg.append("g")
+      const marks = svg.append("g");
+      const dots = marks.append("g")
         .selectAll("circle")
         .data(data, (item) => item.id)
         .join("circle")
         .attr("class", "reception-dot")
-        .attr("cx", item => x(popularity(item)))
-        .attr("cy", item => y(score(item)))
         .attr("r", pointRadius)
         .attr("fill", item => filled(item) ? context.dustColor(String(item.id)) : "transparent")
         .attr("fill-opacity", 0.65)
         .attr("stroke", item => filled(item) ? "var(--surface-solid)" : context.dustColor(String(item.id)))
-        .attr("stroke-width", 1.5)
+        .attr("stroke-width", 1.5);
+
+      function bindMarks(selection) {
         // Closing the details overlay can fire mouseenter under a stationary pointer.
-        .on("mousemove", (event, item) => {
+        selection.on("mousemove", (event, item) => {
           showTooltip(event, `
             <strong>${escapeHTML(item.title)}</strong>
             <span>${rankLimit ? `
@@ -639,15 +650,79 @@
           hideTooltip();
           context.onSelect(String(item.id));
         });
+        keyboardMarks(selection);
+      }
+      bindMarks(dots);
 
-      svg.append("g").attr("aria-hidden", "true")
+      const rings = marks.append("g").attr("aria-hidden", "true")
         .selectAll("circle")
         .data(data.filter(item => context.selectedIds.includes(String(item.id))))
         .join("circle")
         .attr("class", "reception-selection-ring")
-        .attr("cx", item => x(popularity(item)))
-        .attr("cy", item => y(score(item)))
         .attr("r", item => pointRadius(item) + 3);
+
+      const posterLayer = marks.append("g");
+      const thumbnail = rankLimit ? root.AnivizArtwork.movieThumbnail : root.AnivizArtwork.animeThumbnail;
+      const [[left, top], [right, bottom]] = extent;
+      const centerX = (left + right) / 2, centerY = (top + bottom) / 2;
+      const inView = (px, py) =>
+        px >= left - 1e-6 && px <= right + 1e-6 && py >= top - 1e-6 && py <= bottom + 1e-6;
+      const zoomInPoint = transform => {
+        // Keep a title in view when the plotted scores are clustered away from the center.
+        let closest, distance = Infinity;
+        for (const item of data) {
+          const px = transform.applyX(x(popularity(item))), py = transform.applyY(y(score(item)));
+          if (!inView(px, py)) continue;
+          const candidateDistance = Math.hypot(px - centerX, py - centerY);
+          if (candidateDistance >= distance) continue;
+          closest = [px, py];
+          distance = candidateDistance;
+        }
+        return closest;
+      };
+      function draw(transform, showPosters) {
+        chart.draw(transform);
+        const zoomed = transform.k > 1;
+        marks.attr("clip-path", zoomed ? clip : null);
+        const pointX = item => transform.applyX(x(popularity(item)));
+        const pointY = item => transform.applyY(y(score(item)));
+        const visible = item => inView(pointX(item), pointY(item));
+        if (!showPosters) {
+          dots.attr("tabindex", item => !zoomed || visible(item) ? 0 : -1)
+            .attr("aria-hidden", item => !zoomed || visible(item) ? null : "true");
+          dots.attr("cx", pointX).attr("cy", pointY);
+          rings.attr("cx", pointX).attr("cy", pointY);
+        }
+        posterLayer.selectAll("foreignObject")
+          .data(showPosters ? data.filter(visible) : [], item => item.id)
+          .join(enter => {
+            const posters = enter.append("foreignObject").attr("class", "reception-poster")
+              .classed("is-selected", item => context.selectedIds.includes(String(item.id)));
+            const { images } = root.AnivizPosterZoom.addCards(posters, {
+              title: item => item.title, color: item => context.dustColor(String(item.id))
+            });
+            root.AnivizPosterZoom.drawArtwork(images, thumbnail);
+            bindMarks(posters);
+            return posters;
+          })
+          .attr("x", item => pointX(item) - 34).attr("y", item => pointY(item) - 62);
+        receptionCamera = { rankLimit, extent, transform };
+      }
+
+      const previous = receptionCamera;
+      const camera = root.AnivizPosterZoom.attach({
+        container, svg, d3, extent, label: "Score vs. popularity", onStart: hideTooltip, onZoom: draw, zoomInPoint
+      });
+      if (previous && previous.rankLimit === rankLimit && previous.transform.k > 1) {
+        const { k, x: tx, y: ty } = previous.transform;
+        const [[oldLeft, oldTop], [oldRight, oldBottom]] = previous.extent;
+        camera.setTransform(d3.zoomIdentity.translate(
+          left * (1 - k) + (tx - oldLeft * (1 - k)) * (right - left) / (oldRight - oldLeft),
+          top * (1 - k) + (ty - oldTop * (1 - k)) * (bottom - top) / (oldBottom - oldTop)
+        ).scale(k));
+      } else {
+        draw(d3.zoomIdentity, false);
+      }
     }
 
     function linearRegression(points) {
@@ -680,13 +755,11 @@
     const renderers = { genres: renderGenreChart, years: renderTimeline, studios: renderStudioChart,
       heatmap: renderHeatmap, reception: renderScatterplot };
     if (!renderers[kind]) throw new Error(`Unknown chart: ${kind}`);
-    function keyboardMarks(hasSelection) {
+    function keyboardMarks(marks) {
       const selectable = kind === "reception";
       const tooltipEvent = selectable ? "mousemove" : "mouseenter";
-      d3.select(container).selectAll("rect, circle").filter(function () {
-        return Boolean(d3.select(this).on(tooltipEvent));
-      }).attr("tabindex", 0).attr("role", selectable ? "button" : "img")
-        .attr("aria-pressed", item => selectable && hasSelection ? context.selectedIds.includes(String(item.id)) : null)
+      marks.attr("tabindex", 0).attr("role", selectable ? "button" : "img")
+        .attr("aria-pressed", item => selectable && context.hasSelection ? context.selectedIds.includes(String(item.id)) : null)
         .attr("aria-label", item => item.title && (context.movieRankLimit
           ? `${item.title}: TMDB score ${item.vote_average} / 10; TMDB popularity rank #${formatNumber(item.popularity_rank)}; genres ${item.genres.join(", ") || "Unknown"}`
           : `${item.title}: score ${item.average_score} / 100; popularity ${formatNumber(item.popularity)}; favourites ${Number.isFinite(item.favourites) ? formatNumber(item.favourites) : 'Unknown'}; genres ${item.genres.join(", ") || "Unknown"}`) || item.genre && item.studio && `${item.studio} × ${item.genre}: ${item.count}`
@@ -710,11 +783,17 @@
         if (value.anime !== dataIdentity || nextSelection !== selectionKey) cached.clear();
         dataIdentity = value.anime; selectionKey = nextSelection;
         context = { selectedIds: [], onSelect() {},
-          dustColor: () => "#9d7bff", ...value };
-        renderers[kind](); keyboardMarks(Boolean(value.selectedIds));
-        if (focused) [...container.querySelectorAll('[tabindex="0"][aria-label]')].find(node => node.getAttribute('aria-label') === focused)?.focus({ preventScroll: true });
+          dustColor: () => "#9d7bff", hasSelection: Boolean(value.selectedIds), ...value };
+        renderers[kind]();
+        if (kind !== "reception") {
+          keyboardMarks(d3.select(container).selectAll("rect, circle").filter(function () {
+            return Boolean(d3.select(this).on("mouseenter"));
+          }));
+        }
+        if (focused) [...container.querySelectorAll('[aria-label]')].find(node =>
+          node.tabIndex === 0 && !node.disabled && node.getAttribute('aria-label') === focused)?.focus({ preventScroll: true });
       },
-      destroy() { container.replaceChildren(); context = null; }
+      destroy() { container.replaceChildren(); context = receptionCamera = null; }
     };
   }
   root.AnivizCharts = Object.freeze({ create });

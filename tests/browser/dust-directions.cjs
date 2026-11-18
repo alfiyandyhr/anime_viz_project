@@ -164,11 +164,12 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
           && points.every((node, index) => {
             const key = plotted[index], { vote_average, popularity_rank } = snapshot.lookup.get(key).record;
             const { closest } = scored.find(row => row.key === key);
-            const { width, height } = node.ownerSVGElement.viewBox.baseVal;
+            const bounds = node.ownerSVGElement.querySelector('clipPath rect');
+            const { x, y, width, height } = bounds.getBBox();
             return node.getAttribute('r') === '5'
               && node.getAttribute('fill') === AnivizMain.color(snapshot.activeMagnetKeys[closest])
-              && Math.abs(+node.getAttribute('cx') - (62 + (1000 - popularity_rank) / 999 * (width - 90))) < .001
-              && Math.abs(+node.getAttribute('cy') - (height - 58 - vote_average / 10 * (height - 86))) < .001;
+              && Math.abs(+node.getAttribute('cx') - (x + (1000 - popularity_rank) / 999 * width)) < .001
+              && Math.abs(+node.getAttribute('cy') - (y + (1 - vote_average / 10) * height)) < .001;
           })
           && ['genres', 'years'].every(kind => [...document.querySelectorAll(`[data-dust-chart="${kind}"] [role="img"]`)]
             .every(node => {
