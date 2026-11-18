@@ -316,12 +316,13 @@
       // Draw smaller bubbles last so they remain reachable where circles overlap.
       studios.sort((a, b) => d3.descending(a.count, b.count));
 
-      const { svg, x, y } = drawPopularityAxes(studios, {
+      const { svg, x, y, draw } = drawPopularityAxes(studios, {
         popularity: (item) => item.totalPopularity,
         score: (item) => item.averageScore,
         label: "Studio score versus popularity bubble chart",
         popularityLabel: "Total popularity (log scale)"
       });
+      draw();
 
       const radius = d3.scaleSqrt()
         .domain([0, d3.max(studios, (item) => item.count)])
@@ -468,14 +469,16 @@
     }
 
     function drawPopularityAxes(data, { popularity, score, label, popularityLabel, rankLimit }) {
+      const zoomable = kind === "reception";
       const width = Math.max(container.clientWidth, 320);
       const height = Math.max(container.clientHeight, 473);
-      const margin = { top: 52, right: 28, bottom: 58, left: 62 };
+      const margin = { top: zoomable ? 52 : 28, right: 28, bottom: 58, left: 62 };
       const extent = [[margin.left, margin.top], [width - margin.right, height - margin.bottom]];
+      const plotCenter = (margin.left + width - margin.right) / 2;
 
       const svg = d3.select(container)
         .append("svg")
-        .attr("class", "reception-plot")
+        .classed("reception-plot", zoomable)
         .attr("viewBox", [0, 0, width, height])
         .attr("aria-label", label);
 
@@ -527,7 +530,7 @@
 
       svg.append("text")
         .attr("class", "axis-label")
-        .attr("x", (margin.left + width - margin.right) / 2)
+        .attr("x", plotCenter)
         .attr("y", height - 12)
         .attr("text-anchor", "middle")
         .text(popularityLabel);
@@ -556,8 +559,9 @@
       if (correlation !== null && regression) {
         svg.append("text")
           .attr("class", "chart-correlation")
-          .attr("x", margin.left)
-          .attr("y", 28)
+          .attr("x", zoomable ? margin.left : plotCenter)
+          .attr("y", zoomable ? 28 : 16)
+          .attr("text-anchor", zoomable ? null : "middle")
           .attr("font-size", 12)
           .attr("fill", "var(--text-soft)")
           .text(`Pearson r = ${correlation.toFixed(3)}`);
@@ -573,8 +577,8 @@
       }
 
       return { svg, x, y, correlation, clip, extent, draw(transform) {
-        const viewX = transform.rescaleX(x);
-        const viewY = transform.rescaleY(y);
+        const viewX = transform ? transform.rescaleX(x) : x;
+        const viewY = transform ? transform.rescaleY(y) : y;
         updateAxes(viewX, viewY);
         trendline?.attr("d", d3.line()
           .x(value => viewX(value))

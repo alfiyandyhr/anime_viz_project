@@ -3,6 +3,21 @@ const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 
+async function verifyStudioAxes(chart) {
+  await chart.scrollIntoViewIfNeeded();
+  await chart.locator('.studio-dot').first().waitFor();
+  assert.deepEqual(await chart.locator('.axis-label').allTextContents(),
+    ['Total popularity (log scale)', 'Average score / 100']);
+  assert.equal(await chart.locator('.axis .domain').count(), 2);
+  assert.equal(await chart.locator('.axis').filter({ has: chart.page().locator('.tick text').filter({ hasText: /\d/ }) }).count(), 2);
+  assert.equal(await chart.locator('.grid').filter({ has: chart.page().locator('.tick line') }).count(), 2);
+  assert.ok(await chart.locator('.chart-trendline').getAttribute('d'));
+  assert.ok(await chart.evaluate(el => {
+    const xLabel = el.querySelector('.axis-label').getBoundingClientRect();
+    return xLabel.bottom <= el.getBoundingClientRect().bottom;
+  }), 'the popularity axis label fits within the chart');
+}
+
 (async () => {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
@@ -47,11 +62,8 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     assert.equal(new Set(barFills).size, 1);
 
     const studioMarks = chart('studios').locator('.studio-dot');
-    await chart('studios').scrollIntoViewIfNeeded();
-    await studioMarks.first().waitFor();
+    await verifyStudioAxes(chart('studios'));
     assert.equal(await page.locator('#creators select').count(), 0);
-    assert.deepEqual(await chart('studios').locator('.axis-label').allTextContents(),
-      ['Total popularity (log scale)', 'Average score / 100']);
     const { studios, expected } = await studioMarks.evaluateAll(marks => {
       const snapshot = AnivizMain.snapshot();
       const rows = snapshot.displayedKeys.map(id => snapshot.lookup.get(id).record);
@@ -145,6 +157,8 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       assert.equal(await heading.getAttribute('aria-sort'), 'ascending');
       assert.deepEqual(await visibleIds(), rankedIds.slice(0, 10));
     }
-    console.log('Verified chart tooltips, read-only marks, studio axes and bubble areas, both correlations and trendlines, 15 heatmap studios, and ranking directions.');
+    await page.goto(new URL('frontend/explorer/index.html', base).href);
+    await verifyStudioAxes(page.locator('[data-catalogue-chart="studios"]'));
+    console.log('Verified chart tooltips, read-only marks, studio axes in both views, bubble areas, correlations and trendlines, 15 heatmap studios, and ranking directions.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
