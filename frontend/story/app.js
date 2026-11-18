@@ -33,6 +33,8 @@
     ["#digital", 2000], ["#streaming", 2010], ["#modern", 2020]
   ]);
   const timelines = new Map();
+  const animeCovers = new Map();
+  const movieCovers = new Map();
   let liveActionMovieIds;
   let activePerspective = "anime";
   let perspectiveRequest = 0;
@@ -72,7 +74,7 @@
     dialog.showModal();
   }
 
-  function makeCard(id, sourceName) {
+  function makeCard(id, sourceName, covers) {
     const card = $(id);
     card.append($("#history-card-template").content.cloneNode(true));
     const pages = card.querySelector(".history-card-pages");
@@ -88,10 +90,19 @@
     let entry;
     let outgoing;
 
+    function refreshArtwork() {
+      const image = safeURL(entry?.cover || covers.get(String(entry?.id)));
+      cover.hidden = !image;
+      cover.alt = entry ? `Poster for ${entry.title}` : "";
+      if (image) {
+        if (cover.getAttribute("src") !== image) cover.src = image;
+      } else cover.removeAttribute("src");
+    }
+
     button.addEventListener("click", () => openSynopsis(entry, kind.textContent, sourceName));
     cover.addEventListener("error", () => { cover.hidden = true; });
 
-    return (work, label, emptyMessage, additional, motion, focus) => {
+    const update = (work, label, emptyMessage, additional, motion, focus) => {
       face.getAnimations().forEach(animation => animation.cancel());
       outgoing?.remove();
       if (!reducedMotion.matches && motion === "turn") {
@@ -128,10 +139,7 @@
       meta.textContent = work?.meta || "";
       meta.hidden = !work?.meta;
       summary.textContent = work ? work.description || "No synopsis available." : "";
-      const image = safeURL(work?.cover);
-      cover.hidden = !image;
-      if (image) cover.src = image;
-      else cover.removeAttribute("src");
+      refreshArtwork();
       button.hidden = !work?.description;
       button.setAttribute("aria-label", `Read synopsis for ${work?.title ?? label}`);
       extras.hidden = additional.length === 0;
@@ -151,10 +159,12 @@
       }));
       if (focus) title.focus({ preventScroll: true });
     };
+    update.refreshArtwork = refreshArtwork;
+    return update;
   }
 
-  const updateAnime = makeCard("#history-anime", "AniList");
-  const updateMovie = makeCard("#history-movie", "TMDB");
+  const updateAnime = makeCard("#history-anime", "AniList", animeCovers);
+  const updateMovie = makeCard("#history-movie", "TMDB", movieCovers);
 
   function yFor(year) {
     return 34 + 234 * (year - chartStart) / Math.max(1, chartEnd - chartStart);
@@ -383,6 +393,11 @@
 
   async function loadMovieTimeline() {
     if (!timelines.has("movie")) {
+      // Artwork is optional and must not delay or reject the annual rankings.
+      AnivizData.dashboard().then(({ anime }) => {
+        for (const work of anime) animeCovers.set(String(work.id), AnivizArtwork.animeThumbnail(work));
+        updateAnime.refreshArtwork();
+      }).catch(error => console.warn("Anime posters unavailable", error));
       const catalogue = await AnivizData.recommendations();
       const popularity = await AnivizData.moviePopularity(catalogue);
       if (!timelines.has("movie")) {
@@ -613,6 +628,21 @@
     }
   }
 
+  async function loadMovieArtwork() {
+    try {
+      const details = await AnivizAPI.fetchJSON(new URL("data/movie_details.json", project), { timeout: 15000 });
+      if (details?.schema_version !== 1 || details.source !== "TMDB" || !details.movies) {
+        throw new Error("Invalid TMDB movie artwork");
+      }
+      for (const [id, work] of Object.entries(details.movies)) {
+        movieCovers.set(id, AnivizArtwork.movieThumbnail(work));
+      }
+      updateMovie.refreshArtwork();
+    } catch (error) {
+      console.warn("Movie posters unavailable", error);
+    }
+  }
+
   window.addEventListener("scroll", queueSync, { passive: true });
   window.addEventListener("resize", queueSync);
   window.addEventListener("pageshow", queueSync);
@@ -668,5 +698,6 @@
   previous.addEventListener("click", () => goTo(activeIndex - 1));
   next.addEventListener("click", () => goTo(activeIndex + 1));
   perspective.querySelector('[value="anime"]').checked = true;
+  loadMovieArtwork();
   load();
 })();

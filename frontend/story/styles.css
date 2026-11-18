@@ -205,12 +205,14 @@ body[data-chapter="story"] {
   font-size: .85rem;
   line-height: 1.45;
 }
-.history-cover { width: 56px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 4px; }
+.history-cover { flex-shrink: 0; width: 56px; height: auto; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 4px; }
+.history-cover[hidden] { display: none; }
 .history-card-summary p {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 5;
   overflow: hidden;
+  min-width: 0;
   margin: 0;
 }
 
@@ -440,8 +442,8 @@ html:has(.history-zoom[open]) { overflow-y: hidden; scrollbar-gutter: stable; }
   .history-card-label, .history-card-meta { font-size: .65rem; }
   .history-card h2 { margin-top: 5px; -webkit-line-clamp: 2; }
   .history-card-meta { margin-bottom: 7px; }
-  .history-card-summary { min-height: 0; font-size: .74rem; }
-  .history-cover { display: none; }
+  .history-card-summary { flex-direction: column; gap: 7px; min-height: 0; font-size: .74rem; }
+  .history-cover { width: 44px; }
   .synopsis-button { margin-top: 5px; }
   .history-note { margin-top: 6px; }
 }
