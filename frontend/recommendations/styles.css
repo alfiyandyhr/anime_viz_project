@@ -648,8 +648,16 @@ body[data-chapter="dust-magnet"] #recommendation-status:empty { display: none; }
 .dust-motion-setting input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .dust-magnet.is-muted { opacity: .35; }
 #reset-dust-motion { width: 100%; min-height: 32px; }
-.dust-color-control { display: flex; align-items: center; gap: 8px; font-size: .8rem; }
-.dust-color-control input { flex: none; width: 1rem; height: 1rem; margin: 0; accent-color: var(--cyan); }
+.dust-color-control {
+  display: flex; align-items: flex-start; gap: 8px;
+  color: #fff; font-size: .8rem; line-height: 1rem;
+}
+.dust-color-control > span { margin: 0; color: inherit; font: inherit; }
+.dust-color-control input {
+  flex: none; width: 1rem; height: 1rem; min-height: 0; margin: 0; padding: 0;
+  border: 0; background: transparent; accent-color: var(--cyan);
+}
+.dust-color-control input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .field-options-panel .filterbar { margin: 8px 0 0; padding: 8px; }
 .field-options-panel .filter-grid { grid-template-columns: minmax(0, 1fr); padding: 8px 0; }
 .field-options-panel .filter-grid > label:first-child { grid-column: auto; }
