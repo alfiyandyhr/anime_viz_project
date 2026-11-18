@@ -2,7 +2,7 @@
 
 Explore story similarities between anime and live-action movies in a visualization built with Python/Flask and D3.js, using data from AniList and TMDB. Dust & Magnet opens directly, with linked analysis below the field. The view dropdown connects Dust & Magnet, History, and Full Catalogue.
 
-**Live site:** https://alfiyandyhr.github.io/anime_viz_project/
+**Live site:** https://alfiyandyhr.github.io/animoviz/
 
 ---
 
@@ -64,7 +64,7 @@ contributions in the genre, release year, and studio charts.
 
 Native links and the keyboard-accessible dropdown support browser Back/Forward.
 All assets and redirects are relative to the deployment root, including GitHub
-Pages' `/anime_viz_project/` prefix. Root and legacy redirect pages include a
+Pages' `/animoviz/` prefix. Root and legacy redirect pages include a
 relative no-JavaScript fallback link and refresh (the charts themselves need JS).
 
 | Legacy URL or root bookmark | Destination |

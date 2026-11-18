@@ -31,7 +31,7 @@ test('legacy modes resolve to new scopes, with unrelated query parameters preser
 
 test('browser redirects retain project subpaths and never target another redirect stub',()=>{
   const source=readFileSync(require.resolve('../frontend/common/redirect.js'),'utf8');
-  for(const prefix of ['/','/anime_viz_project/']) for(const entry of [undefined,'content','creators','reception','recommendations']) {
+  for(const prefix of ['/','/animoviz/']) for(const entry of [undefined,'content','creators','reception','recommendations']) {
     let target;
     vm.runInNewContext(source,{URL,URLSearchParams,
       location:{hash:entry?'#network':'#content',search:'?shared=1',replace:url=>target=url.href},

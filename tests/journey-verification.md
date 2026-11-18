@@ -81,7 +81,7 @@ prefixed static deployment.
 ```sh
 NODE_PATH=/tmp/aniviz-browser/node_modules \
   CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
-  ANIVIZ_BASE_URL=http://127.0.0.1:8766/anime_viz_project/ \
+  ANIVIZ_BASE_URL=http://127.0.0.1:8766/animoviz/ \
   node tests/browser/dust-directions.cjs
 ```
 
@@ -138,7 +138,7 @@ verification, including checks for the former Network view.
 ## Observed outcomes
 
 Headless Chrome with Playwright exercised the walkthrough against local static
-hosting, Flask, and a static `/anime_viz_project/` deployment prefix. No live
+hosting, Flask, and a Pages-style deployment prefix. No live
 AniList/TMDB API request was needed for route and published-data checks.
 
 | Check | Observed result |
@@ -221,8 +221,17 @@ filters and empty/small sets, per-anime curve/dot/score colors, stable colors af
 movie removal/re-addition, keyboard detail access, and mobile session restoration.
 
 `ANIVIZ_CAPTURE_DIR` writes screenshots. `ANIVIZ_BASE_URL` changes the base for
-either runner. Prefix verification used a server rooted at the repository's parent
-with `http://127.0.0.1:8766/anime_viz_project/`. Flask verification used
+the browser checks. To serve the Pages path locally, run the following from the
+repository root.
+
+```sh
+site_root=$(mktemp -d)
+ln -s "$PWD" "$site_root/animoviz"
+python -m http.server 8766 --bind 127.0.0.1 --directory "$site_root"
+```
+
+In another terminal, run the browser checks with
+`ANIVIZ_BASE_URL=http://127.0.0.1:8766/animoviz/`. Flask verification used
 `PORT=8767 FLASK_DEBUG=false python backend/app.py`, then `routes.cjs` with
 `ANIVIZ_BASE_URL=http://127.0.0.1:8767/ ANIVIZ_FLASK=1`. Both route runs passed,
 including no-JavaScript fallbacks. Browser tests require access to the existing
