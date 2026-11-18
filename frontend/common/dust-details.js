@@ -33,31 +33,36 @@
     }).join('')}<small>${mixed ? `Right column: attraction percentile (0–1)<br>${root.AnivizDust.averageLabel(true)}: ${root.AnivizDust.formatPercentile(match.score)}` : match.record.memberIds ? 'Mean signed cosine similarity' : 'Cosine similarity · higher means closer'}</small></div>`;
   }
 
-  const studioCoverage = match => `${match.contributingCount} of ${match.record.memberIds.length} sampled anime scored`;
+  const groupCoverage = (match, index) => index === undefined
+    ? `${match.record.memberIds.length} catalogue anime`
+    : `${match.contributingCounts[index]} of ${match.record.memberIds.length} catalogue anime scored`;
 
-  function renderStudio({ snapshot, match, color, helpers, heading = 'h3' }) {
+  function renderGroup({ snapshot, match, color, helpers, heading = 'h3' }) {
     const { escapeHTML: escape, escapeAttribute: attr } = helpers;
     const { record } = match;
+    const actor = snapshot.direction === root.AnivizDust.ACTORS;
+    const credit = actor ? 'AniList Japanese main-role credits' : 'AniList main-studio credits';
+    const portrait = actor ? root.AnivizArtwork.detailHero('', record.image, `Portrait of ${record.title}`, attr) : '';
     const supporting = match.supportingWorks.slice(0, 5).map(work => ({
       ...work, title: snapshot.titleLookup.get(`anilist:${work.id}`).record.title
     }));
     const evidenceTitle = snapshot.magnets.some(magnet => !root.AnivizDust.isMetricMagnet(magnet))
-      ? 'Strongest supporting anime by mean story similarity' : 'Scored anime (up to five)';
-    return `<${heading}>${escape(record.title)}</${heading}>
-      <p class="recommendation-detail-meta">${studioCoverage(match)} · AniList main-studio credits</p>
+      ? 'Strongest supporting anime by mean story similarity' : 'Anime with metric data (up to five)';
+    return `${portrait}<${heading}>${escape(record.title)}</${heading}>
+      <p class="recommendation-detail-meta">${groupCoverage(match, snapshot.magnets.length === 1 ? 0 : undefined)} · ${credit}</p>
       ${magnetScores(match, snapshot.magnets, color, helpers)}
       <div class="recommendation-context"><h4>${evidenceTitle}</h4>
-        ${supporting.length ? `<ul>${supporting.map(work => `<li><button type="button" class="recommendation-title-button" data-studio-work="anilist:${attr(work.id)}" aria-haspopup="dialog" aria-controls="detail-drawer">${escape(work.title)}</button>${Number.isFinite(work.similarity) ? ` · ${work.similarity.toFixed(3)}` : ''}</li>`).join('')}</ul>` : '<p>No sampled works have scores for every active magnet.</p>'}</div>
-      <a class="button button-secondary" href="https://anilist.co/studio/${attr(record.id)}" target="_blank" rel="noopener noreferrer">Explore on AniList ↗</a>`;
+        ${supporting.length ? `<ul>${supporting.map(work => `<li><button type="button" class="recommendation-title-button" data-${actor ? 'actor' : 'studio'}-work="anilist:${attr(work.id)}" aria-haspopup="dialog" aria-controls="detail-drawer">${escape(work.title)}</button>${Number.isFinite(work.similarity) ? ` · ${work.similarity.toFixed(3)}` : ''}</li>`).join('')}</ul>` : '<p>No anime scores are available for this view.</p>'}</div>
+      <a class="button button-secondary" href="https://anilist.co/${actor ? 'staff' : 'studio'}/${attr(record.id)}" target="_blank" rel="noopener noreferrer">Explore on AniList ↗</a>`;
   }
 
   function render({ snapshot, focusedMagnet, color, helpers }) {
     const { escapeHTML: escape, escapeAttribute: attr, humanize, formatNumber } = helpers;
-    const { animeThumbnail, movieThumbnail, detailHero, movieHero } = root.AnivizArtwork;
+    const { dustThumbnail, detailHero, movieHero } = root.AnivizArtwork;
     const { magnets, mixed } = snapshot;
-    const reverse = snapshot.direction === 'anime-to-movies';
-    const studios = snapshot.direction === root.AnivizDust.STUDIOS;
-    const noun = studios ? 'studios' : reverse ? 'movies' : 'anime';
+    const reverse = snapshot.direction === root.AnivizDust.REVERSE;
+    const group = root.AnivizDust.groupFor(snapshot.direction);
+    const noun = group?.noun || (reverse ? 'movies' : 'anime');
     const selected = snapshot.selectedKeys.map(key => snapshot.displayedDust.find(row => row.key === key)).filter(Boolean);
     const recordFor = match => snapshot.lookup.get(match.key)?.record || match.record;
     const number = value => Number.isFinite(value) ? formatNumber(value) : 'Unknown';
@@ -65,13 +70,12 @@
       ? `<span class="dust-metric-value"${exact !== label ? ` tabindex="0" title="${attr(exact)}" aria-label="${attr(exact)}"` : ''}>${escape(label)}</span><meter min="${min}" max="${max}" value="${value}" aria-label="${attr(exact)}"></meter>` : 'Unknown';
     function table(matches) {
       const records = matches.map(recordFor);
-      const values = reverse || studios ? records : records.map(root.AnivizChartData.comparisonValues);
+      const values = reverse || group ? records : records.map(root.AnivizChartData.comparisonValues);
       const runtimeMax = Math.max(1, ...values.map(row => Number.isFinite(row.runtime) ? row.runtime : 0));
-      const metadataRows = studios ? [
-        ['Sampled anime', value => number(value.memberIds.length)],
-        ['Anime scored across active magnets', (_, i) => number(matches[i].contributingCount)],
-        ['Median AniList score', value => Number.isFinite(value.medianScore) ? `${number(value.medianScore)} / 100` : 'Unknown'],
-        ['Median AniList list users', value => number(value.medianPopularity)]
+      const metadataRows = group ? [
+        ['Catalogue anime', value => number(value.memberIds.length)],
+        ['Average score', value => Number.isFinite(value.averageScore) ? `${value.averageScore.toFixed(1)} / 100` : 'Unknown'],
+        ['Total popularity', value => number(value.totalPopularity)]
       ] : reverse ? [
         ['Release year', value => value.year ?? 'Unknown'],
         ['Genres', value => escape(value.genres?.join(', ') || 'Unknown')],
@@ -96,14 +100,14 @@
             return score(value, -1, 1, value.toFixed(3), cohort ? `${label}: ${value}` : `Cosine ${value}`);
           }];
         }),
-        [mixed ? root.AnivizDust.averageLabel(true) : studios ? 'Mean story similarity across magnets' : 'Average cosine similarity', (_, i) =>
+        [mixed ? root.AnivizDust.averageLabel(true) : group ? 'Mean story similarity across magnets' : 'Average cosine similarity', (_, i) =>
           score(matches[i].score, mixed ? 0 : -1, 1, matches[i].score.toFixed(3),
             `${mixed ? root.AnivizDust.averageLabel(true) : 'Average cosine'} ${matches[i].score}`)]
       ];
       return `<div class="dust-comparison-scroll" role="region" tabindex="0" aria-label="Selected ${noun} comparison, scroll horizontally">
         <table class="dust-comparison-table"><caption class="sr-only">Selected ${noun} comparison</caption>
         <thead><tr><th scope="col">Compare ${noun}</th>${records.map((item, i) => {
-          const cover = studios ? '' : reverse ? movieThumbnail(item) : animeThumbnail(item);
+          const cover = dustThumbnail(item, matches[i].key);
           return `<th scope="col">
             ${cover ? `<img class="dust-comparison-cover" src="${attr(cover)}" alt="" width="40" height="56">` : ''}
             ${escape(item.title)}
@@ -111,7 +115,7 @@
           </th>`;
         }).join('')}</tr></thead>
         <tbody>${rows.map(([label, cell], index) => `<tr${index >= metadataRows.length && index < metadataRows.length + magnets.length ? ` style="--magnet-color:${color(magnets[index - metadataRows.length].key)}" class="dust-movie-metric"` : ''}><th scope="row">${escape(label)}</th>${values.map((value, i) => `<td>${cell(value, i)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
-        <p class="table-note">${studios ? 'The filmography medians use all sampled works with each metric. Magnet scores use the works scored across all active magnets. ' : reverse ? '' : 'Estimated runtime multiplies episodes by minutes per episode. '}${mixed ? 'Meters show attraction percentiles from 0 to 1.' : 'Cosine scores range from −1 to 1.'}</p>`;
+        <p class="table-note">${group ? 'Each magnet uses all catalogue anime with data for that magnet. ' : reverse ? '' : 'Estimated runtime multiplies episodes by minutes per episode. '}${mixed ? 'Meters show attraction percentiles from 0 to 1.' : 'Cosine scores range from −1 to 1.'}</p>`;
     }
     const focused = focusedMagnet ? null : selected.at(-1);
     const record = focusedMagnet || (focused && recordFor(focused));
@@ -119,12 +123,12 @@
     const cover = record?.cover?.extra_large || record?.cover?.large || '';
     const banner = record?.banner_image || cover;
     const tags = record?.tags || [];
-    const focusLabel = movie ? 'Movie in focus' : studios ? 'Studio in focus' : 'Anime in focus';
-    const placeholder = studios
-      ? '<div class="dust-detail-placeholder"><p class="chart-kicker">Studio in focus</p><p>Select a studio to see its scores and explore its sampled anime below.</p></div>'
+    const focusLabel = movie ? 'Movie in focus' : `${group?.label || 'Anime'} in focus`;
+    const placeholder = group
+      ? `<div class="dust-detail-placeholder"><p class="chart-kicker">${focusLabel}</p><p>Select a ${group.label.toLowerCase()} to see magnet scores and explore credited anime below.</p></div>`
       : `<div class="dust-detail-placeholder"><p class="chart-kicker">${focusLabel}</p><h3>Every dot has a story.</h3><p>Select a dot or a title magnet to explore its storyline and genres.</p></div>`;
-    const studioHtml = studios && focused ? `<p class="chart-kicker">${focusLabel}</p>${renderStudio({ snapshot, match: focused, color, helpers })}` : '';
-    const animeHtml = !movie && !studios && record ? `<p class="chart-kicker">${focusLabel}</p>
+    const groupHtml = group && focused ? `<p class="chart-kicker">${focusLabel}</p>${renderGroup({ snapshot, match: focused, color, helpers })}` : '';
+    const animeHtml = !movie && !group && record ? `<p class="chart-kicker">${focusLabel}</p>
       ${detailHero(banner, cover, `Cover for ${record.title}`, attr)}
       <h3 aria-live="polite">${escape(record.title)}</h3>
       <p class="recommendation-detail-meta">${escape(humanize(record.format || 'Unknown'))} · ${record.year || 'Year unknown'}</p>
@@ -142,9 +146,9 @@
     return {
       count: selected.length,
       focusLabel,
-      focusHtml: studioHtml || movieHtml || animeHtml || placeholder,
+      focusHtml: groupHtml || movieHtml || animeHtml || placeholder,
       html: selected.length ? `<section aria-label="Selected dust ${noun}"><div class="dust-details-heading"><h3>${selected.length > 1 ? `Comparing ${selected.length} ${noun}` : escape(recordFor(selected[0]).title)}</h3><button type="button" class="small-button ghost" data-dust-clear>Clear selection</button></div>${table(selected)}</section>` : ''
     };
   }
-  root.AnivizDustDetails = { render, renderMovie, renderStudio, studioCoverage, magnetScores };
+  root.AnivizDustDetails = { render, renderMovie, renderGroup, groupCoverage, magnetScores };
 })(globalThis);

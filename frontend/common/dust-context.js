@@ -2,23 +2,31 @@
 
 // Analytical state only. Particle/magnet positions and scroll live in the session envelope.
 (function (root, factory) {
-  const api = factory();
-  if (typeof module !== "undefined" && module.exports) module.exports = api;
-  else root.AnivizDust = api;
-})(globalThis, function () {
+  if (typeof module !== "undefined" && module.exports) module.exports = factory(require("./chart-data.js"));
+  else root.AnivizDust = factory(root.AnivizChartData);
+})(globalThis, function (ChartData) {
   const VERSION = 2;
   const STORAGE_KEY = "aniviz-dust-session-v2";
   const LEGACY_KEY = "aniviz-dust-session-v1";
   const FORWARD = "movie-to-anime", REVERSE = "anime-to-movies", STUDIOS = "movie-to-studios";
+  const ACTORS = "movie-to-actors";
   const DIRECTIONS = {
     [FORWARD]: { magnet: "tmdb", dust: "anilist", example: "Inception" },
     [REVERSE]: { magnet: "anilist", dust: "tmdb", example: "Attack on Titan" },
-    [STUDIOS]: { magnet: "tmdb", dust: "anilist", example: "Inception" }
+    [STUDIOS]: { magnet: "tmdb", dust: "anilist", example: "Inception",
+      group: { prefix: "anilist:studio", label: "Studio", noun: "studios" } },
+    [ACTORS]: { magnet: "tmdb", dust: "anilist", example: "Inception",
+      group: { prefix: "anilist:staff", label: "Voice actor", noun: "voice actors" } }
   };
+  const groupFor = direction => DIRECTIONS[direction].group;
   const normalizeStrength = value => Number.isFinite(value) ? Math.round(Math.max(0, Math.min(2, value)) * 10) / 10 : 1;
   const keyFor = (catalogue, id) => `${catalogue}:${id}`;
   const catalogueFor = (data, catalogue) => (catalogue === "tmdb" ? data?.movies : data?.anime) || [];
   const METRIC_MAGNET_TYPES = ["popularity", "score"];
+  const GROUP_METRICS = {
+    popularity: { value: "totalPopularity", count: "popularityCount" },
+    score: { value: "averageScore", count: "scoreCount" }
+  };
   const isMetricMagnet = magnet => METRIC_MAGNET_TYPES.includes(magnet.kind);
   const magnetScoreLabel = magnet => isMetricMagnet(magnet) ? magnet.metric
     : magnet.kind === "genre" ? magnet.title : `Cosine to ${magnet.title}`;
@@ -43,12 +51,6 @@
   const ids = (values) => [...new Set((values || []).filter(v => typeof v === "string" || typeof v === "number").map(id))];
   const finite = (v) => Number.isFinite(v) ? v : null;
   const mean = values => values.reduce((sum, value) => sum + value, 0) / values.length;
-  function median(values) {
-    const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
-    const middle = Math.floor(sorted.length / 2);
-    return !sorted.length ? null : sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
-  }
-  const minimumWorks = value => [1, 3, 5].includes(Number(value)) ? Number(value) : 3;
 
   function joinAnimeRecord(record, meta) {
     // Recommendation text can support filtering, but cannot invent ratings, cast or studios.
@@ -67,26 +69,6 @@
       const anime = joinAnimeRecord(record, meta);
       return [anime.id, { recommendation: record, metadata: meta || null, anime }];
     }));
-  }
-
-  function studioGroups(titles) {
-    const groups = new Map();
-    for (const { record } of titles.values()) {
-      for (const credit of record.studios || []) {
-        if (credit.id == null || !credit.name) continue;
-        const studioId = id(credit.id), key = keyFor("anilist", `studio:${studioId}`);
-        if (!groups.has(key)) groups.set(key, {
-          id: studioId, key, title: credit.name, members: new Map()
-        });
-        groups.get(key).members.set(record.id, record);
-      }
-    }
-    return [...groups.values()].map(({ members, ...studio }) => {
-      const works = [...members.values()];
-      return { ...studio, memberIds: [...members.keys()],
-        medianScore: median(works.map(record => record.average_score)),
-        medianPopularity: median(works.map(record => record.popularity)) };
-    });
   }
 
   function passesFilters(record, filters, direction = FORWARD) {
@@ -147,7 +129,8 @@
     const scorePair = direction === REVERSE
       ? (magnetId, dustId) => pairScore(dustId, magnetId) : pairScore;
     const rawColumns = magnets.map(magnet => {
-      if (isMetricMagnet(magnet)) return records.map(record => finite(metricValues[magnet.kind]?.get(id(record.id))));
+      if (isMetricMagnet(magnet)) return groupFor(direction) ? null
+        : records.map(record => finite(metricValues[magnet.kind]?.get(id(record.id))));
       if (magnet.kind !== "genre") return records.map(record => scorePair(magnet.id, record.id));
       if (!cohortVectors.has(magnet.key)) {
         const vector = records.map(record => magnet.memberIds.reduce((sum, memberId) =>
@@ -157,26 +140,38 @@
       return cohortVectors.get(magnet.key);
     });
     const mixed = magnets.some(isMetricMagnet);
-    if (direction === STUDIOS) {
-      const titleIndexes = new Map(records.map((record, index) => [id(record.id), index]));
-      const memberIndexes = groups.map(group => group.memberIds.map(memberId => titleIndexes.get(memberId))
-        .filter(index => rawColumns.every(column => Number.isFinite(column[index]))));
-      const aggregated = rawColumns.map((column, index) => memberIndexes.map(members => {
-        if (!members.length) return null;
-        const values = members.map(member => column[member]);
-        return isMetricMagnet(magnets[index]) ? median(values) : mean(values);
-      }));
-      const storyColumns = rawColumns.filter((_, index) => !isMetricMagnet(magnets[index]));
-      return dustVectors(groups, aggregated, direction, mixed).map((match, index) => ({
-        ...match,
-        contributingCount: memberIndexes[index].length,
-        supportingWorks: memberIndexes[index].map(member => ({
-          id: id(records[member].id), title: records[member].title,
-          similarity: storyColumns.length ? mean(storyColumns.map(column => column[member])) : null
-        })).sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0) || a.title.localeCompare(b.title))
-      }));
-    }
-    return dustVectors(records, rawColumns, direction, mixed);
+    return groupFor(direction) ? scoreGroups(records, magnets, rawColumns, metricValues, groups, direction, mixed)
+      : dustVectors(records, rawColumns, direction, mixed);
+  }
+
+  function scoreGroups(records, magnets, storyScores, metricValues, groups, direction, mixed) {
+    const titleIndexes = new Map(records.map((record, index) => [id(record.id), index]));
+    const metricsOnly = storyScores.every(column => column === null);
+    const summaries = groups.map(group => {
+      const works = group.memberIds.map(memberId => {
+        const index = titleIndexes.get(memberId);
+        return { id: memberId, scores: storyScores.map(column => column?.[index]) };
+      });
+      const aggregates = magnets.map((magnet, index) => {
+        const metric = GROUP_METRICS[magnet.kind];
+        if (metric) return { value: group[metric.value], count: group[metric.count] };
+        const scores = works.map(work => work.scores[index]).filter(Number.isFinite);
+        return { value: scores.length ? mean(scores) : null, count: scores.length };
+      });
+      const supportingWorks = works.flatMap(work => {
+        const scores = work.scores.filter(Number.isFinite);
+        if (scores.length) return [{ id: work.id, similarity: mean(scores) }];
+        return metricsOnly && magnets.some(magnet => Number.isFinite(metricValues[magnet.kind]?.get(work.id)))
+          ? [{ id: work.id, similarity: null }] : [];
+      }).sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0));
+      return { aggregates, supportingWorks };
+    });
+    const columns = magnets.map((_, index) => summaries.map(summary => summary.aggregates[index].value));
+    return dustVectors(groups, columns, direction, mixed).map((match, index) => ({
+      ...match,
+      contributingCounts: summaries[index].aggregates.map(aggregate => aggregate.count),
+      supportingWorks: summaries[index].supportingWorks
+    }));
   }
 
   function dustVectors(records, rawColumns, direction, mixed) {
@@ -190,7 +185,7 @@
       const scores = columns.map(column => column[index]);
       const available = eligibleSet.has(index);
       const closest = available ? scores.indexOf(Math.max(...scores)) : null;
-      return { record, key: direction === STUDIOS ? record.key : keyFor(DIRECTIONS[direction].dust, record.id), index, scores,
+      return { record, key: groupFor(direction) ? record.key : keyFor(DIRECTIONS[direction].dust, record.id), index, scores,
         rawScores: mixed ? rawColumns.map(column => column[index]) : scores,
         score: available ? scores.reduce((sum, value) => sum + value, 0) / scores.length : null,
         closest, winnerPercentile: available ? percentiles[closest][index] : null,
@@ -239,7 +234,7 @@
   const dustLimit = value => [30, 60, 90].includes(Number(value)) ? Number(value) : 60;
   const blankState = direction => ({ magnetKeys: [], magnetStrengths: {}, dustLimit: 60, candidateKeys: [], displayedKeys: [],
     rankingSortKey: "average", rankingOrder: "ascending", filters: defaults(direction), selectedKeys: [], example: false,
-    ...(direction === STUDIOS ? { minimumWorks: 3, supportingIds: [] } : {}) });
+    ...(groupFor(direction) ? { supportingIds: [] } : {}) });
   const blankLayout = () => ({ magnetPositions: {}, magnetColors: {}, particles: null, scrollY: 0 });
 
   function readSession(direction, saved) {
@@ -252,8 +247,7 @@
       state: { ...state, magnetKeys,
         magnetStrengths: Object.fromEntries(magnetKeys.map(key => [key, normalizeStrength(value.magnetStrengths?.[key])])
           .filter(([, strength]) => strength !== 1)),
-        selectedKeys: typedIds(value.selectedKeys, direction === STUDIOS ? "anilist:studio" : dust).slice(0, 3),
-        ...(direction === STUDIOS ? { minimumWorks: minimumWorks(value.minimumWorks) } : {}),
+        selectedKeys: typedIds(value.selectedKeys, groupFor(direction)?.prefix || dust).slice(0, 3),
         dustLimit: dustLimit(value.dustLimit), rankingSortKey: typeof value.rankingSortKey === "string" ? value.rankingSortKey : "average",
         rankingOrder: value.rankingOrder === "descending" ? "descending" : "ascending",
         filters: Object.fromEntries(Object.entries(state.filters).map(([key, fallback]) =>
@@ -293,7 +287,7 @@
       [REVERSE]: { status: "idle", snapshotDate: null, values: {} }
     };
     let cohorts = [];
-    let catalogue = new Map(), lookup = new Map(), titleLookup = new Map(), studios = [];
+    let catalogue = new Map(), lookup = new Map(), titleLookup = new Map(), groups = [];
     let magnets = [], vectors = [], candidates = [], displayed = [], ranking = [];
     let metricMagnets = {};
     let persistent = true, warned = false, revision = 0, colorByMagnet = false;
@@ -326,7 +320,7 @@
         filteredOutIds: state.candidateKeys.filter(key => !visible.has(key)) };
     }
     function publish() {
-      if (direction === STUDIOS) {
+      if (groupFor(direction)) {
         const { selectedKeys, displayedKeys } = session.state;
         session.state.supportingIds = [...new Set((selectedKeys.length ? selectedKeys : displayedKeys)
           .flatMap(key => lookup.get(key)?.record.memberIds || []))];
@@ -341,8 +335,21 @@
       if (direction !== REVERSE) {
         titleLookup = new Map([...joinRecords(data?.anime || [], metadata)].map(([id, row]) =>
           [keyFor("anilist", id), { record: row.anime, metadata: row.metadata }]));
-        studios = direction === STUDIOS ? studioGroups(titleLookup) : [];
-        lookup = direction === STUDIOS ? new Map(studios.map(record => [record.key, { record }])) : titleLookup;
+        groups = [];
+        if (groupFor(direction)) {
+          for (const row of metadata) {
+            const key = keyFor("anilist", row.id);
+            if (!titleLookup.has(key)) titleLookup.set(key, { record: joinAnimeRecord(row, row), metadata: row });
+          }
+          const summaries = direction === ACTORS ? ChartData.voiceActors(metadata)
+            : ChartData.studios(metadata).filter(studio => studio.studioId !== null)
+              .map(({ studio, studioId, ...summary }) => ({ ...summary, id: studioId, title: studio }));
+          // Prefer groups with more catalogue titles when scores tie.
+          groups = summaries
+            .sort((a, b) => b.count - a.count)
+            .map(({ ids, ...summary }) => ({ ...summary, memberIds: ids }));
+        }
+        lookup = groupFor(direction) ? new Map(groups.map(record => [record.key, { record }])) : titleLookup;
       } else {
         lookup = titleLookup = new Map(catalogueFor(data, "tmdb").map(record => {
           const reception = movieReception[record.id];
@@ -366,49 +373,48 @@
     }
     function derive({ rescore = false, resample = false, rerank = false } = {}) {
       const state = session.state;
-      const studioMode = direction === STUDIOS;
+      const group = groupFor(direction);
       const metricSource = metricSources[direction === REVERSE ? REVERSE : FORWARD];
       if (rescore) {
         state.magnetKeys = validMagnets(state.magnetKeys);
         const records = catalogueFor(data, DIRECTIONS[direction].dust);
         const source = metricSource, reverse = direction === REVERSE;
         const definitions = {
-          popularity: { title: "Popularity", metric: studioMode ? "Median AniList list users" : reverse ? "TMDB popularity" : "AniList list users" },
-          score: { title: "Score", metric: studioMode ? "Median AniList score" : reverse ? "TMDB score" : "AniList score", scale: reverse ? 10 : 100 }
+          popularity: { title: "Popularity", metric: group ? "Total popularity" : reverse ? "TMDB popularity" : "AniList list users" },
+          score: { title: "Score", metric: group ? "Average score" : reverse ? "TMDB score" : "AniList score", scale: reverse ? 10 : 100 }
         };
         metricMagnets = Object.fromEntries(METRIC_MAGNET_TYPES.map(kind => [kind, {
           ...definitions[kind], key: metricMagnetKey(direction, kind), kind,
-          snapshotDate: source.snapshotDate, status: source.status, total: studioMode ? studios.length : records.length,
-          eligible: studioMode
-            ? studios.filter(studio => studio.memberIds.some(member => Number.isFinite(source.values[kind]?.get(member)))).length
+          snapshotDate: source.snapshotDate, status: source.status, total: group ? groups.length : records.length,
+          eligible: group
+            ? groups.filter(row => Number.isFinite(row[GROUP_METRICS[kind].value])).length
             : records.filter(record => Number.isFinite(source.values[kind]?.get(id(record.id)))).length
         }]));
         const availableMetrics = new Map(Object.values(metricMagnets).filter(magnet => magnet.eligible)
           .map(magnet => [magnet.key, magnet]));
         magnets = state.magnetKeys.map(key => catalogue.get(key) || availableMetrics.get(key)).filter(Boolean);
-        vectors = scoreDust(records, magnets, direction, pairScore, cohortVectors, source.values, studios);
+        vectors = scoreDust(records, magnets, direction, pairScore, cohortVectors, source.values, groups);
       }
       if (rescore || resample) {
         const { search, ...memberFilters } = state.filters;
         const titleFilters = { ...memberFilters, search: "", studio: "All" };
         const normalizedSearch = search.toLowerCase();
-        const pool = studioMode ? vectors.filter(match => match.contributingCount >= state.minimumWorks
-          && match.record.title.toLowerCase().includes(normalizedSearch)
+        const pool = group ? vectors.filter(match => match.record.title.toLowerCase().includes(normalizedSearch)
           && match.record.memberIds.some(member => passesFilters(titleLookup.get(keyFor("anilist", member)).record, titleFilters)))
           : vectors;
         candidates = sampleDust(pool, magnets.length, state.dustLimit);
         state.candidateKeys = candidates.map(match => match.key);
       }
-      displayed = studioMode ? candidates
+      displayed = group ? candidates
         : candidates.filter(match => passesFilters(lookup.get(match.key).record, state.filters, direction));
       state.displayedKeys = displayed.map(match => match.key);
       const visible = new Set(state.displayedKeys);
       const waitingForMetrics = state.magnetKeys.some(key => isMetricKey(direction, key))
         && ["idle", "loading"].includes(metricSource.status);
-      const selectionReady = studioMode ? metadataStatus === "ready" : direction === REVERSE || metadataStatus !== "loading";
+      const selectionReady = group ? metadataStatus === "ready" : direction === REVERSE || metadataStatus !== "loading";
       if ((pairScore || vectors.length) && !waitingForMetrics && selectionReady) {
         const retained = state.selectedKeys.filter(key => visible.has(key));
-        if (retained.length < state.selectedKeys.length) onNotice(`Selection updated. ${studioMode ? "Studios" : "Titles"} no longer displayed were removed.`);
+        if (retained.length < state.selectedKeys.length) onNotice(`Selection updated. ${group?.label ? group.label + "s" : "Titles"} no longer displayed were removed.`);
         state.selectedKeys = retained;
       }
       if (!state.magnetKeys.includes(state.rankingSortKey)) state.rankingSortKey = "average";
@@ -523,11 +529,6 @@
         session.state.dustLimit = dustLimit(value);
         return derive({ resample: true });
       },
-      setMinimumWorks(value) {
-        if (direction !== STUDIOS) return snapshot();
-        session.state.minimumWorks = minimumWorks(value);
-        return derive({ resample: true });
-      },
       setColorByMagnet(value) {
         if (colorByMagnet === (value === true)) return snapshot();
         colorByMagnet = value === true;
@@ -550,9 +551,9 @@
         for (const key of Object.keys(defaults(direction))) {
           if (Object.hasOwn(patch, key)) session.state.filters = { ...session.state.filters, [key]: patch[key] };
         }
-        return derive({ resample: direction === STUDIOS });
+        return derive({ resample: Boolean(groupFor(direction)) });
       },
-      resetFilters() { session.state.filters = defaults(direction); return derive({ resample: direction === STUDIOS }); },
+      resetFilters() { session.state.filters = defaults(direction); return derive({ resample: Boolean(groupFor(direction)) }); },
       setRankingSort(key) { session.state.rankingSortKey = id(key); return derive({ rerank: true }); },
       setRankingOrder(order) {
         session.state.rankingOrder = order === "descending" ? "descending" : "ascending";
@@ -567,8 +568,9 @@
         if (!displayedKeys.includes(key)) return snapshot();
         if (selectedKeys.includes(key)) return api.setSelection(selectedKeys.filter(item => item !== key));
         if (selectedKeys.length >= 3) {
-          const noun = direction === STUDIOS ? "studios" : direction === REVERSE ? "movies" : "anime";
-          onNotice(`Compare up to 3 ${noun}. Remove a selected ${direction === STUDIOS ? "studio" : "title"} before adding another.`);
+          const group = groupFor(direction);
+          const noun = group?.noun || (direction === REVERSE ? "movies" : "anime");
+          onNotice(`Compare up to 3 ${noun}. Remove a selected ${group?.label.toLowerCase() || "title"} before adding another.`);
           return snapshot();
         }
         return api.setSelection([...selectedKeys, key]);
@@ -579,7 +581,7 @@
     };
     return api;
   }
-  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, STUDIOS, DIRECTIONS, METRIC_MAGNET_TYPES, isMetricMagnet,
+  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, STUDIOS, ACTORS, DIRECTIONS, groupFor, METRIC_MAGNET_TYPES, isMetricMagnet,
     keyFor, catalogueFor, magnetScoreLabel, cohortDescription,
     averageLabel, formatPercentile, formatRawScore, mixedEvidence, defaults, joinRecords,
     passesFilters, createScoreAccessor, forwardVectors, rankCorpus, sampleDust, createContext };

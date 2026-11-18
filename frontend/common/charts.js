@@ -306,13 +306,12 @@
       clearChart(container);
 
       const groupMode = Boolean(context.studioGroups);
-      const summaries = groupMode ? context.studioGroups.map(group => ({
-        studio: group.title, key: group.key, count: group.memberIds.length,
-        popularity: group.medianPopularity, score: group.medianScore
-      })) : ChartData.studios(context.anime, context.selectedIds).map(item => ({
-        ...item, key: item.studio, popularity: item.totalPopularity, score: item.averageScore
-      }));
-      const studios = summaries.filter(item => item.popularity > 0 && Number.isFinite(item.score));
+      const summaries = groupMode ? context.studioGroups.map(({ title, ...group }) => ({
+        ...group, studio: title
+      })) : ChartData.studios(context.anime, context.selectedIds);
+      const studios = summaries.map(item => ({
+        ...item, popularity: item.totalPopularity, score: item.averageScore
+      })).filter(item => item.popularity > 0 && Number.isFinite(item.score));
 
       if (!studios.length) {
         renderEmpty(container, "No studios with score and popularity data match the filters.");
@@ -322,14 +321,12 @@
       // Draw smaller bubbles last so they remain reachable where circles overlap.
       studios.sort((a, b) => d3.descending(a.count, b.count));
 
-      const popularityLabel = groupMode ? "Median AniList list users" : "Total popularity";
-      const scoreLabel = groupMode ? "Median score" : "Average score";
       const { svg, x, y, draw } = drawPopularityAxes(studios, {
         popularity: (item) => item.popularity,
         score: (item) => item.score,
         label: "Studio score versus popularity bubble chart",
-        popularityLabel: `${popularityLabel} (log scale)`,
-        scoreLabel: `${scoreLabel} / 100`
+        popularityLabel: "Total popularity (log scale)",
+        scoreLabel: "Average score / 100"
       });
       draw();
 
@@ -353,9 +350,9 @@
           showTooltip(event, `
             <strong>${escapeHTML(item.studio)}</strong>
             <span>
-              ${popularityLabel}: ${formatNumber(item.popularity)}<br>
-              ${scoreLabel}: ${item.score.toFixed(1)}/100<br>
-              ${groupMode ? "Sampled anime" : "Matching titles"}: ${formatNumber(item.count)}
+              Total popularity: ${formatNumber(item.popularity)}<br>
+              Average score: ${item.score.toFixed(1)}/100<br>
+              ${groupMode ? "Catalogue anime" : "Matching titles"}: ${formatNumber(item.count)}
             </span>
           `);
         })
@@ -377,7 +374,7 @@
       const studios = context.studioGroups ? context.studioGroups.map(group => ({
         key: group.key, title: group.title, members: new Set(group.memberIds), count: group.memberIds.length
       })) : ChartData.studios(anime, context.selectedIds).map(item => ({
-        key: item.studio, title: item.studio, members: new Set(item.ids), count: item.count
+        key: item.key, title: item.studio, members: new Set(item.ids), count: item.count
       }));
       const topStudios = studios
         .sort((a, b) => d3.descending(a.count, b.count))
@@ -775,12 +772,14 @@
     function keyboardMarks(marks) {
       const selectable = kind === "reception";
       const tooltipEvent = selectable ? "mousemove" : "mouseenter";
+      const selectionNote = item => context.selectionLabel && context.selectedIds.includes(String(item.id))
+        ? `; ${context.selectionLabel}` : "";
       marks.attr("tabindex", 0).attr("role", selectable ? "button" : "img")
         .attr("aria-pressed", item => selectable && context.hasSelection ? context.selectedIds.includes(String(item.id)) : null)
         .attr("aria-label", item => item.title && (context.movieRankLimit
           ? `${item.title}: TMDB score ${item.vote_average} / 10; TMDB popularity rank #${formatNumber(item.popularity_rank)}; genres ${item.genres.join(", ") || "Unknown"}`
-          : `${item.title}: score ${item.average_score} / 100; popularity ${formatNumber(item.popularity)}; favourites ${Number.isFinite(item.favourites) ? formatNumber(item.favourites) : 'Unknown'}; genres ${item.genres.join(", ") || "Unknown"}`) || item.genre && item.studio && `${item.studio} × ${item.genre}: ${item.count}`
-          || item.studio && `${item.studio}: ${context.studioGroups ? "median AniList list users" : "total popularity"} ${formatNumber(item.popularity)}; ${context.studioGroups ? "median" : "average"} score ${item.score.toFixed(1)} / 100; ${item.count} ${context.studioGroups ? "sampled anime" : "matching titles"}`
+          : `${item.title}: score ${item.average_score} / 100; popularity ${formatNumber(item.popularity)}; favourites ${Number.isFinite(item.favourites) ? formatNumber(item.favourites) : 'Unknown'}; genres ${item.genres.join(", ") || "Unknown"}${selectionNote(item)}`) || item.genre && item.studio && `${item.studio} × ${item.genre}: ${item.count}`
+          || item.studio && `${item.studio}. Total popularity ${formatNumber(item.popularity)}. Average score ${item.score.toFixed(1)} / 100. ${item.count} ${context.studioGroups ? "catalogue anime" : "matching titles"}.`
           || `${item.genre ?? item.year}: ${item.count} titles; average score ${averageScore(item)}; ${popularityLabel()} ${formatNumber(item.totalPopularity)}`)
         .on("keydown", selectable ? function (event, item) {
           if (["Enter", " "].includes(event.key)) {

@@ -20,7 +20,7 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
     const picker = page.locator('#dust-type');
     await picker.selectOption('anime-studios');
     await waitForDust();
-    assert.equal(await page.locator('#studio-minimum').inputValue(), '3');
+    assert.equal(await page.locator('#studio-minimum').count(), 0);
     assert.match(await page.locator('#movie-magnets').innerText(), /Inception/);
 
     const { pair, displayed, fullScope, titleScope } = await page.evaluate(() => {
@@ -34,13 +34,13 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
       throw new Error('Expected two displayed studios with a shared title');
     });
     await dot(pair[0]).press('Enter');
-    assert.match(await page.locator('#dust-focus').innerText(), /sampled anime scored/);
+    assert.match(await page.locator('#dust-focus').innerText(), /catalogue anime scored/);
     assert.ok(await page.locator('#dust-focus [data-studio-work]').count());
     await dot(pair[1], '#dust-mirror').press('Space');
     assert.deepEqual(await selection(), pair);
     assert.match(await page.locator('#recommendation-detail').innerText(), /Comparing 2 studios/);
     assert.equal(await page.locator('#recommendation-chart .dust-node').count(), displayed.length);
-    assert.match(await page.locator('#dust-studio-scope').innerText(), new RegExp(`${titleScope.length} distinct sampled anime`));
+    assert.match(await page.locator('#dust-studio-scope').innerText(), new RegExp(`${titleScope.length} distinct catalogue anime`));
 
     const reception = chart('reception');
     await reception.scrollIntoViewIfNeeded();
@@ -90,7 +90,7 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
     await chart('studios').scrollIntoViewIfNeeded();
     await chart('studios').locator('.studio-dot').first().waitFor();
     assert.deepEqual(await chart('studios').locator('.axis-label').allTextContents(),
-      ['Median AniList list users (log scale)', 'Median score / 100']);
+      ['Total popularity (log scale)', 'Average score / 100']);
 
     const extra = displayed.filter(key => !pair.includes(key));
     const connection = chart('connections').locator(`[data-dust-connection-id$=":${extra[0]}"]`);
@@ -100,7 +100,7 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
     assert.deepEqual(await selection(), [...pair, extra[0]]);
     assert.match(await page.locator('[data-dust-notice]').innerText(), /Compare up to 3 studios/);
     await page.locator('[data-dust-clear]').click();
-    assert.match(await page.locator('#dust-studio-scope').innerText(), new RegExp(`${fullScope} distinct sampled anime`));
+    assert.match(await page.locator('#dust-studio-scope').innerText(), new RegExp(`${fullScope} distinct catalogue anime`));
 
     const rank = page.locator('[data-dust-rank-id]').first();
     await rank.click();
@@ -117,7 +117,6 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
     await picker.selectOption('anime-titles');
     await waitForDust();
     assert.deepEqual(await selection(), []);
-    assert.equal(await page.locator('#studio-minimum').isVisible(), false);
     await picker.selectOption('anime-studios');
     await waitForDust();
     assert.deepEqual(await selection(), pair);
@@ -130,6 +129,44 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
     await page.waitForFunction(count => state.networkScopeInfo?.total === count, titleScope.length);
     assert.equal(await page.locator('#network-scope').inputValue(), 'dust');
     assert.deepEqual(await page.evaluate(() => state.networkAnime.map(item => String(item.id)).sort()), titleScope.sort());
+
+    await page.goto(new URL('frontend/explorer/index.html?mode=catalogue', base).href);
+    const catalogueChart = page.locator('[data-catalogue-chart="studios"]');
+    await catalogueChart.scrollIntoViewIfNeeded();
+    const catalogueBubbles = catalogueChart.locator('.studio-dot');
+    await catalogueBubbles.first().waitFor();
+    const leaders = await catalogueBubbles.evaluateAll(nodes => {
+      const studios = nodes.map(node => node.__data__);
+      return ['totalPopularity', 'averageScore'].map(field => studios.reduce((a, b) => a[field] >= b[field] ? a : b));
+    });
+    assert.deepEqual(leaders.map(studio => studio.studio), ['A-1 Pictures', 'TOHO animation STUDIO']);
+    await page.goto(dustUrl);
+    await waitForDust();
+    for (const [index, kind] of ['popularity', 'score'].entries()) {
+      await page.locator('[data-remove-magnet]').click();
+      await page.locator(`#magnet-type input[value="${kind}"]`).check();
+      await page.locator(`#add-${kind}-magnet`).click();
+      await waitForDust();
+      const { key, studio, totalPopularity, averageScore, count } = leaders[index];
+      assert.deepEqual(await page.evaluate(() => AnivizMain.snapshot().activeMagnetKeys), [`anilist:${kind}`]);
+      assert.equal((await page.locator('[data-dust-rank-id]').first().innerText()).trim(), studio);
+      assert.equal(await page.locator('[data-dust-ranking-head] th:nth-last-child(2)').textContent(), 'Anime counts');
+      assert.equal(await page.locator('[data-dust-ranking-body] tr').first().locator('td:nth-last-child(2)').textContent(), String(count));
+      assert.equal(await dot(key).count(), 1);
+      const circles = chart('studios').locator('.studio-dot');
+      await chart('studios').scrollIntoViewIfNeeded();
+      await circles.first().waitFor();
+      assert.deepEqual(await circles.evaluateAll((nodes, key) => {
+        const { popularity, score } = nodes.find(node => node.__data__.key === key).__data__;
+        return [popularity, score];
+      }, key), [totalPopularity, averageScore]);
+      await chart('connections').scrollIntoViewIfNeeded();
+      assert.equal(await chart('connections').locator('.dust-connection-rank').first().innerText(), '1');
+      assert.equal(await chart('connections').locator('.dust-connection-title').first().innerText(), studio);
+      const members = chart('connections').getByRole('table', { name: `Dust members for ${kind === 'score' ? 'Score' : 'Popularity'}` });
+      assert.equal(await members.locator('thead th').last().textContent(), 'Anime counts');
+      assert.equal(await members.locator('tbody tr').first().locator('td').last().textContent(), String(count));
+    }
     assert.deepEqual(errors, []);
 
     const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
@@ -144,7 +181,7 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
     await studio.waitFor();
     await studio.press('Enter');
     assert.match(await mobile.locator('#dust-studio-scope').innerText(), /Selected studios/);
-    console.log('Verified studio selection, deduplicated chart and Network scopes, comparison, restore, and mobile metadata retry.');
+    console.log('Verified catalogue metric parity, studio selection, chart and Network scopes, comparison, restore, and mobile metadata retry.');
   } finally {
     await browser.close();
   }

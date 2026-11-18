@@ -21,8 +21,8 @@
     function update(value, resetMemberScroll = false) {
       const { snapshot, dustMatchColor } = value;
       const { magnets, activeMagnetKeys: magnetKeys, displayedDust, selectedKeys, mixed } = snapshot;
-      const studios = snapshot.direction === AnivizDust.STUDIOS;
-      const noun = studios ? 'studios' : snapshot.direction === AnivizDust.REVERSE ? 'movies' : 'anime';
+      const group = AnivizDust.groupFor(snapshot.direction);
+      const noun = group?.noun || (snapshot.direction === AnivizDust.REVERSE ? 'movies' : 'anime');
       const focused = document.activeElement;
       const focusKey = ['data-dust-connection-movie', 'data-dust-connection-id', 'data-dust-connection-panel',
         'data-dust-member-movie', 'data-dust-member-id', 'data-dust-member-scroll']
@@ -40,11 +40,11 @@
       const magnet = magnets[magnetIndex];
       const cohortLabel = magnet?.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : '';
       const scoreLabel = mixed ? `Attraction percentile · ${AnivizDust.magnetScoreLabel(magnet)}`
-        : studios ? 'Mean signed cosine similarity' : cohortLabel || 'Signed cosine similarity';
+        : group ? 'Mean signed cosine similarity' : cohortLabel || 'Signed cosine similarity';
       onCoverage(`${displayedDust.length} displayed ${noun} · ${scoreLabel}.`);
       if (!magnetKeys.length || !displayedDust.length) {
         offsets = [0, 0];
-        renderEmpty(container, magnetKeys.length && studios ? 'No studios in the field. Check the data status, works minimum, or filters.'
+        renderEmpty(container, magnetKeys.length && group ? `No ${noun} in the field. Check the data status or filters.`
           : magnetKeys.length ? `No ${noun} match the current dust filters. Broaden or reset filters to see connections.`
           : `Add a magnet to compare its most and least similar ${noun}.`);
         return;
@@ -104,15 +104,15 @@
           .style('--dust-color', matchColor)
           .attr('data-dust-connection-id', match => `${selectedMagnetKey}:${match.key}`)
           .attr('aria-pressed', isSelected)
-          .attr('aria-haspopup', match => studios || isSelected(match) ? null : 'dialog')
-          .attr('aria-controls', studios ? 'recommendation-detail' : 'recommendation-detail detail-drawer')
-          .attr('aria-label', match => `Dust rank ${match.rank} of ${ranking.length}: ${match.record.title}. ${mixed ? evidence(match) : `${AnivizDust.magnetScoreLabel(magnet)}: ${match.similarity}`}.${studios ? ` ${AnivizDustDetails.studioCoverage(match)}.` : ''}`)
+          .attr('aria-haspopup', match => group || isSelected(match) ? null : 'dialog')
+          .attr('aria-controls', group ? 'recommendation-detail' : 'recommendation-detail detail-drawer')
+          .attr('aria-label', match => `Dust rank ${match.rank} of ${ranking.length}: ${match.record.title}. ${mixed ? evidence(match) : `${AnivizDust.magnetScoreLabel(magnet)}: ${match.similarity}`}.${group ? ` ${AnivizDustDetails.groupCoverage(match, magnetIndex)}.` : ''}`)
           .attr('title', match => match.record.title)
           .on('click', (event, match) => onSelect(match.key));
         rows.append('span').attr('class', 'dust-connection-dot').attr('aria-hidden', 'true');
         rows.append('span').attr('class', 'dust-connection-rank').text(match => match.rank);
         rows.append('span').attr('class', 'dust-connection-title').text(match => match.record.title)
-          .attr('title', match => studios ? AnivizDustDetails.studioCoverage(match) : null);
+          .attr('title', match => group ? AnivizDustDetails.groupCoverage(match, magnetIndex) : null);
         showScores(rows.append('span').attr('class', 'dust-connection-score'));
         const panel = list.node(), end = panel.scrollHeight - panel.clientHeight;
         panel.scrollTop = index === 0 ? offsets[index] : end - offsets[index];
@@ -136,13 +136,13 @@
         const table = scroll.append('table').attr('aria-label', `Dust members for ${title}`)
           .style('--dust-color', matchColor(members[0]));
         const memberScoreLabel = !mixed || magnet.kind === 'genre' ? 'Similarity' : scoreLabel;
-        const headings = ['Rank', studios ? 'Studio' : noun === 'movies' ? 'Movie' : 'Anime', memberScoreLabel];
-        if (studios) headings.push('Scored / sampled');
+        const headings = ['Rank', group?.label || (noun === 'movies' ? 'Movie' : 'Anime'), memberScoreLabel];
+        if (group) headings.push('Anime counts');
         const headerCells = table.append('thead').append('tr').selectAll('th').data(headings).join('th')
           .attr('scope', 'col')
           .classed('dust-member-similarity', label => label === 'Similarity')
           .text(label => label);
-        if (!studios && AnivizDust.isMetricMagnet(magnet)) {
+        if (!group && AnivizDust.isMetricMagnet(magnet)) {
           headerCells.filter(label => label === memberScoreLabel)
             .classed('dust-member-metric', true).text('Attraction percentile ')
             .append('span').text(AnivizDust.magnetScoreLabel(magnet));
@@ -156,10 +156,10 @@
         rows.append('td').text((_, index) => index + 1);
         rows.append('td').append('button').attr('type', 'button').attr('class', 'dust-member-title')
           .attr('data-dust-member-id', match => `${selectedMagnetKey}:${match.key}`)
-          .attr('aria-pressed', isSelected).attr('aria-haspopup', match => studios || isSelected(match) ? null : 'dialog')
-          .attr('aria-controls', studios ? 'recommendation-detail' : 'recommendation-detail detail-drawer').text(match => match.record.title);
+          .attr('aria-pressed', isSelected).attr('aria-haspopup', match => group || isSelected(match) ? null : 'dialog')
+          .attr('aria-controls', group ? 'recommendation-detail' : 'recommendation-detail detail-drawer').text(match => match.record.title);
         showScores(rows.append('td').attr('class', 'dust-member-score'));
-        if (studios) rows.append('td').text(match => `${match.contributingCount} / ${match.record.memberIds.length}`);
+        if (group) rows.append('td').text(match => match.record.memberIds.length);
         scroll.node().scrollTop = memberScrollTop;
       } else {
         memberPanel.append('p').attr('class', 'dust-member-empty').text(`None of the displayed ${noun} have their highest score for ${title}.`);

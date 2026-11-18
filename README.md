@@ -14,7 +14,7 @@ The compact dropdown contains exactly four destinations:
 
 | View | Data and interactions |
 | --- | --- |
-| Dust & Magnet | Choose Anime titles, Anime studios, or Movie titles, with a field of up to 30, 60, or 90 dots. All three include similarity connections, a field mirror, reception, genres, release years, and a full ranking. Select a dust dot or a title magnet to see it in the In Focus panel. Both anime dust types also show studio charts. |
+| Dust & Magnet | Choose Anime titles, Anime studios, Anime voice actors, or Movie titles, with a field of up to 30, 60, or 90 dots. Each type includes similarity connections, a field mirror, reception, genres, release years, and a full ranking. Select a dust dot or a title magnet to see it in the In Focus panel. Anime dust types also show studio charts. |
 | History | Scroll a pair of release timelines to see each year’s most popular anime and its closest movie match. Both titles have synopses and the connection shows cosine similarity. |
 | Network | Actor/character/work collaboration graph, defaulting to Current dust when a saved anime-dust context exists, otherwise Catalogue. A local selector switches scopes without changing other views. The 35-work display cap and sampled Japanese cast credits are disclosed. |
 | Full Catalogue | The loaded 1,000-title metadata sample, with its own search, filters, sorting, pagination, details and automatic shortlist comparison. Saved movies never narrow its scope. |
@@ -45,14 +45,24 @@ Remove or Clear selection also updates the comparison. Every ranking row opens
 the title’s details independently of the selection.
 Catalogue shortlists are independent and remain in memory for that page visit.
 
-**Anime studios** groups the sampled anime by AniList main-studio credit. Select
-up to three studios to compare their coverage, filmography medians, and magnet
-scores. Reception, genres, and release years show their combined sampled anime
+**Anime studios** groups catalogue anime by AniList main-studio credit. Select
+up to three studios to compare their filmography metrics and magnet scores.
+Reception, genres, and release years show their combined catalogue anime
 and count each co-production once. Genres by studio keeps each studio’s own
 credits, so co-productions appear in each credited studio’s row. Clear the
 selection to analyse all studios in the field. The field, mirror, similarity
 connections, and full ranking continue to compare studios against the magnets.
 Network’s **Current dust** uses the same distinct anime as the title charts.
+
+**Anime voice actors** groups the Full Catalogue by AniList Japanese main-role
+credits. Each title contributes once to an actor’s filmography. Movie magnets
+average those titles’ signed cosine similarity to that movie. Genre cohorts
+average across the cohort’s movies. Popularity sums AniList list users, and Score
+averages available anime scores. Zoom in on an actor for their AniList portrait.
+The linked charts show distinct anime credited to actors in the field. Select up
+to three actors to highlight their anime in Score vs. popularity, genres,
+release years, and studio charts. Network’s **Current dust** uses the selected
+actors’ anime, or the displayed actors’ anime when there is no selection.
 
 ## Routes and session state
 
@@ -300,12 +310,13 @@ slot and contributes one score to the combined average. Its membership stays
 fixed when you filter the dust.
 
 **Anime studios** keeps the movie magnets from **Anime titles** when you switch
-between them. Story magnets use the mean signed cosine of a studio’s sampled
-anime, while **Popularity** and **Score** use medians. Each studio uses the same
-scored anime across all active magnets. The field starts at three scored works
-per studio. Search studio names under **Filter**, or lower **Minimum scored
-works** to see smaller filmographies. The field filters leave studio scores
-and sampled filmographies fixed, and the full ranking includes smaller studios.
+between them. **Popularity** sums AniList list-user counts and **Score** averages
+available ratings across each studio’s catalogue filmography, matching Full
+Catalogue. A movie magnet averages signed cosine similarities to that movie
+across the studio’s anime in the similarity matrix. A genre magnet averages the
+cosines from every pair of a studio anime and a movie in the cohort. Each magnet
+uses all works with data for that magnet. Search studio names under **Filter**.
+Filters change the field while studio scores and filmographies stay fixed.
 
 Choose **Popularity** to use AniList list-user counts for anime or TMDB
 popularity for movies. Choose **Score** to use AniList ratings out of 100 or
@@ -313,7 +324,7 @@ TMDB ratings out of 10. You can combine both with a title or genre cohort
 within the same three slots.
 
 With either metric active, each magnet's raw values become midrank percentiles
-from 0 to 1 over titles with values for every active metric. The field and
+from 0 to 1 over dust with values for every active magnet. The field and
 combined ranking use those percentiles. Individual ranking sorts and score
 evidence expose the raw values. Titles with missing values stay in the full
 ranking with an unavailable combined rank.

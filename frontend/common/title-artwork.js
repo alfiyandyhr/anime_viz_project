@@ -20,6 +20,12 @@
     return tmdbImage(record.poster_path, 'w92');
   }
 
+  function dustThumbnail(record, key) {
+    if (key.startsWith('anilist:staff:')) return record.image;
+    if (key.startsWith('anilist:studio:')) return '';
+    return key.startsWith('tmdb:') ? movieThumbnail(record) : animeThumbnail(record);
+  }
+
   function detailHero(banner, cover, description, attr) {
     if (!banner && !cover) return '';
     return `<div class="title-artwork">
@@ -33,5 +39,5 @@
       `Poster for ${record.title}`, attr);
   }
 
-  root.AnivizArtwork = Object.freeze({ animeThumbnail, movieThumbnail, detailHero, movieHero });
+  root.AnivizArtwork = Object.freeze({ animeThumbnail, movieThumbnail, dustThumbnail, detailHero, movieHero });
 })(globalThis);

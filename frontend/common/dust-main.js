@@ -8,12 +8,15 @@
   const dustTypeByDirection = {
     [AnivizDust.FORWARD]: 'anime-titles',
     [AnivizDust.STUDIOS]: 'anime-studios',
+    [AnivizDust.ACTORS]: 'anime-voice-actors',
     [AnivizDust.REVERSE]: 'movie-titles'
   };
   const magnetColors = new Map();
   const isReverse = () => latest.direction === AnivizDust.REVERSE;
   const isStudio = () => latest.direction === AnivizDust.STUDIOS;
-  const dustNoun = () => isStudio() ? "studios" : isReverse() ? "movies" : "anime";
+  const isActor = () => latest.direction === AnivizDust.ACTORS;
+  const dustGroup = () => AnivizDust.groupFor(latest.direction);
+  const dustNoun = () => dustGroup()?.noun || (isReverse() ? "movies" : "anime");
   const detailHelpers = () => ({ escapeHTML, escapeAttribute, humanize, formatNumber });
   const color = key => magnetColors.get(key);
   const dustColor = match => latest.colorByMagnet
@@ -29,7 +32,7 @@
     elements.yearFrom.value = filters.yearFrom ?? elements.yearFrom.options[0]?.value;
     elements.yearTo.value = filters.yearTo ?? elements.yearTo.options[elements.yearTo.length - 1]?.value;
     if (isReverse()) return;
-    if (!isStudio()) elements.studioFilter.value = filters.studio;
+    if (!dustGroup()) elements.studioFilter.value = filters.studio;
     elements.formatFilter.value = filters.format;
     elements.scoreFilter.value = filters.minimumScore;
     elements.scoreOutput.value = filters.minimumScore;
@@ -39,7 +42,7 @@
     const choices = field => [...new Set(records.flatMap(record => record[field] || []))].sort();
     populateSelect(elements.genreFilter, choices('genres'), 'All genres');
     if (!isReverse()) {
-      if (!isStudio()) populateSelect(elements.studioFilter, choices('studio_names'),
+      if (!dustGroup()) populateSelect(elements.studioFilter, choices('studio_names'),
         latest.metadataStatus === 'unavailable' ? 'Studios unavailable' : 'All studios');
       populateSelect(elements.formatFilter, choices('format'), 'All formats', humanize);
     }
@@ -50,7 +53,7 @@
       Array.from({ length: last - first + 1 }, (_, i) => `<option value="${first + i}">${first + i}</option>`).join('');
     for (const [key, control] of [['genre', elements.genreFilter], ['yearFrom', elements.yearFrom],
       ['yearTo', elements.yearTo], ...(!isReverse() ? [['format', elements.formatFilter]] : []),
-      ...(!isReverse() && !isStudio() ? [['studio', elements.studioFilter]] : [])]) {
+      ...(!isReverse() && !dustGroup() ? [['studio', elements.studioFilter]] : [])]) {
       // Keep explicit saved filters visible if that metadata is currently unavailable.
       const value = latest.filters[key];
       if (value !== null && !Array.from(control.options).some(option => option.value === String(value))) {
@@ -100,13 +103,14 @@
     }
   }
   function inspectRanking(key) {
-    if (!isStudio()) { inspectTitle(key); return; }
+    const group = dustGroup();
+    if (!group) { inspectTitle(key); return; }
     const match = latest.ranking.find(row => row.key === key);
     if (!match) return;
-    elements.drawerContent.innerHTML = AnivizDustDetails.renderStudio({
+    elements.drawerContent.innerHTML = AnivizDustDetails.renderGroup({
       snapshot: latest, match, color, helpers: detailHelpers(), heading: 'h2'
     });
-    openDrawer('Studio details');
+    openDrawer(`${group.label} details`);
   }
   function select(key, { showDrawer = false } = {}) {
     if (!latest.displayedKeys.includes(key)) return;
@@ -114,7 +118,7 @@
     if (wasSelected || latest.selectedKeys.length < 3) focusedMagnetKey = null;
     if (pendingNotice.startsWith('Compare up to 3')) notice('');
     context.toggleSelection(key);
-    if (showDrawer && !wasSelected && !isStudio()) inspectTitle(key);
+    if (showDrawer && !wasSelected && !dustGroup()) inspectTitle(key);
   }
   function focusMagnet(key) {
     if (!context.getMagnetRecord(key)) return;
@@ -139,7 +143,7 @@
     detail.innerHTML = result.html;
     cue.hidden = !result.html;
     cue.innerHTML = result.html ? `<a href="#recommendation-detail">${result.count > 1
-      ? `Comparing ${result.count} ${dustNoun()}` : isStudio() ? 'Selected studio' : 'Selected title'} · below ↓</a>` : '';
+      ? `Comparing ${result.count} ${dustNoun()}` : `Selected ${dustGroup()?.label.toLowerCase() || 'title'}`} · below ↓</a>` : '';
   }
   function publish(snapshot) {
     const switched = latest.direction !== snapshot.direction;
@@ -155,7 +159,7 @@
     }
     if (switched || !snapshot.activeMagnetKeys.includes(focusedMagnetKey)) focusedMagnetKey = null;
     if (switched) loadLayout();
-    const reverse = isReverse(), studios = isStudio();
+    const reverse = isReverse(), studios = isStudio(), actors = isActor(), group = dustGroup();
     const used = new Set();
     snapshot.activeMagnetKeys.forEach(key => {
       let value = magnetColors.get(key);
@@ -172,40 +176,49 @@
     }
     if (recolor) refreshDustColors();
     const keysInScope = snapshot.selectedKeys.length ? snapshot.selectedKeys : snapshot.displayedKeys;
-    const groups = studios ? keysInScope.map(key => snapshot.lookup.get(key)?.record).filter(Boolean) : null;
-    const records = studios ? snapshot.supportingIds.map(id => snapshot.titleLookup.get(`anilist:${id}`).record)
+    const studioGroups = studios ? keysInScope.map(key => snapshot.lookup.get(key)?.record).filter(Boolean) : null;
+    const records = group ? (actors
+      ? [...new Set(snapshot.displayedDust.flatMap(match => match.record.memberIds))]
+      : snapshot.supportingIds).map(id => snapshot.titleLookup.get(`anilist:${id}`).record)
       : snapshot.displayedKeys.map(key => snapshot.lookup.get(key).record);
     const dustColors = new Map(snapshot.displayedDust.map(match => [match.key, dustColor(match)]));
     const metric = $('[data-dust-genre-metric]').value;
     const provider = AnivizDust.DIRECTIONS[snapshot.direction].dust;
-    const selectedIds = snapshot.selectedKeys.map(key => snapshot.lookup.get(key)?.record.id).filter(id => id != null).map(String);
-    composition.update({ anime: records, selectedIds: studios ? [] : selectedIds, hasSelection: !studios,
-      studioGroups: groups,
+    const selectedIds = actors ? (snapshot.selectedKeys.length ? snapshot.supportingIds : [])
+      : studios ? [] : snapshot.selectedKeys.flatMap(key => {
+        const record = snapshot.lookup.get(key)?.record;
+        return record ? [String(record.id)] : [];
+      });
+    composition.update({ anime: records, selectedIds, hasSelection: !group,
+      selectionLabel: actors ? 'Credited to a selected voice actor' : null,
+      studioGroups,
       metric, movieRankLimit: reverse ? Math.max(2, snapshot.lookup.size) : null,
       onSelect: id => {
         const key = AnivizDust.keyFor(provider, id);
-        if (!studios) select(key);
+        if (!group) select(key);
         inspectTitle(key);
       },
-      dustColor: id => studios ? DUST_UNIFORM_COLOR : dustColors.get(AnivizDust.keyFor(provider, id)),
+      dustColor: id => group ? DUST_UNIFORM_COLOR : dustColors.get(AnivizDust.keyFor(provider, id)),
       dustMatchColor: key => dustColors.get(key), snapshot });
     const count = records.length, candidates = snapshot.candidateKeys.length;
-    const studioScope = $('#dust-studio-scope');
-    studioScope.hidden = !studios;
+    const filmographyScope = $('#dust-studio-scope');
+    filmographyScope.hidden = !group;
     if (studios) {
-      const label = snapshot.selectedKeys.length && groups.length ? `Selected studios: ${groups.map(group => group.title).join(', ')}` : 'Displayed studios';
-      studioScope.textContent = `${label} · ${count} distinct sampled anime. Shared credits count once in title charts.`;
+      const label = snapshot.selectedKeys.length && studioGroups.length ? `Selected studios: ${studioGroups.map(studio => studio.title).join(', ')}` : 'Displayed studios';
+      filmographyScope.textContent = `${label} · ${count} distinct catalogue anime. Shared credits count once in title charts.`;
+    } else if (actors) {
+      filmographyScope.textContent = `${count} distinct anime credited to displayed voice actors${selectedIds.length
+        ? ` · ${selectedIds.length} credited to the selection: ${keysInScope.map(key => snapshot.lookup.get(key).record.title).join(', ')}` : ''}.`;
     }
-    $('[data-dust-scope]').textContent = elements.filterSummary.textContent = studios
-      ? `${snapshot.displayedKeys.length} studios shown · ${snapshot.minimumWorks}+ scored works each`
+    $('[data-dust-scope]').textContent = elements.filterSummary.textContent = group
+      ? `${snapshot.displayedKeys.length} ${group.noun} shown`
       : `${count} / ${candidates} ${dustNoun()}`;
-    if (studios) $('#studio-minimum').value = snapshot.minimumWorks;
     $('#dust-limit').value = snapshot.dustLimit;
-    const unit = studios ? 'studios' : 'titles';
-    const scoreLabel = snapshot.mixed ? 'attraction percentiles' : studios ? 'mean story similarity' : 'similarity scores';
-    $('#recommendation-score-note').textContent = `Zoom in for ${studios ? 'studio names' : 'posters'}. Hover or focus for ${scoreLabel}. Thicker links show a stronger pull. Select up to 3 ${unit}.`;
-    const colorNote = snapshot.colorByMagnet ? ` Color identifies each ${studios ? 'studio' : 'title'}’s highest-scoring magnet.` : '';
-    $('#dust-connection-method').textContent = `Select a magnet to rank the displayed ${unit} by ${snapshot.mixed ? 'attraction percentile' : studios ? 'mean signed cosine similarity' : 'cosine similarity'}. Thicker curves show higher scores within that magnet’s range.${colorNote} Dust members lists the ${unit} that score highest for the selected magnet. Scroll either list to see more ${unit}.`;
+    const unit = group?.noun || 'titles';
+    const scoreLabel = snapshot.mixed ? 'attraction percentiles' : group ? 'mean story similarity' : 'similarity scores';
+    $('#recommendation-score-note').textContent = `Zoom in for ${studios ? 'studio names' : actors ? 'portraits' : 'posters'}. Hover or focus for ${scoreLabel}. Thicker links show a stronger pull. Select up to 3 ${unit}.`;
+    const colorNote = snapshot.colorByMagnet ? ` Color identifies each ${group?.label.toLowerCase() || 'title'}’s highest-scoring magnet.` : '';
+    $('#dust-connection-method').textContent = `Select a magnet to rank the displayed ${unit} by ${snapshot.mixed ? 'attraction percentile' : group ? 'mean signed cosine similarity' : 'cosine similarity'}. Thicker curves show higher scores within that magnet’s range.${colorNote} Dust members lists the ${unit} that score highest for the selected magnet. Scroll either list to see more ${unit}.`;
     const notes = {
       genres: [metric === 'count' ? 'Genres' : 'Genre ' + metric,
         row => row.genres.length && (metric === 'score' ? Number.isFinite(row.average_score) : metric !== 'popularity' || Number.isFinite(row.popularity)),
@@ -225,12 +238,12 @@
         studios: ['Titles with studio, score and popularity', row => row.studio_names.length && row.popularity > 0 && Number.isFinite(row.average_score), 'Circle area represents matching titles. Studio credits can overlap.'],
         heatmap: ['Studio × genre', row => row.studio_names.length && row.genres.length,
           'Up to 15 studios and 10 genres, ranked by displayed title count. Titles can appear in multiple cells.'],
-        reception: ['Ratings', row => row.popularity > 0 && Number.isFinite(row.average_score), `Circle area: favourites.${colorNote}`]
+        reception: ['Ratings', row => row.popularity > 0 && Number.isFinite(row.average_score), `Circle area: favourites.${group ? '' : colorNote}`]
       });
       if (studios) {
-        notes.studios = ['Studio coverage', () => true, 'Each circle shows a studio’s median score and list users. Circle area represents its sampled anime count.'];
+        notes.studios = ['Studio coverage', () => true, 'Each circle shows a studio’s average score and total popularity. Circle area represents its catalogue anime count.'];
         notes.heatmap = ['Studio × genre', row => row.genres.length,
-          'Each row counts that studio’s sampled anime. Co-productions count for each credited studio. Up to 15 studios and 10 genres are shown.'];
+          'Each row counts that studio’s catalogue anime. Co-productions count for each credited studio. Up to 15 studios and 10 genres are shown.'];
         notes.reception = ['Ratings', notes.reception[1], 'Circle area: favourites. Select an anime to open its details.'];
       }
     }
@@ -269,22 +282,22 @@
     const ranked = rows.filter(match => match.rank !== null);
     const metricNote = mixed
       ? ` · ${magnets.filter(AnivizDust.isMetricMagnet).map(metricDescription).join(' · ')}. Individual sorts use raw values. Combined ranks require values for all active metrics.` : '';
-    const studios = isStudio();
-    const corpus = studios ? latest.lookup.size : ranking.length;
-    const coverageNote = studios ? ' · The works minimum and filters apply to the field. Scores use the full sample.' : '';
+    const group = dustGroup();
+    const corpus = group ? latest.lookup.size : ranking.length;
+    const coverageNote = group ? ` · Filters apply to the field. Tied ranks list ${group.noun} with more catalogue titles first.` : '';
     $('[data-dust-ranking-note]').textContent = `${corpus} corpus ${dustNoun()} · ${ranked.length ? `ranks ${ranked[0].rank}–${ranked.at(-1).rank}` : 'Ranks unavailable'}` + metricNote + coverageNote;
-    const title = studios ? 'Studio' : isReverse() ? 'Movie' : 'Anime';
+    const title = group?.label || (isReverse() ? 'Movie' : 'Anime');
     const cohortLabels = magnets.map(magnet => magnet.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : '');
     const average = AnivizDust.averageLabel(mixed);
-    $('[data-dust-ranking-head]').innerHTML = `<tr><th scope="col" aria-sort="${rankingOrder}">Rank</th><th scope="col">${title}</th>${magnets.map((magnet, i) => `<th scope="col">M${i + 1} · ${escapeHTML(mixed ? AnivizDust.magnetScoreLabel(magnet) : cohortLabels[i] || magnet.title)}</th>`).join('')}<th scope="col">${average}</th><th scope="col">${studios ? 'Scored / sampled anime' : isReverse() ? 'Year' : 'Format / year'}</th><th scope="col">Displayed dust</th></tr>`;
+    $('[data-dust-ranking-head]').innerHTML = `<tr><th scope="col" aria-sort="${rankingOrder}">Rank</th><th scope="col">${title}</th>${magnets.map((magnet, i) => `<th scope="col">M${i + 1} · ${escapeHTML(mixed ? AnivizDust.magnetScoreLabel(magnet) : cohortLabels[i] || magnet.title)}</th>`).join('')}<th scope="col">${average}</th><th scope="col">${group ? 'Anime counts' : isReverse() ? 'Year' : 'Format / year'}</th><th scope="col">Displayed dust</th></tr>`;
     $('[data-dust-ranking-body]').innerHTML = rows.map(match => {
       const { record } = match;
       const artwork = latest.lookup.get(match.key).record;
-      const cover = studios ? '' : isReverse() ? AnivizArtwork.movieThumbnail(artwork) : AnivizArtwork.animeThumbnail(artwork);
+      const cover = AnivizArtwork.dustThumbnail(artwork, match.key);
       const thumbnail = cover ? `<img src="${escapeAttribute(cover)}" alt="" loading="lazy">` : '';
       const year = record.year || 'Unknown';
       const format = isReverse() ? '' : escapeHTML(humanize(record.format)) + ' / ';
-      const evidence = studios ? `${match.contributingCount} / ${record.memberIds.length}` : format + year;
+      const evidence = group ? record.memberIds.length : format + year;
       const scores = match.scores.map((score, i) => mixed
         ? `<td title="${escapeAttribute(AnivizDust.mixedEvidence(match, magnets[i], i))}">${AnivizDust.formatRawScore(match.rawScores[i], magnets[i])}<br><small>Percentile ${AnivizDust.formatPercentile(score)}</small></td>`
         : `<td title="${escapeAttribute(cohortLabels[i] ? `${cohortLabels[i]}: ${score}` : `Cosine ${score}`)}">${AnivizDust.formatPercentile(score)}</td>`);
@@ -351,10 +364,6 @@
       context.setMagnetStrength(input.dataset.magnetStrength, input.valueAsNumber);
     });
     $('#reset-dust-motion').addEventListener('click', () => context.resetMagnetStrengths());
-    $('#studio-minimum').addEventListener('change', event => {
-      context.setMinimumWorks(event.target.value);
-      renderRecommendations();
-    });
     composition = AnivizComposition.create({ onError: error => console.error(error) });
     document.querySelectorAll('[data-dust-chart]').forEach(container => {
       const kind = container.dataset.dustChart;
@@ -384,8 +393,8 @@
     });
     for (const panel of [$('#dust-focus'), elements.drawerContent]) {
       panel.addEventListener('click', event => {
-        const button = event.target.closest('[data-studio-work]');
-        if (button) inspectTitle(button.dataset.studioWork);
+        const button = event.target.closest('[data-studio-work], [data-actor-work]');
+        if (button) inspectTitle(button.dataset.studioWork || button.dataset.actorWork);
       });
     }
     $('#recommendation-detail').addEventListener('click', event => {
@@ -431,28 +440,30 @@
       ? { ...particles, positions: new Map(positions.map(node => [node.key, node])), stop() {} } : null;
   }
   function updateDustTypeControls() {
-    const reverse = isReverse(), studios = isStudio();
+    const reverse = isReverse(), studios = isStudio(), actors = isActor(), group = dustGroup();
+    const groupLabel = group?.label.toLowerCase();
     $('#dust-type').value = dustTypeByDirection[latest.direction];
-    $('#dust-limit-control span').textContent = studios ? 'Studio dots' : reverse ? 'Movie dots' : 'Anime dots';
-    $('#studio-minimum-control').hidden = !studios;
+    $('#dust-limit-control span').textContent = group ? `${group.label} dots` : reverse ? 'Movie dots' : 'Anime dots';
     $('#filter-title').textContent = `Filter ${dustNoun()}`;
-    $('#dust-filter-search-label').textContent = studios ? 'Search studio names' : reverse ? 'Search titles or aliases' : 'Search titles, studios, or actors';
-    elements.searchInput.placeholder = studios ? 'e.g. MADHOUSE' : reverse ? 'e.g. Pacific Rim' : 'e.g. Attack on Titan';
-    $('#dust-ranking-title').textContent = `Full ${studios ? 'studio' : reverse ? 'movie' : 'anime'} ranking`;
-    $('#reception h3').textContent = studios ? 'Score vs. popularity of sampled anime' : reverse ? 'Score vs. popularity rank' : 'Score vs. popularity';
-    $('#dust-reception-guide').textContent = studios ? 'Zoom in for posters.' : 'Zoom in for posters. Select a title to open its details.';
-    $('#content h3').textContent = studios ? 'Genres of sampled anime' : 'Genres';
-    $('#content + article h3').textContent = studios ? 'Release years of sampled anime' : 'Release years';
-    $('#dust-connection-title').textContent = studios ? 'How do studios compare against each magnet?' : 'Which stories are similar—and which differ?';
+    $('#dust-filter-search-label').textContent = group ? `Search ${groupLabel} names` : reverse ? 'Search titles or aliases' : 'Search titles, studios, or actors';
+    elements.searchInput.placeholder = studios ? 'e.g. MADHOUSE' : actors ? 'e.g. Kana Hanazawa' : reverse ? 'e.g. Pacific Rim' : 'e.g. Attack on Titan';
+    $('#dust-ranking-title').textContent = `Full ${groupLabel || (reverse ? 'movie' : 'anime')} ranking`;
+    $('#reception h3').textContent = group ? 'Score vs. popularity of catalogue anime' : reverse ? 'Score vs. popularity rank' : 'Score vs. popularity';
+    $('#dust-reception-guide').textContent = actors ? 'Select a voice actor in the field to outline their anime. Zoom in for posters. Select a title to open its details.'
+      : studios ? 'Zoom in for posters.' : 'Zoom in for posters. Select a title to open its details.';
+    $('#content h3').textContent = studios ? 'Genres of catalogue anime' : 'Genres';
+    $('#content + article h3').textContent = studios ? 'Release years of catalogue anime' : 'Release years';
+    $('#dust-connection-title').textContent = group ? `How do ${group.noun} compare against each magnet?` : 'Which stories are similar—and which differ?';
     $('#dust-connection-selection').textContent = studios
-      ? 'Select up to three studios here or in the field to focus the analysis below on their sampled anime. Select a studio again to remove it.'
-      : 'Outlined titles are selected for comparison in the playground and here. Click an outlined title to remove it. Click any other title to open its details and add it to the comparison if there’s room for it. Compare up to three titles.';
-    $('#dust-mirror-guide').textContent = `Zoom in for ${studios ? 'studio names' : 'posters'}. Select a title magnet to show it in the In Focus panel. Drag magnets or use arrow keys to move them. Select ${studios ? 'studios' : 'titles'} to compare them, or click empty space to remove the latest selection.`;
+      ? 'Select up to three studios here or in the field to focus the analysis below on their catalogue anime. Select a studio again to remove it.'
+      : actors ? 'Select up to three voice actors here or in the field to highlight their anime in the charts. Select an actor again to remove them.'
+        : 'Outlined titles are selected for comparison in the playground and here. Click an outlined title to remove it. Click any other title to open its details and add it to the comparison if there’s room for it. Compare up to three titles.';
+    $('#dust-mirror-guide').textContent = `Zoom in for ${studios ? 'studio names' : actors ? 'portraits' : 'posters'}. Select a title magnet to show it in the In Focus panel. Drag magnets or use arrow keys to move them. Select ${group?.noun || 'titles'} to compare them, or click empty space to remove the latest selection.`;
     $('[data-dust-genre-metric] option[value="popularity"]').textContent = reverse ? 'Popularity score' : 'Popularity';
-    $('#creators h3').textContent = studios ? 'Typical reception by studio' : reverse ? 'Creators' : 'Studios';
+    $('#creators h3').textContent = studios ? 'Score vs. popularity by studio' : reverse ? 'Creators' : 'Studios';
     $('#dust-heatmap-title').textContent = studios ? 'Genres by studio' : 'Studio × genre';
     $('[data-dust-chart="heatmap"]').classList.toggle('studio-heatmap', studios);
-    $('[data-title-studio-filter]').hidden = studios || reverse;
+    $('[data-title-studio-filter]').hidden = Boolean(group) || reverse;
     document.querySelectorAll('[data-anime-only], [data-anime-chart]').forEach(node => { node.hidden = reverse; });
     populateFilterChoices();
     resetMagnetPicker();
