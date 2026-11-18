@@ -65,7 +65,7 @@ const url = route => new URL(route, base).href;
     assert.match(await page.locator('#movie-magnets').innerText(),/Example/);
     assert.equal((await snapshot()).ids.length,60);
     assert.equal(await page.locator('#recommendation-detail').isVisible(),false);
-    assert.deepEqual(await page.locator('#view-destinations a').allTextContents(),['Dust & Magnet','History','Network','Full Catalogue']);
+    assert.deepEqual(await page.locator('#view-destinations a').allTextContents(),['Dust & Magnet','History','Full Catalogue']);
     const menu=page.locator('[data-view-menu] > summary');await menu.focus();await page.keyboard.press('ArrowDown');
     assert.equal(await page.locator('#view-destinations a').first().evaluate(el=>document.activeElement===el),true);
     await page.keyboard.press('End');await page.keyboard.press('Escape');
@@ -192,9 +192,6 @@ const url = route => new URL(route, base).href;
     const persisted=await snapshot();
     await page.evaluate(()=>scrollTo(0,1500));
     const scroll=await page.evaluate(()=>scrollY);
-    await goView('Network');await page.waitForSelector('.network-nodes g');
-    assert.equal(await page.inputValue('#network-scope'),'dust');assert.match(await page.locator('#network-summary').innerText(),/35 of 60/);
-    await page.selectOption('#network-scope','catalogue');
     await goView('Full Catalogue');await page.waitForSelector('#anime-table-body tr');
     assert.equal(await page.evaluate(()=>state.cohort_ids),null);
     assert.equal(await page.evaluate(()=>state.filteredAnime.length),1000);
@@ -226,12 +223,12 @@ const url = route => new URL(route, base).href;
         await dustReady();await page.waitForFunction(id=>document.getElementById(id).getBoundingClientRect().top>=48&&document.getElementById(id).getBoundingClientRect().top<180,expected);
       } else assert.ok(page.url().includes(`/frontend/${expected}/index.html`));
     }
-    await page.goto(url('frontend/creators/index.html?mode=catalogue#network-chart'));await page.waitForSelector('.network-nodes g');
-    assert.equal(await page.inputValue('#network-scope'),'catalogue');
+    await page.goto(url('frontend/creators/index.html?mode=catalogue#network-chart'));
+    await page.waitForURL('**/frontend/dust-magnet/index.html#creators');
     await page.goto(url('frontend/content/index.html?mode=matches'));await dustReady();
     await page.waitForFunction(()=>document.getElementById('content').getBoundingClientRect().top>=48&&document.getElementById('content').getBoundingClientRect().top<180);
     await page.evaluate(()=>scrollTo(0,2300));const anchoredScroll=await page.evaluate(()=>scrollY);
-    await goView('Network');await page.waitForSelector('.network-nodes g');await page.goBack();await dustReady();
+    await goView('Full Catalogue');await page.waitForSelector('#anime-table-body tr');await page.goBack();await dustReady();
     assert.ok(Math.abs(await page.evaluate(()=>scrollY)-anchoredScroll)<5,'Back restores scroll even on anchored URLs');
     await page.goto(url('frontend/story/index.html'));await page.waitForSelector('#history-pair');
     assert.equal(await page.inputValue('#year-picker'), '1963');
@@ -402,7 +399,9 @@ const url = route => new URL(route, base).href;
     await page.mouse.move(5, 150);
     await page.mouse.wheel(0, 80);
     await page.waitForFunction(() => document.querySelector('#year-picker').value === '1996');
-    await page.selectOption('#year-picker', '1933');
+    const oldestMovieYear = await page.locator('#year-picker option').first().textContent();
+    assert.ok(Number(oldestMovieYear) < 1963);
+    await page.selectOption('#year-picker', oldestMovieYear);
     await checkConnectionEndpoints();
     await page.getByText('Anime Timeline', {exact:true}).click();
     assert.equal(await page.inputValue('#year-picker'), '1963');
@@ -418,9 +417,6 @@ const url = route => new URL(route, base).href;
     await checkIsolated(async(c,p)=>{await c.addInitScript(()=>sessionStorage.setItem('aniviz_seed_movie',JSON.stringify({tmdbId:'157336',title:'Interstellar'})));await p.goto(url(''));},async p=>{
       await p.waitForSelector('.dust-node');assert.deepEqual(await p.evaluate(()=>AnivizMain.snapshot().magnetKeys),['tmdb:157336']);
       assert.equal(await p.locator('#recommendation-chart .dust-node').count(),60);assert.doesNotMatch(await p.locator('#movie-magnets').innerText(),/Example/);
-    });
-    await checkIsolated(async(c,p)=>{await p.goto(url('frontend/network/index.html'));},async p=>{
-      await p.waitForSelector('.network-nodes g');assert.equal(await p.inputValue('#network-scope'),'catalogue');
     });
     await checkIsolated(async(c,p)=>{await c.addInitScript(()=>{Object.defineProperty(window,'sessionStorage',{get(){throw new Error('disabled')}})});await p.goto(url(''));},async p=>{
       await p.waitForSelector('.dust-node');assert.match(await p.locator('[data-dust-notice]').innerText(),/unavailable/);
@@ -454,9 +450,9 @@ const url = route => new URL(route, base).href;
       for(const kind of ['connections','reception','genres','years','studios','heatmap']) {
         await page.locator(`[data-dust-chart="${kind}"]`).scrollIntoViewIfNeeded();await overflow();
       }
-      for(const view of ['network','story','explorer']) {
+      for(const view of ['story','explorer']) {
         await page.goto(url(`frontend/${view}/index.html`));
-        await page.waitForSelector(view==='network'?'.network-nodes g':view==='story'?'#history-pair':'#anime-table-body tr');
+        await page.waitForSelector(view==='story'?'#history-pair':'#anime-table-body tr');
         await overflow();
         if(output) await page.screenshot({path:path.join(output,`verified-${view}-${width}.png`)});
       }
@@ -474,6 +470,6 @@ const url = route => new URL(route, base).href;
     await phone.waitForFunction(()=>scrollY>0);assert.equal(await phone.evaluate(()=>AnivizMain.snapshot().selectedKeys.length),2);
     await touch.close();
     assert.deepEqual(errors,[]);
-    console.log('Passed real-browser checks: four views, scopes, filters, ranking, selection, history/scroll restoration, legacy routes, migration, loading/storage failures, desktop/mobile layouts and touch scrolling.');
+    console.log('Passed real-browser checks: three views, scopes, filters, ranking, selection, history/scroll restoration, legacy routes, migration, loading/storage failures, desktop/mobile layouts and touch scrolling.');
   } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1});

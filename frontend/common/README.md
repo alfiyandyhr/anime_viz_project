@@ -94,17 +94,7 @@ shows the TMDB poster and backdrop when available. Cosine meters span −1 to 1,
 hover or focus. Field tooltips, Movie in focus, and the movie details drawer show
 scores to three decimals. Any ranking row can open the appropriate details drawer
 independently of the comparison.
-Explorer uses the same extracted chart transforms and table instance. `collaboration-network.js` owns the extracted actor/character/work graph and
-inspection functions for Network. `network/app.js`
-is the dedicated Network adapter: `network/scope.js` reads the versioned dust
-snapshot without writing it, normalizes displayed IDs, and joins metadata.
-Current dust is the default for active anime dust, including an empty filtered
-set. With movie dust or on direct entry without a session, Network uses Catalogue. Search, type toggles, and
-scope changes are local. Missing metadata is reported separately from the
-35-most-popular-work rendering limit. Actor profiles cover the entire active
-scope, including works beyond that limit. Edge and node evidence supports
-keyboard inspection. Reduced motion settles the simulation before displaying
-it; drag/zoom remain available.
+Explorer uses the same extracted chart transforms and table instance.
 
 Full Catalogue always uses catalogue mode, including legacy `?mode=matches`
 entries. Its saved filters and page-local shortlist stay independent of dust;
@@ -127,10 +117,9 @@ dust context.
 
 `redirect.js` exports a pure `resolve(entry, search, hash)` for tests and runs a
 single `location.replace` in compatibility pages. Root hashes map explicitly to
-the four views; Content, Creators and Reception target stable main-view IDs.
-Creators graph anchors target Network. Legacy query modes are removed for dust
-and History, forced to catalogue for Explorer, and translated to local scope for
-graph links. Unrelated parameters survive. The script URL supplies the deployment
+the three views. Content, Creators and Reception target stable main-view IDs.
+The redirects remove legacy query modes for Dust & Magnet and History and set
+catalogue mode for Explorer. Unrelated parameters survive. The script URL supplies the deployment
 prefix, without root-relative assets or a redirect chain through obsolete pages.
 No-JavaScript refreshes live inside `noscript`, avoiding a competing redirect.
 The main adapter scrolls to explicit sections after data/layout are ready;

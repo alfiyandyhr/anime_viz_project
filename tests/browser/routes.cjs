@@ -14,8 +14,10 @@ const url=route=>new URL(route,base).href;
       assert.equal(new URL(page.url()).hash,`#${section}`);
       await page.waitForFunction(id=>{const r=document.getElementById(id).getBoundingClientRect();return r.top>=48&&r.top<innerHeight/2},section);
     }
-    await page.goto(url('frontend/creators/index.html?mode=catalogue#network-chart'));await page.waitForSelector('.network-nodes g');
-    assert.equal(await page.inputValue('#network-scope'),'catalogue');
+    await page.goto(url('frontend/creators/index.html?mode=catalogue#network-chart'));
+    await page.waitForURL('**/frontend/dust-magnet/index.html#creators');
+    const removed = await page.request.get(url('frontend/network/index.html'));
+    assert.equal(removed.status(),404);
     await page.goto(url('frontend/explorer/index.html?mode=matches'));await page.waitForSelector('#anime-table-body tr');
     assert.equal(await page.evaluate(()=>state.filteredAnime.length),1000);
     await page.goto(url('frontend/story/index.html'));await page.waitForSelector('#history-pair');
@@ -26,7 +28,7 @@ const url=route=>new URL(route,base).href;
     if(process.env.ANIVIZ_FLASK==='1') {
       for(const route of ['content?mode=matches','creators?mode=catalogue#network-chart','history','catalogue?mode=matches']) {
         await page.goto(url(route));
-        await page.waitForSelector(route.startsWith('content')?'.dust-node':route.startsWith('creators')?'.network-nodes g':route==='history'?'#history-pair':'#anime-table-body tr');
+        await page.waitForSelector(route==='history'?'#history-pair':route.startsWith('catalogue')?'#anime-table-body tr':'.dust-node');
       }
     }
     assert.deepEqual(errors,[]);console.log(`Passed relative assets, legacy routes, independent direct views and no-JavaScript fallbacks at ${base}`);

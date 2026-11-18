@@ -1,7 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { ACTORS, FORWARD, createContext } = require('../frontend/common/dust-context.js');
-const { read: networkScope } = require('../frontend/network/scope.js');
 
 test('voice actors aggregate by AniList staff ID and retain a distinct anime selection across reload', () => {
   const lead = { id: 42, name: 'Lead' };
@@ -45,7 +44,6 @@ test('voice actors aggregate by AniList staff ID and retain a distinct anime sel
   snapshot = context.setSelection([firstKey, secondKey]);
   assert.deepEqual(snapshot.displayedKeys, displayedKeys);
   assert.deepEqual(snapshot.supportingIds, ['1', '2', '4', '3']);
-  assert.deepEqual(networkScope(storage), { ids: snapshot.supportingIds });
   assert.deepEqual(context.setDirection(FORWARD).selectedKeys, []);
   context.setDirection(ACTORS);
 

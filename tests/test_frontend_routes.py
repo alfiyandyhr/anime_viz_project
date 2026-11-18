@@ -9,11 +9,11 @@ from app import app, service, story_service
 
 
 class FrontendRoutesTests(unittest.TestCase):
-    def test_four_views_and_legacy_redirects_serve_without_live_api_requests(self):
+    def test_three_views_and_legacy_redirects_serve_without_live_api_requests(self):
         with app.test_client() as client, \
                 patch.object(service, "get_dashboard", side_effect=AssertionError("No dashboard request")), \
                 patch.object(story_service, "get_story", side_effect=AssertionError("No story request")):
-            for page in ["intro", "recommendations", "content", "creators", "reception", "dust-magnet", "network", "story", "explorer"]:
+            for page in ["intro", "recommendations", "content", "creators", "reception", "dust-magnet", "story", "explorer"]:
                 for query in ["", "?mode=matches", "?mode=catalogue"]:
                     with self.subTest(page=page, query=query), \
                             client.get(f"/frontend/{page}/index.html{query}") as response:
@@ -32,13 +32,11 @@ class FrontendRoutesTests(unittest.TestCase):
         with app.test_client() as client, \
                 patch.object(service, "get_dashboard", side_effect=AssertionError("No dashboard request")), \
                 patch.object(story_service, "get_story", side_effect=AssertionError("No story request")):
-            for url in ["/recommendations", "/recommendations/", "/dust-magnet", "/dust-magnet/", "/network", "/network/"]:
+            for url in ["/recommendations", "/recommendations/", "/dust-magnet", "/dust-magnet/"]:
                 with client.get(url, follow_redirects=True) as response:
                     self.assertEqual(response.status_code, 200)
                     if url.startswith("/recommendations"):
                         self.assertIn(b'url=../dust-magnet/index.html', response.data)
-                    elif url.startswith("/network"):
-                        self.assertIn(b'id="network-chart"', response.data)
                     else:
                         self.assertIn(b'id="movie-search"', response.data)
             with client.get("/") as response:
@@ -62,7 +60,7 @@ class FrontendRoutesTests(unittest.TestCase):
     def test_clean_paths_preserve_query_and_offer_history_and_catalogue_aliases(self):
         from urllib.parse import urlparse, parse_qs
         with app.test_client() as client:
-            for view in ["intro", "content", "creators", "reception", "recommendations", "dust-magnet", "network", "story", "history", "explorer", "catalogue"]:
+            for view in ["intro", "content", "creators", "reception", "recommendations", "dust-magnet", "story", "history", "explorer", "catalogue"]:
                 for suffix in ["", "/"]:
                     with self.subTest(view=view, suffix=suffix):
                         response = client.get(f"/{view}{suffix}?mode=matches&shared=one&shared=two")
@@ -76,6 +74,12 @@ class FrontendRoutesTests(unittest.TestCase):
                         with client.get(response.location) as page_response:
                             self.assertEqual(page_response.status_code, 200)
             self.assertEqual(client.get("/unknown-view").status_code, 404)
+
+    def test_removed_network_view_is_unavailable(self):
+        with app.test_client() as client:
+            for url in ["/network", "/network/", "/frontend/network/index.html"]:
+                with self.subTest(url=url):
+                    self.assertEqual(client.get(url).status_code, 404)
 
     def test_asset_routes_do_not_expose_other_data_files(self):
         with app.test_client() as client:

@@ -4,10 +4,10 @@ const {readFileSync}=require('node:fs');
 const {resolve}=require('../frontend/common/redirect.js');
 const vm=require('node:vm');
 
-test('all legacy aliases resolve directly to four valid destinations and main scroll sections',()=>{
+test('all legacy aliases resolve directly to three valid destinations and main scroll sections',()=>{
   const expected={intro:'dust-magnet',recommendations:'dust-magnet','dust-magnet':'dust-magnet',
     content:'dust-magnet/index.html#content',creators:'dust-magnet/index.html#creators',
-    reception:'dust-magnet/index.html#reception',story:'story',history:'story',explorer:'explorer',catalogue:'explorer',network:'network'};
+    reception:'dust-magnet/index.html#reception',story:'story',history:'story',explorer:'explorer',catalogue:'explorer'};
   for(const [alias,route] of Object.entries(expected)) {
     const target=route.includes('/')?`../${route}`:`../${route}/index.html${['explorer','catalogue'].includes(alias)?'?mode=catalogue':''}`;
     assert.equal(resolve(null,'',`#${alias}`),target,alias);
@@ -15,8 +15,10 @@ test('all legacy aliases resolve directly to four valid destinations and main sc
   }
   assert.equal(resolve(null,'','#unknown'),'../dust-magnet/index.html');
   assert.equal(resolve(null),'../dust-magnet/index.html');
-  for(const hash of ['#network','#network-chart','#tab-network','#collaboration','#collaboration-structure'])
-    assert.equal(resolve('creators','',hash),'../network/index.html');
+  for(const hash of ['#network','#network-chart','#tab-network','#collaboration','#collaboration-structure']) {
+    assert.equal(resolve(null,'',hash),'../dust-magnet/index.html');
+    assert.equal(resolve('creators','',hash),'../dust-magnet/index.html#creators');
+  }
 });
 
 test('legacy modes resolve to new scopes, with unrelated query parameters preserved',()=>{
@@ -24,8 +26,7 @@ test('legacy modes resolve to new scopes, with unrelated query parameters preser
     assert.equal(resolve('explorer',`?mode=${mode}&shared=1`),'../explorer/index.html?shared=1&mode=catalogue');
     assert.equal(resolve('content',`?mode=${mode}&shared=1`),'../dust-magnet/index.html?shared=1#content');
   }
-  assert.equal(resolve('creators','?mode=catalogue','#network'),'../network/index.html?scope=catalogue');
-  assert.equal(resolve('creators','?mode=matches','#network'),'../network/index.html?scope=dust');
+  assert.equal(resolve('creators','?mode=matches&shared=1','#network'),'../dust-magnet/index.html?shared=1#creators');
 });
 
 test('browser redirects retain project subpaths and never target another redirect stub',()=>{
@@ -37,7 +38,7 @@ test('browser redirects retain project subpaths and never target another redirec
       document:{currentScript:{src:`https://example.com${prefix}frontend/common/redirect.js`,dataset:{route:entry}}}});
     const relative=resolve(entry,'?shared=1',entry?'#network':'#content');
     assert.equal(target,new URL(relative,`https://example.com${prefix}frontend/common/redirect.js`).href);
-    assert.match(target,/frontend\/(?:dust-magnet|network)\/index.html/);
+    assert.match(target,/frontend\/dust-magnet\/index.html/);
   }
 });
 

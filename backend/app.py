@@ -60,7 +60,7 @@ def frontend_view(view):
     pages = {
         "intro": "intro", "recommendations": "recommendations", "dust-magnet": "dust-magnet",
         "content": "content", "creators": "creators", "reception": "reception",
-        "network": "network", "story": "story", "history": "story",
+        "story": "story", "history": "story",
         "explorer": "explorer", "catalogue": "explorer",
     }
     if view not in pages:

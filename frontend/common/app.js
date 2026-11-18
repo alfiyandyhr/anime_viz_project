@@ -4,8 +4,6 @@ const state = {
   data: null,
   filteredAnime: [],
   genreColor: null,
-  networkSimulation: null,
-  networkTypes: new Set(["actor", "character", "work"]),
   tablePage: 0,
   tablePageSize: 10,
   cohort: null,
@@ -43,7 +41,7 @@ function migrateScopeFilters(cohort = readMovieCohort()) {
 
 function initializeBrowseMode() {
   // The old Top-20 scope is read only to attribute legacy catalogue filters.
-  // Dust owns its versioned state; History and Network have independent scopes.
+  // Dust owns its versioned state. History has an independent scope.
   if (document.body?.dataset.chapter === "explorer") migrateScopeFilters(readMovieCohort());
   state.browseMode = "catalogue";
   state.cohort = null;
@@ -165,13 +163,10 @@ function bindControls() {
   });
 
   window.addEventListener("resize", debounce(renderPage, 250));
-  window.addEventListener("pagehide", () => {
-    pageControls.pause?.();
-    state.networkSimulation?.stop();
-  });
+  window.addEventListener("pagehide", () => pageControls.pause?.());
   window.addEventListener("pageshow", event => { if (event.persisted) renderPage(); });
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) { pageControls.pause?.(); state.networkSimulation?.stop(); }
+    if (document.hidden) pageControls.pause?.();
     else renderPage();
   });
 }
@@ -205,7 +200,6 @@ function restoreFilterControls(saved) {
 }
 
 function saveFilters() {
-  if (document.body?.dataset.chapter === "network") return;
   try {
     sessionStorage.setItem(state.browseMode === "matches" ? FILTER_STORAGE_KEY : CATALOGUE_FILTER_STORAGE_KEY,
       JSON.stringify(readFilterControls()));
@@ -215,7 +209,6 @@ function saveFilters() {
 }
 
 function restoreFilters() {
-  if (document.body?.dataset.chapter === "network") return;
   try {
     const saved = JSON.parse(sessionStorage.getItem(state.browseMode === "matches" ? FILTER_STORAGE_KEY : CATALOGUE_FILTER_STORAGE_KEY) || "null");
     restoreFilterControls(saved);
@@ -245,16 +238,11 @@ async function loadDashboard() {
       .domain(payload.meta.genres)
       .range(colors);
 
-    if (document.body?.dataset.chapter === "network") {
-      state.filteredAnime = payload.anime;
-      renderPage();
-    } else {
-      populateControls();
-      initializeBrowseMode();
-      restoreFilters();
-      elements.scoreOutput.value = elements.scoreFilter.value;
-      applyFilters();
-    }
+    populateControls();
+    initializeBrowseMode();
+    restoreFilters();
+    elements.scoreOutput.value = elements.scoreFilter.value;
+    applyFilters();
 
     const warning = payload.meta.warning
       ? ` ${payload.meta.warning}`
@@ -701,8 +689,7 @@ function showFatalMessage(message) {
     "#genre-chart",
     "#timeline-chart",
     "#studio-chart",
-    "#heatmap-chart",
-    "#network-chart"
+    "#heatmap-chart"
   ].forEach((selector) => {
     const container = document.querySelector(selector);
 

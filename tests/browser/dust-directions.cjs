@@ -400,19 +400,13 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     }
     assert.match(await page.locator('#reception').innerText(), /Rank #1 is most popular in the movie sample/);
     assert.match(await page.locator('#creators').innerText(), /no production company or cast credits/);
-    await page.evaluate(() => {
-      sessionStorage.setItem('aniviz-dust-session-v1', JSON.stringify({ version: 1, state: {
-        version: 1, movieIds: ['27205'], candidateDustIds: ['1'], displayedDustIds: ['1']
-      } }));
-    });
-    await page.goto(url('frontend/creators/index.html?mode=matches#network-chart'));
-    assert.equal(await page.inputValue('#network-scope'), 'catalogue');
-    assert.match(await page.locator('#network-dust-note').innerText(), /Current dust is available.*anime/);
+    await page.goto(url('frontend/story/index.html'));
+    await page.waitForSelector('#history-pair');
     await page.goBack();
     await ready();
     assert.deepEqual(await evidence(), savedReverse);
     await page.goForward();
-    assert.equal(await page.inputValue('#network-scope'), 'catalogue');
+    await page.waitForSelector('#history-pair');
     await page.goBack();
     await ready();
     await page.reload();
@@ -426,12 +420,6 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     assert.deepEqual(await evidence(), inception);
     await dustTypePicker.selectOption(movieTitles);
     assert.deepEqual((await evidence()).magnetKeys, []);
-    await dustTypePicker.selectOption(animeTitles);
-    if (!(await fieldOptions.evaluate(node => node.open))) await fieldOptions.locator('summary').click();
-    await page.locator('#search-input').fill('No anime matches this string 2562');
-    await page.goto(url('frontend/network/index.html?scope=dust'));
-    await page.waitForFunction(() => state.networkScopeInfo?.total === 0);
-    assert.equal(await page.inputValue('#network-scope'), 'dust');
 
     await page.goto(url('frontend/explorer/index.html?mode=catalogue'));
     await page.locator('[data-catalogue-target="movie"]').click();
@@ -483,6 +471,6 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     await retry.locator('.dust-node').first().waitFor();
     assert.equal(await retry.locator('[data-dust-rank-id]').first().innerText(), reverseLeader.title);
     assert.deepEqual(errors, []);
-    console.log('Verified Attack on Titan in both layouts, three-decimal scores, movie charts, ranking drawer, dust type sessions and Network fallback.');
+    console.log('Verified Attack on Titan in both layouts, three-decimal scores, movie charts, ranking drawer and dust type sessions.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

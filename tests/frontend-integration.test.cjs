@@ -5,8 +5,8 @@ const path = require("node:path");
 const vm = require("node:vm");
 const root = path.resolve(__dirname, "..");
 
-test("all views have exactly four shared destinations, with relative resources and no rail or journey", () => {
-  const active = {"dust-magnet": "Dust &amp; Magnet", story: "History", network: "Network", explorer: "Full Catalogue"};
+test("all views have exactly three shared destinations, with relative resources and no rail or journey", () => {
+  const active = {"dust-magnet": "Dust &amp; Magnet", story: "History", explorer: "Full Catalogue"};
   for (const page of readdirSync(path.join(root, "frontend"))) {
     const filename = path.join(root, "frontend", page, "index.html");
     if (!existsSync(filename)) continue;
@@ -17,7 +17,7 @@ test("all views have exactly four shared destinations, with relative resources a
       const nav = html.match(/<nav id="view-destinations"[\s\S]*?<\/nav>/)[0];
       assert.deepEqual([...nav.matchAll(/<a href="([^"]+)"[^>]*>([^<]+)<\/a>/g)].map(([, href, label]) => [href, label]), [
         ["../dust-magnet/index.html", "Dust &amp; Magnet"], ["../story/index.html", "History"],
-        ["../network/index.html", "Network"], ["../explorer/index.html?mode=catalogue", "Full Catalogue"]
+        ["../explorer/index.html?mode=catalogue", "Full Catalogue"]
       ], page);
       assert.equal((html.match(/data-view-menu/g) || []).length, 1);
       assert.equal((nav.match(/aria-current="page"/g) || []).length, 1);
@@ -56,17 +56,12 @@ test("pages with independent data initialize and resize without loading the dash
   assert.equal(dashboardRequests, 0);
 });
 
-test("Dust & Magnet owns contextual controls and details in normal flow; Network owns graph controls", () => {
+test("Dust & Magnet owns contextual controls and details in normal flow", () => {
   const dust = readFileSync(path.join(root, "frontend/dust-magnet/index.html"), "utf8");
   assert.match(dust, /data-field-options/);
   assert.match(dust, /id="recommendation-detail"[^>]* hidden/);
   assert.ok(dust.indexOf('id="recommendation-chart"') < dust.indexOf('id="recommendation-detail"'));
   assert.ok(dust.indexOf('id="recommendation-detail"') < dust.indexOf('id="dust-analysis"'));
-  const network = readFileSync(path.join(root, "frontend/network/index.html"), "utf8");
-  assert.doesNotMatch(network, /id="filterbar"/);
-  assert.match(network, /id="network-search"/);
-  assert.match(network, /data-network-type="actor"/);
-  assert.doesNotMatch(network, /id="(?:studio-chart|heatmap-chart|cohort-studios)"/);
   for (const stylesheet of ['frontend/common/styles.css', 'frontend/explorer/styles.css', 'frontend/story/styles.css']) {
     assert.doesNotMatch(readFileSync(path.join(root, stylesheet), 'utf8'), /--rail-width|grid-template-columns:\s*300px/, stylesheet);
   }
@@ -87,7 +82,7 @@ test('view disclosure supports keyboard focus, Escape, focus departure and resto
   const document = { activeElement: null, addEventListener: (name, callback) => { documentEvents[name] = callback; } };
   const focusable = name => ({ name, focus() { document.activeElement = this; } });
   const summary = focusable('summary');
-  const links = ['Dust & Magnet', 'History', 'Network', 'Full Catalogue'].map(focusable);
+  const links = ['Dust & Magnet', 'History', 'Full Catalogue'].map(focusable);
   const menu = { open: false, querySelector: () => summary, querySelectorAll: () => links,
     addEventListener: (name, callback) => { events[name] = callback; },
     hasAttribute: name => name === 'data-view-menu', contains: target => [summary, ...links].includes(target) };
@@ -97,9 +92,9 @@ test('view disclosure supports keyboard focus, Escape, focus departure and resto
   });
   const key = name => { let prevented = false; events.keydown({ key: name, preventDefault() { prevented = true; }, stopPropagation() {} }); return prevented; };
   summary.focus(); assert.equal(key('ArrowDown'), true); assert.equal(menu.open, true); assert.equal(document.activeElement, links[0]);
-  key('End'); assert.equal(document.activeElement, links[3]);
+  key('End'); assert.equal(document.activeElement, links.at(-1));
   key('ArrowDown'); assert.equal(document.activeElement, links[0]);
-  key('ArrowUp'); assert.equal(document.activeElement, links[3]);
+  key('ArrowUp'); assert.equal(document.activeElement, links.at(-1));
   key('Home'); assert.equal(document.activeElement, links[0]);
   assert.equal(key('Tab'), false, 'native Tab and Enter behavior must remain available');
   key('Escape'); assert.equal(menu.open, false); assert.equal(document.activeElement, summary);

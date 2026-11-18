@@ -1,22 +1,20 @@
 # AniMoViz: Anime and Movie Visualization
 
-Explore story similarities between anime and live-action movies in a visualization built with Python/Flask and D3.js, using data from AniList and TMDB. Dust & Magnet opens directly, with linked analysis below the field. One compact view dropdown connects Dust & Magnet, History, Network, and Full Catalogue.
+Explore story similarities between anime and live-action movies in a visualization built with Python/Flask and D3.js, using data from AniList and TMDB. Dust & Magnet opens directly, with linked analysis below the field. The view dropdown connects Dust & Magnet, History, and Full Catalogue.
 
 **Live site:** https://alfiyandyhr.github.io/anime_viz_project/
 
 ---
 
-## Four views
+## Three views
 
 The root URL opens **Dust & Magnet** with **Anime titles** as dust and Inception as the example magnet.
 Set **Dust type** to **Movie titles** for movie dots and Attack on Titan as the first-use example. Choose the **Movie** magnet type with anime dust or **Anime** with movie dust to search by title, alias, or year. **Genre cohort** also draws from the other catalogue. Use **Popularity** or **Score** to attract dust by audience size or rating. Fill up to three slots and remove any magnet with ×.
-The compact dropdown contains exactly four destinations:
 
 | View | Data and interactions |
 | --- | --- |
 | Dust & Magnet | Choose Anime titles, Anime studios, Anime voice actors, or Movie titles, with a field of up to 30, 60, or 90 dots. Each type includes similarity connections, a field mirror, reception, genres, release years, and a full ranking. Select a dust dot or a title magnet to see it in the In Focus panel. Anime dust types also show studio charts. |
 | History | Scroll a pair of release timelines to see each year’s most popular anime and its closest movie match. Both titles have synopses and the connection shows cosine similarity. |
-| Network | Actor/character/work collaboration graph, defaulting to Current dust when a saved anime-dust context exists, otherwise Catalogue. A local selector switches scopes without changing other views. The 35-work display cap and sampled Japanese cast credits are disclosed. |
 | Full Catalogue | The loaded 1,000-title metadata sample, with its own search, filters, sorting, pagination, details and automatic shortlist comparison. Saved movies never narrow its scope. |
 
 The dust type, magnet picker, removable magnets, dot count, and **Reset positions** sit in the left panel.
@@ -52,7 +50,6 @@ and count each co-production once. Genres by studio keeps each studio’s own
 credits, so co-productions appear in each credited studio’s row. Clear the
 selection to analyse all studios in the field. The field, mirror, similarity
 connections, and full ranking continue to compare studios against the magnets.
-Network’s **Current dust** uses the same distinct anime as the title charts.
 
 **Anime voice actors** groups the Full Catalogue by AniList Japanese main-role
 credits. Each title contributes once to an actor’s filmography. Movie magnets
@@ -61,8 +58,7 @@ average across the cohort’s movies. Popularity sums AniList list users, and Sc
 averages available anime scores. Zoom in on an actor for their AniList portrait.
 The linked charts show distinct anime credited to actors in the field. Select up
 to three actors to filter Score vs. popularity to their anime and highlight their
-contributions in the genre, release year, and studio charts. Network’s
-**Current dust** also uses the selected actors’ anime when there is a selection.
+contributions in the genre, release year, and studio charts.
 
 ## Routes and session state
 
@@ -76,16 +72,14 @@ relative no-JavaScript fallback link and refresh (the charts themselves need JS)
 | Introduction, Movie → Anime, `#recommendations`, `#dust-magnet` | Dust & Magnet |
 | Content, `#content` | Main view's Genres section |
 | Creators, `#creators` | Main view's Studios section |
-| Creators `#network`, `#network-chart`, `#tab-network`, `#collaboration`, `#collaboration-structure` | Network |
 | Reception, `#reception` | Main view's Score vs. popularity section |
 | Story, `#story`, `#history` | History |
 | Explorer, `#explorer`, `#catalogue` | Full Catalogue |
 
-Old `?mode=matches` and `?mode=catalogue` URLs resolve to the destination's new
-scope. Full Catalogue always uses catalogue scope. Graph links translate those
-modes to local `scope=dust` / `scope=catalogue`; unavailable dust falls back to
-Catalogue. Other query parameters are preserved. Flask also serves `/history`
-and `/catalogue`, plus the legacy clean paths with or without trailing slashes.
+Legacy `?mode=matches` and `?mode=catalogue` URLs use the destination's current
+scope. Full Catalogue always uses catalogue scope. Other query parameters are
+preserved. Flask also serves `/history` and `/catalogue`, plus the legacy clean
+paths with or without trailing slashes.
 
 Session storage uses `aniviz-dust-session-v2` to keep the active dust type and
 separate magnets, filters, dot counts, sorts, selections, positions, and scroll
@@ -94,20 +88,20 @@ explicitly empty field. The previous v1 session imports into **Anime titles**.
 Otherwise, a resolvable `aniviz_seed_movie.tmdbId` takes priority over the
 Inception example. The current matrix recomputes dust membership on restore.
 **Movie titles** uses Attack on Titan on first entry. Catalogue filters use
-`aniviz-catalogue-filters`, while History's annual data and Network's local
-controls stay independent. Storage failure permits in-memory use with one concise notice.
+`aniviz-catalogue-filters`. History loads annual data independently. Storage
+failure permits in-memory use with one notice.
 Explicit section links take priority over saved scroll on entry; reload and
 Back/Forward restore the saved location, including anchored URLs.
 
 ## Frontend structure
 
-`frontend/dust-magnet/index.html`, `frontend/story/`, `frontend/network/` and
-`frontend/explorer/` are the four view entry points. Introduction, Recommendations,
+`frontend/dust-magnet/index.html`, `frontend/story/`, and `frontend/explorer/`
+are the three view entry points. Introduction, Recommendations,
 Content, Creators and Reception HTML files are compatibility redirects. The
 recommendation engine and dust geometry remain in `frontend/recommendations/`.
 Shared modules in `frontend/common/` own navigation, independent data loading,
 the ID join and dust context, reusable chart instances, lazy composition,
-inline details/comparison and the extracted collaboration graph.
+and inline details and comparisons.
 
 Recommendation IDs are strings and metadata IDs are normalized before joining.
 The refresh workflow builds Full Catalogue and Dust & Magnet from the same
@@ -131,8 +125,8 @@ always collects 1,000 unique titles from each source.
 | `ANILIST_PAGES` | `20` | Number of pages fetched from AniList (max 50 per page → `20 × 50 = 1 000` anime) |
 | `ANILIST_PER_PAGE` | `50` | Results per page (AniList cap: 50) |
 | `CACHE_TTL_HOURS` | `6` | How long the backend caches a response before re-fetching |
-| `NETWORK_NODE_LIMIT` | `90` | Max voice-actor nodes shown in the network graph |
-| `NETWORK_LINK_LIMIT` | `750` | Max edges shown in the network graph |
+| `NETWORK_NODE_LIMIT` | `90` | Maximum voice-actor nodes in the dashboard API payload |
+| `NETWORK_LINK_LIMIT` | `750` | Maximum voice-actor links in the dashboard API payload |
 | `PORT` | `5000` | Flask server port |
 | `FLASK_DEBUG` | `true` | Enable Flask debug mode |
 
@@ -217,7 +211,7 @@ also work. AniList uses its public GraphQL API.
    when selected.
 
 The frontend reads the displayed dates from the published files. The Anime tab
-and Network show the AniList collection time, the Movie tab shows its source
+shows the AniList collection time, the Movie tab shows its source
 snapshot date, and Dust & Magnet's **About / Data**
 shows when the similarity scores finished. Reload after the updated files are
 available to see the new dates.
@@ -392,7 +386,7 @@ the TMDB ratings and popularity snapshot. Popularity ranks break ties by the
 retained movie order. See [the refresh workflow](#refresh-full-catalogue-and-dust--magnet)
 to regenerate the bundle and its metadata together.
 
-Run recommendation, story, network, and collector checks:
+Run the recommendation, story, and collector checks.
 
 ```bash
 node --test tests/*.test.cjs

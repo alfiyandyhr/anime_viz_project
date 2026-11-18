@@ -69,9 +69,8 @@ Run `node tests/browser/dust-genres.cjs` with the Playwright setup below.
 5. Switch back to **Anime titles** and return to **Movie titles**. Check separate
    selections, filters, ranking sorts, magnet positions, and scroll. Remove
    every anime magnet and confirm that switching preserves the empty field.
-6. Open a legacy Current dust link while movie dust is active. Network falls
-   back to Catalogue even if v1 contains an older anime set. With active anime
-   dust filtered to zero, Network keeps Current dust and shows zero works.
+6. Open History and use Back and Forward. Check that returning to Dust & Magnet
+   restores the movie dust state.
 
 Run the existing browser suites and the directional walkthrough below with
 the Playwright setup documented later in this guide. The walkthrough includes
@@ -90,14 +89,14 @@ NODE_PATH=/tmp/aniviz-browser/node_modules \
 
 # Route migration and final verification — Tasks 9–10 — 2026-11-06
 
-Completed on `alfi`, retaining the existing Tasks 1–8 work. The current contract
-has four views, normal scrolling analysis and independent data scopes. Entries
-below this section are historical records of earlier implementation stages.
+Completed on `alfi`. The walkthrough reflects the three current views and
+their independent data scopes. The dated results below record earlier
+verification, including checks for the former Network view.
 
 ## Repeatable walkthrough
 
 1. Open the root with a fresh session. The field immediately shows the labelled
-   Inception example and 60 dots. Use the four-item dropdown with keyboard arrows,
+   Inception example and 60 dots. Use the three-item dropdown with keyboard arrows,
    Tab/Enter and Escape. Add Interstellar and The Matrix in the search input;
    exercise 30, 60 and 90 dots under Field options and remove movies directly.
 2. Scroll through Similarity connections → Score vs. popularity / playground mirror →
@@ -120,14 +119,13 @@ below this section are historical records of earlier implementation stages.
    comparison maps rerank within the filtered dust and stay independent of table sorting;
    an empty dust field also clears the maps and offers filter guidance;
    missing metadata is separate from filtering, and unknown metrics stay unknown.
-6. Switch to Network: Current dust uses the displayed set; Catalogue is local.
-   Full Catalogue starts from its own sample and filters; its shortlist does not
+6. Switch to Full Catalogue. It starts from its own sample and filters. Its shortlist does not
    affect dust. History retains independent annual samples, six eras and posters.
    Back/Forward, returning through the menu and reload restore dust state/scroll.
 7. Check root `#recommendations`, `#content`, `#creators`, `#reception`, `#story`,
    `#explorer`, `#dust-magnet`, plus old HTML URLs. Content/Creators/Reception land
-   on their main sections. Creators' graph bookmarks land in Network. Catalogue
-   ignores old matches mode; graph links translate old modes to local scope.
+   on their main sections. Old Creators graph bookmarks open Studios. Full
+   Catalogue opens in catalogue mode.
    New explicit section links override old scroll; Back/reload restore location.
 8. Deny session storage, fail metadata, fail the score matrix and Retry. Test
    legacy seed migration before/after metadata arrives, invalid seeds, and a

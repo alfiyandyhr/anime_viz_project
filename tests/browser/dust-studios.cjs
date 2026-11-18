@@ -133,11 +133,6 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
     assert.deepEqual(await selection(), pair);
     assert.equal(await picker.inputValue(), 'anime-studios');
 
-    await page.goto(new URL('frontend/network/index.html', base).href);
-    await page.waitForFunction(count => state.networkScopeInfo?.total === count, titleScope.length);
-    assert.equal(await page.locator('#network-scope').inputValue(), 'dust');
-    assert.deepEqual(await page.evaluate(() => state.networkAnime.map(item => String(item.id)).sort()), titleScope.sort());
-
     await page.goto(new URL('frontend/explorer/index.html?mode=catalogue', base).href);
     const catalogueChart = page.locator('[data-catalogue-chart="studios"]');
     await catalogueChart.scrollIntoViewIfNeeded();
@@ -189,7 +184,7 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
     await studio.waitFor();
     await studio.press('Enter');
     assert.match(await mobile.locator('#dust-studio-scope').innerText(), /Selected studios/);
-    console.log('Verified catalogue metric parity, studio selection, chart and Network scopes, comparison, restore, and mobile metadata retry.');
+    console.log('Verified catalogue metric parity, studio selection, chart scopes, comparison, restore, and mobile metadata retry.');
   } finally {
     await browser.close();
   }

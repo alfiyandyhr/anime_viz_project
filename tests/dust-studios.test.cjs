@@ -2,7 +2,6 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createContext, FORWARD, REVERSE, STUDIOS } = require('../frontend/common/dust-context.js');
 const { studios: catalogueStudios } = require('../frontend/common/chart-data.js');
-const { read: networkScope } = require('../frontend/network/scope.js');
 
 const studioKey = id => `anilist:studio:${id}`;
 const credit = (id, name) => ({ id, name });
@@ -107,16 +106,16 @@ test('standalone studio metrics match Full Catalogue even for works outside the 
   }
 });
 
-test('selection publishes a deduplicated title scope and restores independently of title sessions', () => {
+test('selection has a deduplicated title scope and restores independently of title sessions', () => {
   const { context, storage } = setup();
   const selectedTitle = context.snapshot().displayedKeys[0];
   context.setSelection([selectedTitle]);
   const studios = context.setDirection(STUDIOS);
   const before = studios.displayedKeys;
   context.setSelection([studioKey(10)]);
-  assert.deepEqual(networkScope(storage), { ids: ['1', '2', '3', '4'] });
+  assert.deepEqual(context.snapshot().supportingIds, ['1', '2', '3', '4']);
   context.toggleSelection(studioKey(20));
-  assert.deepEqual(networkScope(storage), { ids: ['1', '2', '3', '4', '5', '6'] });
+  assert.deepEqual(context.snapshot().supportingIds, ['1', '2', '3', '4', '5', '6']);
   assert.deepEqual(context.snapshot().displayedKeys, before);
   context.toggleSelection(studioKey(30));
   context.toggleSelection(studioKey(40));
@@ -124,7 +123,6 @@ test('selection publishes a deduplicated title scope and restores independently 
   assert.deepEqual(context.snapshot().selectedKeys, selection);
   context.saveLayout({ scrollY: 800 });
   context.setDirection(REVERSE);
-  assert.deepEqual(networkScope(storage), { movieDust: true });
   assert.deepEqual(context.setDirection(FORWARD).selectedKeys, [selectedTitle]);
   assert.equal(context.getLayout().scrollY, 0);
   assert.deepEqual(context.setDirection(STUDIOS).selectedKeys, selection);
@@ -141,7 +139,7 @@ test('selection publishes a deduplicated title scope and restores independently 
   restored.setMetadata(metadata);
   assert.equal(restored.getLayout().scrollY, 800);
   assert.deepEqual(restored.snapshot().selectedKeys, selection);
-  assert.deepEqual(networkScope(storage), { ids: ['1', '2', '3', '4', '5', '6', '7'] });
+  assert.deepEqual(restored.snapshot().supportingIds, ['1', '2', '3', '4', '5', '6', '7']);
   restored.setSelection([]);
-  assert.equal(networkScope(storage).ids.length, 9);
+  assert.equal(restored.snapshot().supportingIds.length, 9);
 });
