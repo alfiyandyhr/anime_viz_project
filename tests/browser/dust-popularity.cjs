@@ -55,7 +55,7 @@ const state = page => page.evaluate(() => {
     });
     await page.goto(base);
     await ready(page);
-    const colorBySimilarity = page.getByRole('checkbox', { name: 'Color dust by highest similarity score' });
+    const colorBySimilarity = page.getByRole('checkbox', { name: 'Color dust by strongest attraction' });
     const colorByPercentile = page.getByRole('checkbox', { name: 'Color dust by highest attraction percentile' });
     assert.ok(await colorBySimilarity.isVisible());
     await page.getByRole('radio', { name: 'Genre cohort' }).check();

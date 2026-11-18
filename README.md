@@ -343,7 +343,7 @@ The dust field defaults to **60 dots**, with 30 and 90 options. It reserves half
 the candidate budget equally for each magnet's strongest matches, then fills
 remaining slots with the highest average attraction scores, deduplicating overlap.
 The reference sample stays fixed when dot count or filters change. Dots share
-one color by default. **Color dust by highest similarity score** colors each
+one color by default. **Color dust by strongest attraction** colors each
 title by its highest-scoring magnet in the field, mirror, and linked charts.
 With Popularity or Score active, the control uses the highest attraction
 percentile. White outlines mark selected anime. Hover, keyboard-focus,
