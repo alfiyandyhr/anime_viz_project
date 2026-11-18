@@ -635,6 +635,52 @@ test('popularity uses midranks on one shared sample and preserves raw sorts for 
   assert.equal(cosine.candidateDust.length, 4);
 });
 
+test('Score uses the dust catalogue ratings and shares the percentile sample with Popularity', () => {
+  const fixture = {
+    movies: [1, 2, 3, 4].map(id => ({ id, title: `Movie ${id}` })),
+    anime: [1, 2, 3, 4].map(id => ({ id, title: `Anime ${id}` }))
+  };
+  const memory = new Map();
+  const storage = { getItem: key => memory.get(key), setItem: (key, value) => memory.set(key, value) };
+  const context = createContext({ storage });
+  context.setSources(fixture, null);
+  context.setMetadata([
+    { id: 1, average_score: 95, popularity: 10 },
+    { id: 2, average_score: 95, popularity: 20 },
+    { id: 3, average_score: 0 },
+    { id: 4, average_score: null, popularity: 40 }
+  ]);
+  const forwardKeys = ['anilist:score', 'anilist:popularity'];
+  const forward = context.setMagnets(forwardKeys);
+  assert.deepEqual(forward.activeMagnetKeys, forwardKeys);
+  assert.equal(forward.score.eligible, 3);
+  assert.deepEqual(forward.ranking.map(row => [row.key, row.scores, row.rawScores, row.rank]), [
+    ['anilist:2', [0.5, 1], [95, 20], 1],
+    ['anilist:1', [0.5, 0], [95, 10], 2],
+    ['anilist:3', [null, null], [0, null], null],
+    ['anilist:4', [null, null], [null, 40], null]
+  ]);
+  assert.deepEqual(context.setRankingSort('anilist:score').ranking.map(row => row.rank), [1, 2, 3, null]);
+
+  context.setDirection(REVERSE);
+  const reverseKeys = ['tmdb:score'];
+  assert.deepEqual(context.setMagnets(reverseKeys).activeMagnetKeys, []);
+  const payload = { vote_average: { 1: 8.6, 2: 9.1, 3: null, 4: 8.6 } };
+  const reverse = context.setMoviePopularity(payload, 'ready');
+  assert.deepEqual(reverse.ranking.map(row => [row.key, row.score, row.rawScores[0], row.rank]), [
+    ['tmdb:2', 1, 9.1, 1], ['tmdb:1', 0.25, 8.6, 2],
+    ['tmdb:4', 0.25, 8.6, 3], ['tmdb:3', null, null, null]
+  ]);
+  context.setSelection(['tmdb:2']);
+
+  const restored = createContext({ storage });
+  assert.ok(restored.restore());
+  assert.deepEqual(restored.setSources(fixture, new Float32Array(16)).magnetKeys, reverseKeys);
+  assert.deepEqual(restored.setMoviePopularity(null, 'loading').selectedKeys, ['tmdb:2']);
+  assert.deepEqual(restored.setMoviePopularity(payload, 'ready').selectedKeys, ['tmdb:2']);
+  assert.deepEqual(restored.setDirection(FORWARD).magnetKeys, forwardKeys);
+});
+
 test('popularity sources, saved choices, and missing values remain independent by direction', () => {
   const { context, storage } = setup();
   const scienceFiction = 'tmdb:genre:Science Fiction';

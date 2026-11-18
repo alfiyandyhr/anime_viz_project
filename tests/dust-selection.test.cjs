@@ -2,7 +2,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const vm = require('node:vm');
-const { createContext } = require('../frontend/common/dust-context.js');
+const AnivizDust = require('../frontend/common/dust-context.js');
+const { createContext } = AnivizDust;
 const ChartData = require('../frontend/common/chart-data.js');
 
 function fixture() {
@@ -41,7 +42,7 @@ test('direct selection toggles, caps at three without replacement, and leaves an
 });
 
 function renderDetails(context, data, externalId) {
-  const sandbox = vm.createContext({AnivizChartData:ChartData});
+  const sandbox = vm.createContext({AnivizChartData:ChartData,AnivizDust});
   vm.runInContext(readFileSync(require.resolve('../frontend/common/title-artwork.js'),'utf8'),sandbox);
   vm.runInContext(readFileSync(require.resolve('../frontend/common/dust-details.js'),'utf8'),sandbox);
   const escape = value => String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');

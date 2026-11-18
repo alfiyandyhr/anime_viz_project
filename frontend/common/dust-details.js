@@ -16,7 +16,7 @@
   function magnetScores(match, magnets, color, { escapeHTML: escape, escapeAttribute: attr },
     { exactEvidence = true } = {}) {
     if (!match) return '';
-    const mixed = magnets.some(magnet => magnet.kind === 'popularity');
+    const mixed = magnets.some(root.AnivizDust.isMetricMagnet);
     return `<div class="dust-detail-scores">${magnets.map((magnet, index) => {
       const score = match.scores[index];
       if (mixed) {

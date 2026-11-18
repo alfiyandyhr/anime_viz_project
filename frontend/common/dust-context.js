@@ -17,14 +17,20 @@
   const normalizeStrength = value => Number.isFinite(value) ? Math.round(Math.max(0, Math.min(2, value)) * 10) / 10 : 1;
   const keyFor = (catalogue, id) => `${catalogue}:${id}`;
   const catalogueFor = (data, catalogue) => (catalogue === "tmdb" ? data?.movies : data?.anime) || [];
-  const magnetScoreLabel = magnet => magnet.kind === "popularity" ? magnet.metric
+  const METRIC_MAGNET_TYPES = ["popularity", "score"];
+  const isMetricMagnet = magnet => METRIC_MAGNET_TYPES.includes(magnet.kind);
+  const magnetScoreLabel = magnet => isMetricMagnet(magnet) ? magnet.metric
     : magnet.kind === "genre" ? magnet.title : `Cosine to ${magnet.title}`;
   const cohortDescription = magnet => `${magnet.source} · ${magnet.memberIds.length} ${magnet.noun}`;
-  const popularityKey = direction => keyFor(DIRECTIONS[direction].dust, "popularity");
+  const metricMagnetKey = (direction, kind) => keyFor(DIRECTIONS[direction].dust, kind);
+  const isMetricKey = (direction, key) => METRIC_MAGNET_TYPES.some(kind => key === metricMagnetKey(direction, kind));
   const averageLabel = mixed => mixed ? "Average attraction percentile" : "Average similarity";
   const formatPercentile = value => Number.isFinite(value) ? value.toFixed(3) : "Unavailable";
-  const formatRawScore = (value, magnet) => Number.isFinite(value) && magnet.kind === "popularity"
-    ? String(value) : formatPercentile(value);
+  function formatRawScore(value, magnet) {
+    if (!Number.isFinite(value)) return "Unavailable";
+    if (magnet.kind === "score") return `${value} / ${magnet.scale}`;
+    return magnet.kind === "popularity" ? String(value) : formatPercentile(value);
+  }
   function mixedEvidence(match, magnet, index) {
     const raw = formatRawScore(match.rawScores[index], magnet);
     return `${magnetScoreLabel(magnet)}: ${raw} · Attraction percentile: ${formatPercentile(match.scores[index])}`;
@@ -106,12 +112,12 @@
     return percentiles;
   }
 
-  function scoreDust(records, magnets, direction, pairScore, cohortVectors, popularityValues) {
-    if (!magnets.length || (!pairScore && magnets.some(magnet => magnet.kind !== "popularity"))) return [];
+  function scoreDust(records, magnets, direction, pairScore, cohortVectors, metricValues) {
+    if (!magnets.length || (!pairScore && magnets.some(magnet => !isMetricMagnet(magnet)))) return [];
     const scorePair = direction === REVERSE
       ? (magnetId, dustId) => pairScore(dustId, magnetId) : pairScore;
     const rawColumns = magnets.map(magnet => {
-      if (magnet.kind === "popularity") return records.map(record => finite(popularityValues.get(id(record.id))));
+      if (isMetricMagnet(magnet)) return records.map(record => finite(metricValues[magnet.kind]?.get(id(record.id))));
       if (magnet.kind !== "genre") return records.map(record => scorePair(magnet.id, record.id));
       if (!cohortVectors.has(magnet.key)) {
         const vector = records.map(record => magnet.memberIds.reduce((sum, memberId) =>
@@ -120,10 +126,10 @@
       }
       return cohortVectors.get(magnet.key);
     });
-    const popularityIndex = magnets.findIndex(magnet => magnet.kind === "popularity");
-    const mixed = popularityIndex >= 0;
+    const metricColumns = rawColumns.filter((_, index) => isMetricMagnet(magnets[index]));
+    const mixed = metricColumns.length > 0;
     const eligible = records.flatMap((_, index) =>
-      !mixed || Number.isFinite(rawColumns[popularityIndex][index]) ? [index] : []);
+      metricColumns.every(column => Number.isFinite(column[index])) ? [index] : []);
     // Keep geometry ranks with the scored vectors so sampling and filtering cannot change them.
     const percentiles = rawColumns.map(column => midrankPercentiles(column, eligible));
     const columns = mixed ? percentiles : rawColumns;
@@ -187,7 +193,7 @@
     const { magnet, dust } = DIRECTIONS[direction];
     const typedIds = (values, catalogue) => ids(Array.isArray(values) ? values : []).filter(key => key.startsWith(`${catalogue}:`));
     const magnetKeys = ids(Array.isArray(value.magnetKeys) ? value.magnetKeys : [])
-      .filter(key => key.startsWith(`${magnet}:`) || key === popularityKey(direction)).slice(0, 3);
+      .filter(key => key.startsWith(`${magnet}:`) || isMetricKey(direction, key)).slice(0, 3);
     return {
       state: { ...state, magnetKeys,
         magnetStrengths: Object.fromEntries(magnetKeys.map(key => [key, normalizeStrength(value.magnetStrengths?.[key])])
@@ -227,13 +233,13 @@
     const sessions = new Map();
     // Catalogue-qualified keys separate directions. A new data or matrix object invalidates the bundle cache.
     const cohortVectors = new Map();
-    const popularitySources = {
-      [FORWARD]: { status: "loading", snapshotDate: null, values: new Map() },
-      [REVERSE]: { status: "idle", snapshotDate: null, values: new Map() }
+    const metricSources = {
+      [FORWARD]: { status: "loading", snapshotDate: null, values: {} },
+      [REVERSE]: { status: "idle", snapshotDate: null, values: {} }
     };
     let cohorts = [];
     let catalogue = new Map(), lookup = new Map(), magnets = [], vectors = [], candidates = [], displayed = [], ranking = [];
-    let popularity;
+    let metricMagnets = {};
     let persistent = true, warned = false, revision = 0, colorByMagnet = false;
     const listeners = new Set();
     function storageFailure() {
@@ -258,7 +264,7 @@
       const state = session.state;
       const visible = new Set(state.displayedKeys);
       return { ...state, version: VERSION, direction, revision, colorByMagnet, magnets, genreCohorts: cohorts, candidateDust: candidates, displayedDust: displayed,
-        ranking, lookup, metadataStatus, persistent, popularity, mixed: magnets.some(magnet => magnet.kind === "popularity"),
+        ranking, lookup, metadataStatus, persistent, ...metricMagnets, mixed: magnets.some(isMetricMagnet),
         activeMagnetKeys: magnets.map(magnet => magnet.key),
         missingMetadataIds: direction === FORWARD ? state.candidateKeys.filter(key => !lookup.get(key)?.metadata) : [],
         filteredOutIds: state.candidateKeys.filter(key => !visible.has(key)) };
@@ -293,21 +299,26 @@
       refreshLookup();
     }
     function validMagnets(values) {
-      return ids(values).filter(key => catalogue.has(key) || key === popularityKey(direction)).slice(0, 3);
+      return ids(values).filter(key => catalogue.has(key) || isMetricKey(direction, key)).slice(0, 3);
     }
     function derive({ rescore = false, resample = false, rerank = false } = {}) {
       const state = session.state;
       if (rescore) {
         state.magnetKeys = validMagnets(state.magnetKeys);
         const records = catalogueFor(data, DIRECTIONS[direction].dust);
-        const source = popularitySources[direction], reverse = direction === REVERSE;
-        const eligible = records.filter(record => Number.isFinite(source.values.get(id(record.id)))).length;
-        popularity = { key: popularityKey(direction), kind: "popularity",
-          title: `High ${reverse ? "movie" : "anime"} popularity`,
-          metric: reverse ? "TMDB popularity" : "AniList list users",
-          snapshotDate: source.snapshotDate, status: source.status, eligible, total: records.length };
-        magnets = state.magnetKeys.map(key => key === popularity.key
-          ? (eligible ? popularity : null) : catalogue.get(key)).filter(Boolean);
+        const source = metricSources[direction], reverse = direction === REVERSE;
+        const definitions = {
+          popularity: { title: "Popularity", metric: reverse ? "TMDB popularity" : "AniList list users" },
+          score: { title: "Score", metric: reverse ? "TMDB score" : "AniList score", scale: reverse ? 10 : 100 }
+        };
+        metricMagnets = Object.fromEntries(METRIC_MAGNET_TYPES.map(kind => [kind, {
+          ...definitions[kind], key: metricMagnetKey(direction, kind), kind,
+          snapshotDate: source.snapshotDate, status: source.status, total: records.length,
+          eligible: records.filter(record => Number.isFinite(source.values[kind]?.get(id(record.id)))).length
+        }]));
+        const availableMetrics = new Map(Object.values(metricMagnets).filter(magnet => magnet.eligible)
+          .map(magnet => [magnet.key, magnet]));
+        magnets = state.magnetKeys.map(key => catalogue.get(key) || availableMetrics.get(key)).filter(Boolean);
         vectors = scoreDust(records, magnets, direction, pairScore, cohortVectors, source.values);
       }
       if (rescore || resample) {
@@ -317,8 +328,9 @@
       displayed = candidates.filter(match => passesFilters(lookup.get(match.key).record, state.filters, direction));
       state.displayedKeys = displayed.map(match => match.key);
       const visible = new Set(state.displayedKeys);
-      const waitingForPopularity = state.magnetKeys.includes(popularity?.key) && ["idle", "loading"].includes(popularity.status);
-      if ((pairScore || vectors.length) && !waitingForPopularity && (direction === REVERSE || metadataStatus !== "loading")) {
+      const waitingForMetrics = state.magnetKeys.some(key => isMetricKey(direction, key))
+        && ["idle", "loading"].includes(metricSources[direction].status);
+      if ((pairScore || vectors.length) && !waitingForMetrics && (direction === REVERSE || metadataStatus !== "loading")) {
         const retained = state.selectedKeys.filter(key => visible.has(key));
         if (retained.length < state.selectedKeys.length) onNotice("Selection updated. Titles no longer displayed were removed.");
         state.selectedKeys = retained;
@@ -387,8 +399,9 @@
       },
       setMetadata(rows, status = "ready", snapshotDate = null) {
         metadata = rows || []; metadataStatus = status;
-        popularitySources[FORWARD] = { status, snapshotDate: typeof snapshotDate === "string" ? snapshotDate : null,
-          values: new Map(metadata.map(row => [id(row.id), row.popularity])) };
+        metricSources[FORWARD] = { status, snapshotDate: typeof snapshotDate === "string" ? snapshotDate : null,
+          values: { popularity: new Map(metadata.map(row => [id(row.id), row.popularity])),
+            score: new Map(metadata.map(row => [id(row.id), row.average_score])) } };
         if (!data || direction === REVERSE) return snapshot();
         refreshLookup();
         return derive({ rescore: true });
@@ -407,8 +420,9 @@
       },
       setMoviePopularity(payload, status) {
         movieReception = payload?.movies || {};
-        popularitySources[REVERSE] = { status, snapshotDate: payload?.snapshot_date,
-          values: new Map(Object.entries(payload?.popularity || {})) };
+        metricSources[REVERSE] = { status, snapshotDate: payload?.snapshot_date,
+          values: { popularity: new Map(Object.entries(payload?.popularity || {})),
+            score: new Map(Object.entries(payload?.vote_average || {})) } };
         if (direction !== REVERSE) return snapshot();
         refreshLookup();
         return derive({ rescore: true });
@@ -476,7 +490,8 @@
     };
     return api;
   }
-  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, DIRECTIONS, keyFor, catalogueFor, magnetScoreLabel, cohortDescription,
+  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, DIRECTIONS, METRIC_MAGNET_TYPES, isMetricMagnet,
+    keyFor, catalogueFor, magnetScoreLabel, cohortDescription,
     averageLabel, formatPercentile, formatRawScore, mixedEvidence, defaults, joinRecords,
     passesFilters, createScoreAccessor, forwardVectors, rankCorpus, sampleDust, createContext };
 });

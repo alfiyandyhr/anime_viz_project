@@ -1,7 +1,7 @@
-# High-popularity magnets
+# Popularity magnets
 
 1. Keep **Inception** in **Movie → Anime**. Add **Science Fiction movies** and
-   **High anime popularity**. Check that the popularity chip shows the title
+   **Popularity**. Check that the popularity chip shows the title
    and that Magnet strength has three sliders, each at 1×.
 2. Focus a dot and compare two dots. Check the raw cosine, raw popularity, and
    the attraction percentiles in the tooltip, mirror, focus card, comparison,
@@ -11,7 +11,7 @@
    the mirror, and that the displayed titles and ranking stay fixed. Sort by
    Inception and confirm all 1,000 titles have a raw similarity rank. Remove
    popularity to restore cosine scores.
-4. Switch to **Anime → Movies** and add **High movie popularity** alongside
+4. Switch to **Anime → Movies** and add **Popularity** alongside
    Attack on Titan. Check that the movie popularity chip shows the title.
    Switch directions and reload to check saved magnets,
    strengths, sorts, and selections.

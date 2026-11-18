@@ -225,15 +225,16 @@
     highlightRecommendation();
   }
   function renderRanking() {
-    const { ranking, magnets, rankingOrder, mixed, popularity } = latest, size = 10;
+    const { ranking, magnets, rankingOrder, mixed } = latest, size = 10;
     const total = Math.max(1, Math.ceil(ranking.length / size));
     rankingPage = Math.min(rankingPage, total - 1);
     const ordered = rankingOrder !== 'descending' ? ranking
       : [...ranking.filter(match => match.rank !== null).reverse(), ...ranking.filter(match => match.rank === null)];
     const start = rankingPage * size, rows = ordered.slice(start, start + size);
     const ranked = rows.filter(match => match.rank !== null);
-    $('[data-dust-ranking-note]').textContent = `${ranking.length} corpus ${dustNoun()} · ${ranked.length ? `ranks ${ranked[0].rank}–${ranked.at(-1).rank}` : 'Ranks unavailable'}`
-      + (mixed ? ` · ${popularityDescription(popularity)}. Individual magnet sorts use raw values. Titles without popularity have no combined rank.` : '');
+    const metricNote = mixed
+      ? ` · ${magnets.filter(AnivizDust.isMetricMagnet).map(metricDescription).join(' · ')}. Individual sorts use raw values. Combined ranks require values for all active metrics.` : '';
+    $('[data-dust-ranking-note]').textContent = `${ranking.length} corpus ${dustNoun()} · ${ranked.length ? `ranks ${ranked[0].rank}–${ranked.at(-1).rank}` : 'Ranks unavailable'}` + metricNote;
     const title = isReverse() ? 'Movie' : 'Anime';
     const cohortLabels = magnets.map(magnet => magnet.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : '');
     const average = AnivizDust.averageLabel(mixed);
@@ -271,7 +272,7 @@
     else if (focusedMagnetKey) renderFocus();
     restoreScroll();
   }
-  async function loadPopularity() {
+  async function loadMetricData() {
     if (!isReverse()) { void loadMetadata(); return; }
     const { status } = latest.popularity;
     if (!['idle', 'unavailable'].includes(status)) return;
@@ -397,9 +398,10 @@
   }
   function restoreScroll() {
     if (scrollRestored || !recommendationState.data
-      || (latest.magnets.some(magnet => magnet.kind !== 'popularity') && !recommendationState.scores)
+      || (latest.magnets.some(magnet => !AnivizDust.isMetricMagnet(magnet)) && !recommendationState.scores)
       || (!isReverse() && latest.metadataStatus === 'loading')
-      || (latest.magnetKeys.includes(latest.popularity.key) && latest.popularity.status === 'loading')) return;
+      || AnivizDust.METRIC_MAGNET_TYPES.some(type => latest.magnetKeys.includes(latest[type].key)
+        && ['idle', 'loading'].includes(latest[type].status))) return;
     scrollRestored = true;
     const direction = latest.direction;
     requestAnimationFrame(() => {
@@ -423,7 +425,7 @@
       context.setSources(data, null, { seedExample: true });
       updateDirectionControls();
       if (isReverse()) {
-        void loadPopularity();
+        void loadMetricData();
         loadMovieDetails();
       }
       restoreScroll();
@@ -437,7 +439,7 @@
       if (!pendingNotice.startsWith('Session storage')) notice('');
       context.setDirection(direction);
       if (isReverse()) {
-        void loadPopularity();
+        void loadMetricData();
         loadMovieDetails();
       }
       renderRecommendations();
@@ -446,7 +448,7 @@
     },
     setMagnets(keys) { context.setMagnets(keys); renderRecommendations(); },
     setDustLimit(value) { context.setDustLimit(value); renderRecommendations(); },
-    select, focusMagnet, color, dustColor, saveLayout, loadPopularity,
+    select, focusMagnet, color, dustColor, saveLayout, loadMetricData,
     deselectLast() {
       if (latest.selectedKeys.length) {
         focusedMagnetKey = null;

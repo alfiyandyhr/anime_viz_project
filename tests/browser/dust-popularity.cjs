@@ -14,7 +14,7 @@ const dot = page => page.locator('#recommendation-chart .dust-node');
 const add = page => page.locator('#add-popularity-magnet');
 const rank = page => page.locator('[data-dust-ranking-body]');
 const switchTo = (page, direction) => page.selectOption('#dust-direction', direction);
-const choosePopularity = page => page.getByRole('radio', { name: 'High popularity' }).check();
+const choosePopularity = page => page.getByRole('radio', { name: 'Popularity' }).check();
 const ready = page => dot(page).first().waitFor();
 const mixed = page => page.waitForFunction(() => AnivizMain.snapshot().mixed && AnivizMain.snapshot().ranking.length === 1000);
 const assertTooltip = async (page, title) => {
@@ -68,7 +68,7 @@ const state = page => page.evaluate(() => {
     await colorByPercentile.check();
     assert.doesNotMatch(await page.locator('#movie-magnets').innerText(), /AniList list users|eligible/);
     assert.ok(await page.locator('#popularity-magnet-source').isHidden());
-    assert.equal(await page.getByRole('slider', { name: 'High anime popularity strength' }).inputValue(), '1');
+    assert.equal(await page.getByRole('slider', { name: 'Popularity strength' }).inputValue(), '1');
     const combined = await state(page);
     assert.equal(combined.magnetKeys.length, 3);
     await add(page).click();
@@ -118,7 +118,7 @@ const state = page => page.evaluate(() => {
     await page.reload();
     await page.locator('#retry-popularity').waitFor();
     await ready(page);
-    assert.match(await page.locator('#movie-magnets').innerText(), /High anime popularity\s+Inactive/);
+    assert.match(await page.locator('#movie-magnets').innerText(), /Popularity\s+Inactive/);
     assert.deepEqual((await state(page)).ranking, cosine.ranking);
     animeFails = false;
     await page.locator('#retry-popularity').click();
@@ -143,10 +143,10 @@ const state = page => page.evaluate(() => {
     await mixed(page);
     assert.ok(movieURL.searchParams.has('retry'));
     assert.ok(await colorByPercentile.isChecked());
-    assert.equal(await page.getByRole('slider', { name: 'High movie popularity strength' }).inputValue(), '1');
+    assert.equal(await page.getByRole('slider', { name: 'Popularity strength' }).inputValue(), '1');
     assert.doesNotMatch(await page.locator('#movie-magnets').innerText(), /TMDB popularity|eligible/);
     assert.ok(await page.locator('#popularity-magnet-source').isHidden());
-    assert.equal(await page.locator('#recommendation-chart .dust-magnet').last().locator('title').textContent(), 'High movie popularity');
+    assert.equal(await page.locator('#recommendation-chart .dust-magnet').last().locator('title').textContent(), 'Popularity');
     await assertTooltip(page, 'Attack on Titan');
     await dot(page).first().press('Enter');
     const movieBlend = await state(page);

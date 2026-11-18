@@ -375,7 +375,8 @@ function refreshDustColors() {
 
 function renderDustRecommendations() {
   const snapshot = AnivizMain.snapshot();
-  const { magnets, magnetKeys, popularity, mixed, displayedDust, direction, example } = snapshot;
+  const { magnets, magnetKeys, mixed, displayedDust, direction, example } = snapshot;
+  const savedMetrics = AnivizDust.METRIC_MAGNET_TYPES.map(type => snapshot[type]);
   const reverse = direction === AnivizDust.REVERSE;
   const noun = reverse ? "movies" : "anime";
   const container = document.querySelector("#recommendation-chart");
@@ -385,8 +386,8 @@ function renderDustRecommendations() {
   document.querySelector("#recommendation-chart-title").textContent = reverse ? "Movies shown" : "Anime shown";
   document.querySelector("#movie-magnets").innerHTML = magnetKeys.map(key => {
     const index = magnets.findIndex(magnet => magnet.key === key);
-    const magnet = magnets[index] || popularity;
-    const description = magnet.kind === "popularity" ? (index < 0 ? "Inactive" : "")
+    const magnet = magnets[index] || savedMetrics.find(magnet => magnet.key === key);
+    const description = AnivizDust.isMetricMagnet(magnet) ? (index < 0 ? "Inactive" : "")
       : magnet.kind === "genre" ? AnivizDust.cohortDescription(magnet) : magnet.year || "";
     return `<div class="movie-magnet-chip" style="--magnet-color:${AnivizMain.color(magnet.key) || "currentColor"}">
       <span class="magnet-chip-number">${index < 0 ? "–" : index + 1}</span><span>${escapeHTML(magnet.title)}${description ? ` <small>${escapeHTML(description)}</small>` : ""}${example ? ' <em class="magnet-example">Example</em>' : ""}</span>
@@ -399,13 +400,13 @@ function renderDustRecommendations() {
   document.querySelector("#reset-magnets").disabled = !magnets.length;
   if (!magnets.length) {
     dustChart = null;
-    const message = magnetKeys.length ? "The saved popularity magnet is inactive. Check its data status or add another magnet."
+    const message = magnetKeys.length ? "Check the data status of your saved magnets or add another magnet."
       : `Add a magnet to explore the ${noun} sample.`;
     container.innerHTML = `<div class="dust-empty"><p>${message}</p></div>`;
     renderEmpty(mirror, message);
     return;
   }
-  if (!recommendationState.scores && magnets.some(magnet => magnet.kind !== "popularity")) {
+  if (!recommendationState.scores && magnets.some(magnet => !AnivizDust.isMetricMagnet(magnet))) {
     const error = recommendationState.scoresError;
     const message = error ? `Could not load full similarities: ${error}` : `Gathering ${noun}…`;
     container.innerHTML = `<div class="dust-empty" role="status"><p>${escapeHTML(message)}</p>${error ? `<button type="button" class="small-button ghost" id="dust-retry">Retry full scores</button>` : ""}</div>`;
@@ -545,7 +546,7 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
   magnetArt.append("text").attr("class", "magnet-title").attr("text-anchor", "middle").attr("y", 49)
     .text((anchor) => truncate(anchor.magnet.title, width < 400 ? 16 : 23));
   magnets.append("title").text(({ magnet }) => {
-    if (magnet.kind === "popularity") return magnet.title;
+    if (AnivizDust.isMetricMagnet(magnet)) return magnet.title;
     const description = magnet.kind === "genre" ? AnivizDust.cohortDescription(magnet) : magnet.year || "Year unknown";
     return `${magnet.title} (${description})`;
   });

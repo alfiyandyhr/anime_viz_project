@@ -162,10 +162,12 @@ function bindRecommendationControls() {
     document.querySelector("#recommendation-status").textContent = "";
   });
   document.querySelector("#add-genre-magnet").addEventListener("click", () => addMagnet(genreChoice.value, "genre"));
-  document.querySelector("#add-popularity-magnet").addEventListener("click", () => {
-    addMagnet(AnivizMain.snapshot().popularity.key, "popularity");
-  });
-  document.querySelector("#retry-popularity").addEventListener("click", () => AnivizMain.loadPopularity());
+  for (const type of AnivizDust.METRIC_MAGNET_TYPES) {
+    document.querySelector(`#add-${type}-magnet`).addEventListener("click", () => {
+      addMagnet(AnivizMain.snapshot()[type].key, type);
+    });
+    document.querySelector(`#retry-${type}`).addEventListener("click", () => AnivizMain.loadMetricData());
+  }
   document.querySelector("#dust-direction").addEventListener("change", event => AnivizMain.switchDirection(event.target.value));
   document.querySelector("#recommendation-retry").addEventListener("click", () => {
     recommendationState.error = null;
@@ -211,37 +213,43 @@ function updateMagnetPickerMode() {
   document.querySelector("#movie-suggestions").hidden = type !== "title";
   closeMovieSearch();
   document.querySelector("#recommendation-status").textContent = "";
-  if (type === "popularity" && AnivizMain.snapshot().popularity?.status === "idle") AnivizMain.loadPopularity();
-  renderPopularityPicker();
+  if (AnivizDust.METRIC_MAGNET_TYPES.includes(type) && AnivizMain.snapshot()[type]?.status === "idle") AnivizMain.loadMetricData();
+  renderMetricPickers();
 }
 
-function popularityDescription({ metric, snapshotDate, eligible, total }) {
+function metricDescription({ metric, snapshotDate, eligible, total }) {
   return `${metric}${snapshotDate ? ` · ${snapshotDate.slice(0, 10)} UTC` : ""} · ${eligible} of ${total} eligible`;
 }
 
-function renderPopularityPicker() {
-  const { popularity, magnetKeys } = AnivizMain.snapshot();
-  if (!popularity) return;
-  const picking = document.querySelector('#magnet-type [value="popularity"]').checked;
-  const saved = magnetKeys.includes(popularity.key);
-  const button = document.querySelector("#add-popularity-magnet");
-  document.querySelector("#popularity-magnet-picker").hidden = !picking && !(saved && !popularity.eligible);
-  button.hidden = !picking;
-  button.disabled = !popularity.eligible;
-  button.textContent = `Add ${popularity.title.toLowerCase()} magnet`;
-  document.querySelector("#retry-popularity").hidden = popularity.status !== "unavailable";
-  const status = popularity.eligible ? ""
-    : ["loading", "idle"].includes(popularity.status) ? `Loading ${popularity.metric}…`
-    : popularity.status === "unavailable" ? `${popularity.metric} could not be loaded or validated. Retry to use this magnet.`
-    : `${popularityDescription(popularity)}. No values are available for this sample.`;
-  const source = document.querySelector("#popularity-magnet-source");
-  source.textContent = status;
-  source.hidden = !status;
+function renderMetricPickers() {
+  const snapshot = AnivizMain.snapshot();
+  const selectedType = document.querySelector('#magnet-type input:checked').value;
+  const types = AnivizDust.METRIC_MAGNET_TYPES;
+  const visibleType = types.includes(selectedType) ? selectedType : types.find(type => {
+    const magnet = snapshot[type];
+    return magnet && !magnet.eligible && snapshot.magnetKeys.includes(magnet.key);
+  });
+  for (const type of types) {
+    const magnet = snapshot[type];
+    if (!magnet) continue;
+    document.querySelector(`#${type}-magnet-picker`).hidden = type !== visibleType;
+    const button = document.querySelector(`#add-${type}-magnet`);
+    button.hidden = type !== selectedType;
+    button.disabled = !magnet.eligible;
+    document.querySelector(`#retry-${type}`).hidden = magnet.status !== "unavailable";
+    const status = magnet.eligible ? ""
+      : ["loading", "idle"].includes(magnet.status) ? `Loading ${magnet.metric}…`
+      : magnet.status === "unavailable" ? `${magnet.metric} could not be loaded or validated. Retry to use this magnet.`
+      : `${metricDescription(magnet)}. No values are available for this sample.`;
+    const source = document.querySelector(`#${type}-magnet-source`);
+    source.textContent = status;
+    source.hidden = !status;
+  }
 }
 
 function focusMagnetPicker() {
   const type = document.querySelector('#magnet-type input:checked').value;
-  const input = document.querySelector({ title: "#movie-search", genre: "#genre-magnet-choice", popularity: "#add-popularity-magnet" }[type]);
+  const input = document.querySelector({ title: "#movie-search", genre: "#genre-magnet-choice" }[type] || `#add-${type}-magnet`);
   (input.disabled ? document.querySelector('#magnet-type input:checked') : input).focus({ preventScroll: true });
 }
 
@@ -270,9 +278,9 @@ async function loadRecommendations() {
     document.querySelector("#dust-direction").disabled = false;
     document.querySelector("#magnet-type").disabled = false;
     document.querySelector("#recommendation-method-data").textContent =
-      `${numberFormatter.format(data.meta.anime_count)} AniList anime × ${numberFormatter.format(data.meta.movie_count)} TMDB movies: ${numberFormatter.format(data.meta.pair_count)} pairs. Both directions read the same cosine for each movie–anime pair. Use up to three magnets across titles, genre cohorts, and one popularity magnet. Computed ${formatDate(data.meta.generated_at)}.`;
+      `${numberFormatter.format(data.meta.anime_count)} AniList anime × ${numberFormatter.format(data.meta.movie_count)} TMDB movies: ${numberFormatter.format(data.meta.pair_count)} pairs. Both directions read the same cosine for each movie–anime pair. Use up to three magnets from titles, genre cohorts, Popularity, and Score. Computed ${formatDate(data.meta.generated_at)}.`;
     document.querySelector("#recommendation-method-model").textContent =
-      `${data.meta.model} embeds titles, genres, tags, and synopses. Cosine similarity compares the normalized story vectors. The popularity magnet uses a separate source metric.`;
+      `${data.meta.model} embeds titles, genres, tags, and synopses. Cosine similarity compares the normalized story vectors.`;
   } catch (error) {
     recommendationState.error = error.message;
     setStatus("Recommendation data could not be loaded.", "error");
@@ -326,15 +334,17 @@ function renderMovieSearchResults(query) {
 }
 
 function addMagnet(key, type, { status = document.querySelector("#recommendation-status"), restoreFocus = true } = {}) {
-  const { magnetKeys, genreCohorts, popularity } = AnivizMain.snapshot();
+  const snapshot = AnivizMain.snapshot();
+  const { magnetKeys, genreCohorts } = snapshot;
   const genre = type === "genre";
   if (genre && !genreCohorts.some(cohort => cohort.key === key)) {
     status.textContent = "That genre cohort is unavailable in this sample.";
     return;
   }
-  if (type === "popularity" && !popularity.eligible) return;
+  if (AnivizDust.METRIC_MAGNET_TYPES.includes(type) && !snapshot[type].eligible) return;
   if (magnetKeys.includes(key)) {
-    status.textContent = `That ${genre ? "genre cohort" : type === "popularity" ? "popularity choice" : "title"} is already a magnet.`;
+    const label = snapshot[type]?.title;
+    status.textContent = label ? `${label} is already a magnet.` : `That ${genre ? "genre cohort" : "title"} is already a magnet.`;
     return;
   }
   if (magnetKeys.length >= 3) {
@@ -361,7 +371,7 @@ function renderRecommendations() {
   }
   document.querySelector("#movie-magnets").hidden = false;
   document.querySelector("#dust-toolbar").hidden = false;
-  renderPopularityPicker();
+  renderMetricPickers();
   hideTooltip();
   renderDustRecommendations();
 }

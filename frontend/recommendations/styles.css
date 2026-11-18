@@ -617,7 +617,7 @@ body[data-chapter="dust-magnet"] .recommendation-picker {
   border: 0; background: transparent; accent-color: var(--cyan);
 }
 .magnet-type-picker input[type="radio"]:focus-visible { outline-offset: 2px; }
-#genre-magnet-source, #popularity-magnet-source { margin: 6px 0; color: var(--text-soft); font-size: .72rem; }
+#genre-magnet-source, .metric-magnet-source { margin: 6px 0; color: var(--text-soft); font-size: .72rem; }
 .dust-movie-drawer { padding: 48px 24px 24px; overflow-wrap: anywhere; }
 .dust-movie-drawer > * { margin-bottom: 16px; }
 body[data-chapter="dust-magnet"] .recommendation-controls { display: block; min-width: 0; }

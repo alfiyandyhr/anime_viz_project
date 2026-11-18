@@ -9,7 +9,7 @@ A visual story discovery tool built with Python/Flask, AniList GraphQL API, and 
 ## Four views
 
 The root URL opens **Dust & Magnet** with an **Example** Inception magnet.
-Switch Direction to **Anime → Movies** for the **Example** Attack on Titan magnet. Use **Title** to search by title, alias, or year. Use **Genre cohort** to add a group of titles by genre. Fill up to three slots with any mix of distinct titles and cohorts. Remove any magnet with ×.
+Switch Direction to **Anime → Movies** for the **Example** Attack on Titan magnet. Use **Title** to search by title, alias, or year. Use **Genre cohort** to add a group of titles by genre. Use **Popularity** or **Score** to attract dust by audience size or rating. Fill up to three slots and remove any magnet with ×.
 The compact dropdown contains exactly four destinations:
 
 | View | Data and interactions |
@@ -193,9 +193,9 @@ also work. AniList uses its public GraphQL API.
    failure reuses the completed matrix for the staged catalogue.
 
    Genre cohorts rebuild their membership from the refreshed genres in each
-   direction and average the new cosine scores. High popularity uses the
-   refreshed AniList list-user counts or TMDB popularity and recalculates
-   midrank percentiles when selected.
+   direction and average the new cosine scores. Popularity and Score use
+   the refreshed AniList and TMDB metadata and recalculate midrank percentiles
+   when selected.
 
 The frontend reads the displayed dates from the published files. The Anime tab
 and Network show the AniList collection time, the Movie tab shows its source
@@ -204,7 +204,7 @@ shows when the similarity scores finished. Reload after the updated files are
 available to see the new dates.
 
 After both steps finish, open the two Catalogue tabs and try both Dust & Magnet
-directions with a title, a Genre cohort, and High popularity. Commit the web
+directions with a title, a Genre cohort, Popularity, and Score. Commit the web
 files together and push or merge into the branch configured for GitHub Pages.
 
 ```bash
@@ -289,16 +289,16 @@ in the reverse direction. Each cohort score averages the signed
 cosines to its sampled titles. A cohort occupies one slot and contributes one score
 to the combined average. Its membership stays fixed when you filter the dust.
 
-Choose **High popularity** to add one popularity magnet within the same three
-slots. With anime dust it uses AniList list users. With movie dust it uses TMDB
-popularity.
-Try **Inception**, **Science Fiction movies**,
-and **High anime popularity** together. Each magnet's raw values become
-midrank percentiles from 0 to 1 over the same titles with known popularity.
-The field and combined ranking use those percentiles. Individual ranking
-sorts and score evidence still expose the raw values. Titles without popularity
-stay in the full ranking with an unavailable combined rank. Remove the
-popularity magnet to return to cosine scores.
+Choose **Popularity** to use AniList list-user counts for anime or TMDB
+popularity for movies. Choose **Score** to use AniList ratings out of 100 or
+TMDB ratings out of 10. You can combine both with a title or genre cohort
+within the same three slots.
+
+With either metric active, each magnet's raw values become midrank percentiles
+from 0 to 1 over titles with values for every active metric. The field and
+combined ranking use those percentiles. Individual ranking sorts and score
+evidence expose the raw values. Titles with missing values stay in the full
+ranking with an unavailable combined rank.
 
 Choose 30, 60, or 90 dots and use **Reset positions** directly in the left panel.
 Under **Magnet strength**, each active magnet has a slider from 0× to 2×.
@@ -322,7 +322,7 @@ remaining slots with the highest average attraction scores, deduplicating overla
 The reference sample stays fixed when dot count or filters change. Dots share
 one color by default. **Color dust by highest similarity score** colors each
 title by its highest-scoring magnet in the field, mirror, and linked charts.
-With a popularity magnet active, the control uses the highest attraction
+With Popularity or Score active, the control uses the highest attraction
 percentile. White outlines mark selected anime. Hover, keyboard-focus,
 or select a dot to see its links. Thicker links show a stronger pull for that
 dot. Hover or focus a dot to see its scores.
@@ -358,7 +358,7 @@ proximity, not a percentage or a prediction of enjoyment.
 The web bundle contains 20 top and 20 bottom matches per movie and a 4 MB
 movie-major, little-endian float32 matrix with every score. The browser
 validates the matrix dimensions and hash before using it for magnets and
-rankings. The Movie catalogue, reception chart, and popularity magnet share
+rankings. The Movie catalogue, reception chart, and Popularity and Score magnets share
 the TMDB ratings and popularity snapshot. Popularity ranks break ties by the
 retained movie order. See [the refresh workflow](#refresh-full-catalogue-and-dust--magnet)
 to regenerate the bundle and its metadata together.
