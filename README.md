@@ -60,9 +60,9 @@ average those titles’ signed cosine similarity to that movie. Genre cohorts
 average across the cohort’s movies. Popularity sums AniList list users, and Score
 averages available anime scores. Zoom in on an actor for their AniList portrait.
 The linked charts show distinct anime credited to actors in the field. Select up
-to three actors to highlight their anime in Score vs. popularity, genres,
-release years, and studio charts. Network’s **Current dust** uses the selected
-actors’ anime, or the displayed actors’ anime when there is no selection.
+to three actors to filter Score vs. popularity to their anime and highlight their
+contributions in the genre, release year, and studio charts. Network’s
+**Current dust** also uses the selected actors’ anime when there is a selection.
 
 ## Routes and session state
 

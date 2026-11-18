@@ -495,8 +495,8 @@ input[type="range"] {
 .reception-dot, .reception-poster, .studio-dot { outline: none; paint-order: stroke fill; }
 .reception-dot, .reception-poster { cursor: pointer; }
 .reception-poster:is(.is-selected, :hover, :focus-visible) .dust-poster-card { box-shadow: inset 0 0 0 2px white; }
-.reception-dot:not([fill="transparent"]):is(:hover, :focus-visible, [aria-pressed="true"]) { stroke: white; stroke-width: 2; }
-.studio-dot:is(:hover, :focus-visible) { fill-opacity: 1; }
+.reception-dot:not(.filmography-dot, [fill="transparent"]):is(:hover, :focus-visible, [aria-pressed="true"]) { stroke: white; stroke-width: 2; }
+:is(.studio-dot, .filmography-dot):is(:hover, :focus-visible) { fill-opacity: 1; }
 .reception-dot:focus-visible, .studio-dot:focus-visible { filter: drop-shadow(0 0 2px white); }
 .reception-selection-ring { fill: none; stroke: white; stroke-width: 1; stroke-dasharray: 2 2; pointer-events: none; }
 

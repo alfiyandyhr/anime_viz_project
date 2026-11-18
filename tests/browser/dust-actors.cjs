@@ -39,19 +39,27 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     for (let step = 0; step < 3; step++) await zoom.click();
     assert.equal(await actor.locator('img').getAttribute('src'), portrait);
     await field.getByRole('button', { name: 'Reset zoom', exact: true }).click();
+
+    const reception = chart('reception');
+    const dots = reception.locator('.reception-dot');
+    const ids = locator => locator.evaluateAll(nodes => nodes.map(node => node.__data__.id).sort());
+    await reception.scrollIntoViewIfNeeded();
+    await dots.first().waitFor();
+    assert.deepEqual(await ids(dots), filmography);
+
     await actor.press('Enter');
     assert.match(await page.locator('#dust-focus').innerText(), /Japanese main-role credits/);
     await chart('connections').locator(`[data-dust-connection-id$=":${second}"]`).press('Enter');
     assert.deepEqual(await page.evaluate(() => AnivizMain.snapshot().selectedKeys), [first, second]);
 
-    const reception = chart('reception');
     await reception.scrollIntoViewIfNeeded();
-    const dots = reception.locator('.reception-dot');
-    const rings = reception.locator('.reception-selection-ring');
-    const ids = locator => locator.evaluateAll(nodes => nodes.map(node => node.__data__.id).sort());
-    await rings.first().waitFor();
-    assert.deepEqual(await ids(dots), filmography);
-    assert.deepEqual(await ids(rings), selected);
+    await dots.first().waitFor();
+    assert.deepEqual(await ids(dots), selected);
+    assert.ok(await dots.evaluateAll(nodes => nodes.every(node => node.__data__.favourites > 0
+      ? getComputedStyle(node).fill === 'rgb(157, 123, 255)'
+      : node.getAttribute('fill') === 'transparent')));
+    assert.deepEqual(await ids(reception.locator('.reception-dot[stroke-width="1"]')), selected);
+    assert.equal(await reception.locator('.reception-selection-ring').count(), 0);
     await dots.first().press('Enter');
     assert.equal(await page.locator('#detail-drawer').getAttribute('aria-label'), 'Anime details');
     assert.deepEqual(await page.evaluate(() => AnivizMain.snapshot().selectedKeys), [first, second]);
@@ -67,8 +75,12 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     }
     await actor.press('Enter');
     assert.deepEqual(await page.evaluate(() => AnivizMain.snapshot().selectedKeys), [second]);
+    await field.locator(`[data-match-id="${second}"]`).press('Enter');
+    await reception.scrollIntoViewIfNeeded();
+    await dots.first().waitFor();
+    assert.deepEqual(await ids(dots), filmography);
     assert.deepEqual(errors, []);
-    console.log('Voice actor portraits, connections, selection rings and chart highlights passed.');
+    console.log('Verified voice actor portraits, connections, purple scatterplot filtering and highlights in the other charts.');
   } finally {
     await browser.close();
   }

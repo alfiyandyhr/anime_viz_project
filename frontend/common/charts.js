@@ -628,6 +628,10 @@
       // A hollow marker keeps titles with zero or unknown favourites available for selection.
       const pointRadius = item => rankLimit ? 5 : item.favourites > 0 ? radius(item.favourites) : 4;
       const filled = item => rankLimit || item.favourites > 0;
+      const { filmography } = context;
+      const selectedIds = new Set(context.selectedIds);
+      const isSelected = item => selectedIds.has(String(item.id));
+      const color = filmography ? () => "var(--purple)" : item => context.dustColor(String(item.id));
 
       const marks = svg.append("g");
       const dots = marks.append("g")
@@ -635,11 +639,19 @@
         .data(data, (item) => item.id)
         .join("circle")
         .attr("class", "reception-dot")
+        .classed("filmography-dot", Boolean(filmography))
         .attr("r", pointRadius)
-        .attr("fill", item => filled(item) ? context.dustColor(String(item.id)) : "transparent")
-        .attr("fill-opacity", 0.65)
-        .attr("stroke", item => filled(item) ? "var(--surface-solid)" : context.dustColor(String(item.id)))
-        .attr("stroke-width", 1.5);
+        .attr("fill", item => filled(item) ? color(item) : "transparent");
+
+      if (filmography) {
+        dots.attr("fill-opacity", 0.8)
+          .attr("stroke", item => filled(item) ? "white" : color(item))
+          .attr("stroke-width", 1);
+      } else {
+        dots.attr("fill-opacity", 0.65)
+          .attr("stroke", item => filled(item) ? "var(--surface-solid)" : color(item))
+          .attr("stroke-width", 1.5);
+      }
 
       function bindMarks(selection) {
         // Closing the details overlay can fire mouseenter under a stationary pointer.
@@ -670,7 +682,7 @@
 
       const rings = marks.append("g").attr("aria-hidden", "true")
         .selectAll("circle")
-        .data(data.filter(item => context.selectedIds.includes(String(item.id))))
+        .data(data.filter(isSelected))
         .join("circle")
         .attr("class", "reception-selection-ring")
         .attr("r", item => pointRadius(item) + 3);
@@ -711,9 +723,9 @@
           .data(showPosters ? data.filter(visible) : [], item => item.id)
           .join(enter => {
             const posters = enter.append("foreignObject").attr("class", "reception-poster")
-              .classed("is-selected", item => context.selectedIds.includes(String(item.id)));
+              .classed("is-selected", isSelected);
             const { images } = root.AnivizPosterZoom.addCards(posters, {
-              title: item => item.title, color: item => context.dustColor(String(item.id))
+              title: item => item.title, color
             });
             root.AnivizPosterZoom.drawArtwork(images, thumbnail);
             bindMarks(posters);
@@ -772,13 +784,11 @@
     function keyboardMarks(marks) {
       const selectable = kind === "reception";
       const tooltipEvent = selectable ? "mousemove" : "mouseenter";
-      const selectionNote = item => context.selectionLabel && context.selectedIds.includes(String(item.id))
-        ? `; ${context.selectionLabel}` : "";
       marks.attr("tabindex", 0).attr("role", selectable ? "button" : "img")
         .attr("aria-pressed", item => selectable && context.hasSelection ? context.selectedIds.includes(String(item.id)) : null)
         .attr("aria-label", item => item.title && (context.movieRankLimit
           ? `${item.title}: TMDB score ${item.vote_average} / 10; TMDB popularity rank #${formatNumber(item.popularity_rank)}; genres ${item.genres.join(", ") || "Unknown"}`
-          : `${item.title}: score ${item.average_score} / 100; popularity ${formatNumber(item.popularity)}; favourites ${Number.isFinite(item.favourites) ? formatNumber(item.favourites) : 'Unknown'}; genres ${item.genres.join(", ") || "Unknown"}${selectionNote(item)}`) || item.genre && item.studio && `${item.studio} × ${item.genre}: ${item.count}`
+          : `${item.title}: score ${item.average_score} / 100; popularity ${formatNumber(item.popularity)}; favourites ${Number.isFinite(item.favourites) ? formatNumber(item.favourites) : 'Unknown'}; genres ${item.genres.join(", ") || "Unknown"}`) || item.genre && item.studio && `${item.studio} × ${item.genre}: ${item.count}`
           || item.studio && `${item.studio}. Total popularity ${formatNumber(item.popularity)}. Average score ${item.score.toFixed(1)} / 100. ${item.count} ${context.studioGroups ? "catalogue anime" : "matching titles"}.`
           || `${item.genre ?? item.year}: ${item.count} titles; average score ${averageScore(item)}; ${popularityLabel()} ${formatNumber(item.totalPopularity)}`)
         .on("keydown", selectable ? function (event, item) {
@@ -795,11 +805,14 @@
     return {
       update(value) {
         const focused = container.contains(document.activeElement) ? document.activeElement.getAttribute('aria-label') : null;
-        const nextSelection = JSON.stringify(value.selectedIds || []);
-        if (value.anime !== dataIdentity || nextSelection !== selectionKey) cached.clear();
-        dataIdentity = value.anime; selectionKey = nextSelection;
-        context = { selectedIds: [], onSelect() {},
-          dustColor: () => "#9d7bff", hasSelection: Boolean(value.selectedIds), ...value };
+        const filmography = kind === "reception" ? value.filmography : null;
+        const anime = filmography ?? value.anime;
+        const selectedIds = filmography ? [] : value.selectedIds || [];
+        const nextSelection = JSON.stringify(selectedIds);
+        if (anime !== dataIdentity || nextSelection !== selectionKey) cached.clear();
+        dataIdentity = anime; selectionKey = nextSelection;
+        context = { onSelect() {}, dustColor: () => "#9d7bff", hasSelection: Boolean(value.selectedIds),
+          ...value, anime, filmography, selectedIds };
         renderers[kind]();
         if (kind !== "reception") {
           keyboardMarks(d3.select(container).selectAll("rect, circle").filter(function () {

@@ -33,6 +33,14 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
       }
       throw new Error('Expected two displayed studios with a shared title');
     });
+    const reception = chart('reception');
+    const marks = reception.locator('.reception-dot');
+    await reception.scrollIntoViewIfNeeded();
+    await marks.first().waitFor();
+    assert.ok(await marks.evaluateAll(nodes => nodes.every(node => node.getAttribute('stroke-width') === '1')));
+    const filled = reception.locator('.reception-dot[fill="var(--purple)"]').first();
+    assert.equal(await filled.evaluate(node => getComputedStyle(node).fill), 'rgb(157, 123, 255)');
+
     await dot(pair[0]).press('Enter');
     assert.match(await page.locator('#dust-focus').innerText(), /catalogue anime scored/);
     assert.ok(await page.locator('#dust-focus [data-studio-work]').count());
@@ -42,9 +50,7 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
     assert.equal(await page.locator('#recommendation-chart .dust-node').count(), displayed.length);
     assert.match(await page.locator('#dust-studio-scope').innerText(), new RegExp(`${titleScope.length} distinct catalogue anime`));
 
-    const reception = chart('reception');
     await reception.scrollIntoViewIfNeeded();
-    const marks = reception.locator('.reception-dot');
     await marks.first().waitFor();
     const expectedMarks = await page.evaluate(ids => {
       const { titleLookup } = AnivizMain.snapshot();
@@ -54,6 +60,8 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
       }).sort();
     }, titleScope);
     assert.deepEqual(await marks.evaluateAll(nodes => nodes.map(node => node.__data__.id).sort()), expectedMarks);
+    assert.ok(await marks.evaluateAll(nodes => nodes.every(node => node.getAttribute('stroke-width') === '1')));
+    assert.equal(await reception.locator('.reception-selection-ring').count(), 0);
     await marks.first().press('Enter');
     assert.equal(await page.locator('#detail-drawer').getAttribute('aria-label'), 'Anime details');
     assert.deepEqual(await selection(), pair);

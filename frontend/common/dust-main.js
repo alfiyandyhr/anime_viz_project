@@ -177,10 +177,12 @@
     if (recolor) refreshDustColors();
     const keysInScope = snapshot.selectedKeys.length ? snapshot.selectedKeys : snapshot.displayedKeys;
     const studioGroups = studios ? keysInScope.map(key => snapshot.lookup.get(key)?.record).filter(Boolean) : null;
+    const animeFor = id => snapshot.titleLookup.get(`anilist:${id}`).record;
     const records = group ? (actors
       ? [...new Set(snapshot.displayedDust.flatMap(match => match.record.memberIds))]
-      : snapshot.supportingIds).map(id => snapshot.titleLookup.get(`anilist:${id}`).record)
+      : snapshot.supportingIds).map(animeFor)
       : snapshot.displayedKeys.map(key => snapshot.lookup.get(key).record);
+    const receptionAnime = actors && snapshot.selectedKeys.length ? snapshot.supportingIds.map(animeFor) : records;
     const dustColors = new Map(snapshot.displayedDust.map(match => [match.key, dustColor(match)]));
     const metric = $('[data-dust-genre-metric]').value;
     const provider = AnivizDust.DIRECTIONS[snapshot.direction].dust;
@@ -190,7 +192,7 @@
         return record ? [String(record.id)] : [];
       });
     composition.update({ anime: records, selectedIds, hasSelection: !group,
-      selectionLabel: actors ? 'Credited to a selected voice actor' : null,
+      filmography: group ? receptionAnime : null,
       studioGroups,
       metric, movieRankLimit: reverse ? Math.max(2, snapshot.lookup.size) : null,
       onSelect: id => {
@@ -198,17 +200,15 @@
         if (!group) select(key);
         inspectTitle(key);
       },
-      dustColor: id => group ? DUST_UNIFORM_COLOR : dustColors.get(AnivizDust.keyFor(provider, id)),
+      dustColor: id => dustColors.get(AnivizDust.keyFor(provider, id)),
       dustMatchColor: key => dustColors.get(key), snapshot });
     const count = records.length, candidates = snapshot.candidateKeys.length;
     const filmographyScope = $('#dust-studio-scope');
     filmographyScope.hidden = !group;
-    if (studios) {
-      const label = snapshot.selectedKeys.length && studioGroups.length ? `Selected studios: ${studioGroups.map(studio => studio.title).join(', ')}` : 'Displayed studios';
-      filmographyScope.textContent = `${label} · ${count} distinct catalogue anime. Shared credits count once in title charts.`;
-    } else if (actors) {
-      filmographyScope.textContent = `${count} distinct anime credited to displayed voice actors${selectedIds.length
-        ? ` · ${selectedIds.length} credited to the selection: ${keysInScope.map(key => snapshot.lookup.get(key).record.title).join(', ')}` : ''}.`;
+    if (group) {
+      const selectedNames = snapshot.selectedKeys.map(key => snapshot.lookup.get(key)?.record.title).filter(Boolean);
+      const label = selectedNames.length ? `Selected ${group.noun}: ${selectedNames.join(', ')}` : `Displayed ${group.noun}`;
+      filmographyScope.textContent = `${label} · ${receptionAnime.length} distinct catalogue anime. Shared credits count once.`;
     }
     $('[data-dust-scope]').textContent = elements.filterSummary.textContent = group
       ? `${snapshot.displayedKeys.length} ${group.noun} shown`
@@ -244,13 +244,13 @@
         notes.studios = ['Studio coverage', () => true, 'Each circle shows a studio’s average score and total popularity. Circle area represents its catalogue anime count.'];
         notes.heatmap = ['Studio × genre', row => row.genres.length,
           'Each row counts that studio’s catalogue anime. Co-productions count for each credited studio. Up to 15 studios and 10 genres are shown.'];
-        notes.reception = ['Ratings', notes.reception[1], 'Circle area: favourites. Select an anime to open its details.'];
       }
     }
     Object.entries(notes).forEach(([kind, [label, predicate, suffix]]) => {
-      const available = records.filter(predicate).length;
+      const chartRecords = kind === 'reception' ? receptionAnime : records;
+      const available = chartRecords.filter(predicate).length;
       $(`[data-coverage="${kind}"]`).textContent = !reverse && snapshot.metadataStatus === 'unavailable' && ['studios', 'heatmap', 'reception'].includes(kind)
-        ? `${label} unavailable: metadata failed to load.` : (available < count ? `${label}: ${available} of ${count} · ` : '') + suffix;
+        ? `${label} unavailable: metadata failed to load.` : (available < chartRecords.length ? `${label}: ${available} of ${chartRecords.length} · ` : '') + suffix;
     });
     $('[data-dust-chips]').replaceChildren();
     Object.entries(snapshot.filters).filter(([, value]) => value !== null && value !== "" && value !== "All" && value !== 0).forEach(([key, value]) => {
@@ -449,14 +449,13 @@
     elements.searchInput.placeholder = studios ? 'e.g. MADHOUSE' : actors ? 'e.g. Kana Hanazawa' : reverse ? 'e.g. Pacific Rim' : 'e.g. Attack on Titan';
     $('#dust-ranking-title').textContent = `Full ${groupLabel || (reverse ? 'movie' : 'anime')} ranking`;
     $('#reception h3').textContent = group ? 'Score vs. popularity of catalogue anime' : reverse ? 'Score vs. popularity rank' : 'Score vs. popularity';
-    $('#dust-reception-guide').textContent = actors ? 'Select a voice actor in the field to outline their anime. Zoom in for posters. Select a title to open its details.'
-      : studios ? 'Zoom in for posters.' : 'Zoom in for posters. Select a title to open its details.';
+    $('#dust-reception-guide').textContent = 'Zoom in for posters. Select a title to open its details.';
     $('#content h3').textContent = studios ? 'Genres of catalogue anime' : 'Genres';
     $('#content + article h3').textContent = studios ? 'Release years of catalogue anime' : 'Release years';
     $('#dust-connection-title').textContent = group ? `How do ${group.noun} compare against each magnet?` : 'Which stories are similar—and which differ?';
     $('#dust-connection-selection').textContent = studios
       ? 'Select up to three studios here or in the field to focus the analysis below on their catalogue anime. Select a studio again to remove it.'
-      : actors ? 'Select up to three voice actors here or in the field to highlight their anime in the charts. Select an actor again to remove them.'
+      : actors ? 'Select up to three voice actors here or in the field to filter Score vs. popularity to their anime and highlight their contributions in the other charts. Select an actor again to remove them.'
         : 'Outlined titles are selected for comparison in the playground and here. Click an outlined title to remove it. Click any other title to open its details and add it to the comparison if there’s room for it. Compare up to three titles.';
     $('#dust-mirror-guide').textContent = `Zoom in for ${studios ? 'studio names' : actors ? 'portraits' : 'posters'}. Select a title magnet to show it in the In Focus panel. Drag magnets or use arrow keys to move them. Select ${group?.noun || 'titles'} to compare them, or click empty space to remove the latest selection.`;
     $('[data-dust-genre-metric] option[value="popularity"]').textContent = reverse ? 'Popularity score' : 'Popularity';
