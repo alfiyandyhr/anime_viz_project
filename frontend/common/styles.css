@@ -200,6 +200,39 @@ img {
 }
 .view-menu nav a { padding: 9px 10px; border-radius: 5px; }
 .view-menu nav a:hover, .view-menu nav a[aria-current="page"] { background: var(--primary-tint); }
+
+/* Reveal the native disclosure like a drawer while preserving link and focus behavior. */
+.view-menu summary::after { transition: transform 280ms cubic-bezier(.22, 1, .36, 1); }
+@supports (interpolate-size: allow-keywords) and (transition-behavior: allow-discrete) and selector(::details-content) {
+  .view-menu { interpolate-size: allow-keywords; }
+  .view-menu::details-content {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: 208px;
+    height: 0;
+    overflow: hidden;
+    opacity: 0;
+    border-radius: 9px;
+    box-shadow: var(--shadow);
+    transition:
+      height 280ms cubic-bezier(.22, 1, .36, 1),
+      opacity 200ms ease,
+      content-visibility 280ms allow-discrete;
+  }
+  .view-menu[open]::details-content { height: auto; opacity: 1; content-visibility: visible; }
+  .view-menu nav { position: static; width: 100%; box-shadow: none; }
+  @media (max-width: 480px) {
+    .view-menu::details-content { left: auto; right: 0; }
+  }
+}
+@media (max-width: 480px) {
+  .view-menu nav { left: auto; right: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .view-menu::details-content, .view-menu summary::after { transition: none; }
+}
+
 :where(a, button, summary):focus-visible,
 :where(html:not(.pointer-input) :is(input, select)):focus-visible {
   outline: 2px solid var(--cyan);
