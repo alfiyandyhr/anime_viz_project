@@ -263,7 +263,7 @@ class AniListService:
             "Accept": "application/json",
             "Content-Type": "application/json",
             "User-Agent": (
-                "AnIViz/1.0 "
+                "AniMoViz/1.0 "
                 "(educational data-visualization project)"
             )
         })
@@ -645,7 +645,7 @@ class AniListService:
 
         return {
             "meta": {
-                "project": "AnIViz — Anime Industry Visualization",
+                "project": "AniMoViz: Anime and Movie Visualization",
                 "generated_at": iso_now(),
                 "generated_epoch": generated_epoch,
                 "source": "AniList GraphQL API",

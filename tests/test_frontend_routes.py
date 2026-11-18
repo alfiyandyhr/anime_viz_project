@@ -51,6 +51,7 @@ class FrontendRoutesTests(unittest.TestCase):
                 ("/data/movie_details.json", "data/movie_details.json"),
                 ("/data/story_movie_recommendations.json", "data/story_movie_recommendations.json"),
                 ("/assets/tmdb-logo.svg", "assets/tmdb-logo.svg"),
+                ("/assets/anilist-logo.png", "assets/anilist-logo.png"),
                 ("/frontend/recommendations/app.js", "frontend/recommendations/app.js"),
                 ("/frontend/recommendations/dust-magnet.js", "frontend/recommendations/dust-magnet.js"),
             ]:

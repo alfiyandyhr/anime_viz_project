@@ -47,8 +47,9 @@ def recommendation_data():
 
 
 @app.get("/assets/tmdb-logo.svg")
-def tmdb_logo():
-    return send_from_directory(PROJECT_ROOT / "assets", "tmdb-logo.svg")
+@app.get("/assets/anilist-logo.png")
+def attribution_logo():
+    return send_from_directory(PROJECT_ROOT / "assets", Path(request.path).name)
 
 
 # Keep legacy paths as small HTML redirects so browser fragments (including
@@ -89,7 +90,7 @@ def health():
 
     return jsonify({
         "status": "ok",
-        "service": "AnIViz API",
+        "service": "AniMoViz API",
         "anilist_endpoint": service.anilist_url,
         "cache": cache_info
     })
@@ -166,7 +167,7 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
 
     print("=" * 68)
-    print("AnIViz — Anime Industry Visualization")
+    print("AniMoViz: Anime and Movie Visualization")
     print(f"Dashboard: http://localhost:{port}")
     print(f"Health API: http://localhost:{port}/api/health")
     print("=" * 68)

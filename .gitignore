@@ -17,4 +17,6 @@ data/anilist_story_cache.json
 data/semantic_similarity/output/
 
 # Keep local asset documents out of version control.
-/assets/
+/assets/*
+!/assets/anilist-logo.png
+!/assets/tmdb-logo.svg

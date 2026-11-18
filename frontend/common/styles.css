@@ -91,8 +91,20 @@ img {
   display: flex; align-items: center; gap: 20px; padding: 0 var(--page-gutter);
   border-bottom: 1px solid var(--border); background: #0d1221;
 }
-.brand { font-family: "Space Grotesk", sans-serif; font-size: 1.08rem; font-weight: 700; }
-.view-menu { position: relative; font-size: .82rem; }
+.brand {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.brand-subtitle {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-soft);
+  font-size: .68rem;
+  font-weight: 500;
+}
+.view-menu { position: relative; flex: none; font-size: .82rem; }
 .view-menu summary, .field-options > summary {
   display: flex; align-items: center; justify-content: space-between; gap: 18px;
   list-style: none; cursor: pointer; padding: 5px 10px; border: 1px solid var(--border-strong);

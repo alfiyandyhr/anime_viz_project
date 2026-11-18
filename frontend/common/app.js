@@ -80,7 +80,6 @@ function renderScopePageCopy() {
     const title = head?.querySelector?.("h1, h2");
     if (title) title.textContent = titles[chapter];
     head?.querySelectorAll?.(".chapter-eyebrow, .chapter-lede").forEach(node => node.remove());
-    document.title = `AnIViz — ${titles[chapter]}`;
   }
 }
 

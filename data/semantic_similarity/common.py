@@ -193,7 +193,7 @@ class JsonClient:
         self.interval = interval
         self.api_key = api_key
         self.headers = {"Accept": "application/json",
-                        "User-Agent": "AnIViz-Semantic-Research/1.0", **(headers or {})}
+                        "User-Agent": "AniMoViz-Semantic-Research/1.0", **(headers or {})}
         self.next_request = 0.0
 
     def wait(self, seconds):

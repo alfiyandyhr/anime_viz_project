@@ -1,6 +1,6 @@
-# AnIViz — Anime Industry Visualization
+# AniMoViz: Anime and Movie Visualization
 
-A visual story discovery tool built with Python/Flask, AniList GraphQL API, and D3.js. Dust & Magnet opens directly, with linked analysis below the field. One compact view dropdown connects Dust & Magnet, History, Network, and Full Catalogue.
+Explore story similarities between anime and live-action movies in a visualization built with Python/Flask and D3.js, using data from AniList and TMDB. Dust & Magnet opens directly, with linked analysis below the field. One compact view dropdown connects Dust & Magnet, History, Network, and Full Catalogue.
 
 **Live site:** https://alfiyandyhr.github.io/anime_viz_project/
 

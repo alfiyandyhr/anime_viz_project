@@ -13,7 +13,7 @@
     content="Explore anime titles, studios, voice actors, or movie titles with up to three magnets based on titles, genre cohorts, popularity, or score."
   >
 
-  <title>AnIViz — Dust &amp; Magnet</title>
+  <title>AniMoViz: Anime and Movie Visualization</title>
 
   <link
     rel="preconnect"
@@ -55,7 +55,10 @@
   <div class="app-shell">
     <!-- Shared view navigation -->
     <header class="site-header">
-      <a class="brand" href="../dust-magnet/index.html" aria-label="AnIViz home">AnIViz</a>
+      <a class="brand" href="../dust-magnet/index.html">
+        AniMoViz
+        <span class="brand-subtitle">Anime and Movie Visualization</span>
+      </a>
       <details class="view-menu" data-view-menu>
         <summary aria-controls="view-destinations">Dust &amp; Magnet</summary>
         <nav id="view-destinations" aria-label="Views">
@@ -311,10 +314,15 @@
           </div>
         <div class="data-freshness"><span id="footer-generated">Data not loaded</span> · <span id="footer-cache"></span></div></details>
         <div class="stage-foot recommendation-credits">
-          <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer" aria-label="The Movie Database">
-            <img src="../../assets/tmdb-logo.svg" alt="TMDB" width="72" height="52">
-          </a>
-          <p>This product uses the TMDB API but is not endorsed or certified by TMDB. Anime metadata: <a href="https://anilist.co/" target="_blank" rel="noopener noreferrer">AniList</a>.</p>
+          <div class="recommendation-credit-logos">
+            <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer" aria-label="The Movie Database">
+              <img src="../../assets/tmdb-logo.svg" alt="TMDB" width="72" height="52">
+            </a>
+            <a href="https://anilist.co/" target="_blank" rel="noopener noreferrer">
+              <img src="../../assets/anilist-logo.png" alt="AniList" width="52" height="52">
+            </a>
+          </div>
+          <p>This product uses the TMDB API but is not endorsed or certified by TMDB. Anime metadata from <a href="https://anilist.co/" target="_blank" rel="noopener noreferrer">AniList</a>.</p>
         </div>
       </section>
 
