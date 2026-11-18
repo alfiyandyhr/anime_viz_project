@@ -4,9 +4,10 @@
   const posterZoom = 6;
   const maxZoom = 12;
 
-  function attach({ container, svg, d3, extent, label, onStart, onZoom, zoomInPoint, canDragFrom = () => true }) {
+  function attach({ container, svg, d3, extent, label, onStart, onZoom, zoomInPoint, zoomContent = "posters",
+    canDragFrom = () => true }) {
     svg.attr("role", "group").attr("tabindex", 0)
-      .attr("aria-description", "Zoom in for posters. When zoomed in, drag or use arrow keys to pan.");
+      .attr("aria-description", `Zoom in for ${zoomContent}. When zoomed in, drag or use arrow keys to pan.`);
     const controls = d3.select(container).append("div").attr("class", "dust-zoom-controls")
       .attr("role", "group").attr("aria-label", `${label} zoom controls`)
       .html(`<button type="button" aria-label="Zoom out" title="Zoom out">−</button>

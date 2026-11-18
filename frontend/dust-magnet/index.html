@@ -10,7 +10,7 @@
 
   <meta
     name="description"
-    content="Explore anime or movie titles with up to three magnets based on titles, genre cohorts, popularity, or score."
+    content="Explore anime titles, studios, or movie titles with up to three magnets based on titles, genre cohorts, popularity, or score."
   >
 
   <title>AnIViz — Dust &amp; Magnet</title>
@@ -80,6 +80,7 @@
             <span>Dust type</span>
             <select id="dust-type" disabled>
               <option value="anime-titles">Anime titles</option>
+              <option value="anime-studios">Anime studios</option>
               <option value="movie-titles">Movie titles</option>
             </select>
           </label>
@@ -133,6 +134,14 @@
               <option value="90">90 · explore</option>
             </select>
           </label>
+          <label id="studio-minimum-control" class="picker-select-label" for="studio-minimum" hidden>
+            <span>Minimum scored works</span>
+            <select id="studio-minimum">
+              <option value="1">1 work</option>
+              <option value="3" selected>3 works</option>
+              <option value="5">5 works</option>
+            </select>
+          </label>
           <fieldset class="dust-motion-controls" hidden>
             <legend>Magnet strength</legend>
             <div id="dust-magnet-strengths"></div>
@@ -169,7 +178,7 @@
                     </select>
                   </label>
 
-                  <label data-anime-only>
+                  <label data-title-studio-filter>
                     <span>Studio</span>
                     <select id="studio-filter">
                       <option value="All">All studios</option>
@@ -255,17 +264,18 @@
         <section id="dust-analysis" aria-label="Displayed dust analysis">
 
           <article class="chart-card dust-analysis-wide"><p class="chart-kicker">Compare similarities &amp; differences</p>
-            <h3>Which stories are similar—and which differ?</h3>
+            <h3 id="dust-connection-title">Which stories are similar—and which differ?</h3>
             <p id="dust-connection-method">Select a magnet to rank the displayed titles by cosine similarity. Thicker curves show higher scores within that magnet’s range. Dust members lists the titles that score highest for the selected magnet. Scroll either list to see more titles.</p>
-            <p>Outlined titles are selected for comparison in the playground and here. Click an outlined title to remove it. Click any other title to open its details and add it to the comparison if there’s room for it. Compare up to three titles.</p>
+            <p id="dust-connection-selection">Outlined titles are selected for comparison in the playground and here. Click an outlined title to remove it. Click any other title to open its details and add it to the comparison if there’s room for it. Compare up to three titles.</p>
             <p data-coverage="connections"></p><div class="dust-linked-chart" role="region" aria-label="Similarity connections" data-dust-chart="connections"></div></article>
           <div class="dust-analysis-wide dust-reception">
             <article class="chart-card" id="reception"><h3>Score vs. popularity</h3>
-              <p data-coverage="reception"></p><p>Zoom in for posters. Select a title to open its details.</p>
+              <p id="dust-studio-scope" hidden></p>
+              <p data-coverage="reception"></p><p id="dust-reception-guide">Zoom in for posters. Select a title to open its details.</p>
               <div class="dust-linked-chart" data-dust-chart="reception"></div></article>
             <article class="chart-card" aria-labelledby="dust-mirror-title">
               <h3 id="dust-mirror-title">Dust &amp; Magnet mirror</h3>
-              <p>Zoom in for posters. Select a title magnet to show it in the In Focus panel. Drag magnets or use arrow keys to move them. Select titles to compare them, or click empty space to remove the latest selection.</p>
+              <p id="dust-mirror-guide">Zoom in for posters. Select a title magnet to show it in the In Focus panel. Drag magnets or use arrow keys to move them. Select titles to compare them, or click empty space to remove the latest selection.</p>
               <div class="dust-linked-chart" id="dust-mirror"></div>
             </article>
           </div>
@@ -276,7 +286,7 @@
             <p data-coverage="years"></p><div class="dust-linked-chart" data-dust-chart="years"></div></article>
           <article class="chart-card" id="creators"><h3>Studios</h3>
             <p data-coverage="studios"></p><div class="dust-linked-chart" data-dust-chart="studios" data-anime-chart></div></article>
-          <article class="chart-card" data-anime-only><h3>Studio × genre</h3>
+          <article class="chart-card" data-anime-only><h3 id="dust-heatmap-title">Studio × genre</h3>
             <p data-coverage="heatmap"></p><div class="dust-linked-chart" role="region" tabindex="0" aria-label="Studio genre chart, scroll horizontally" data-dust-chart="heatmap" data-anime-chart></div></article>
           <article class="chart-card dust-analysis-wide"><h3 id="dust-ranking-title">Full anime ranking</h3>
             <p data-dust-ranking-note></p>
@@ -297,6 +307,7 @@
             <article><h3>One million comparisons</h3><p id="recommendation-method-data">1,000 popular AniList anime × 1,000 popular TMDB movies. Anime and movie dust use the same pair scores from the complete score matrix.</p></article>
             <article><h3>Story similarity</h3><p id="recommendation-method-model">Qwen3-Embedding-4B embeds titles, genres, tags, and synopses. Cosine similarity compares the normalized vectors; ratings and popularity do not affect the score.</p></article>
             <article><h3>Genre cohorts</h3><p>Genre magnets use mean cosine similarity. For each dust title, the score is the arithmetic mean of its signed cosine similarities to every sampled title with that genre in the magnet catalogue. A title can belong to multiple cohorts and contribute to each of their scores. Each magnet contributes one score to the combined average. Filters narrow the dust while the cohorts stay fixed.</p></article>
+            <article><h3>Anime studios</h3><p>Each studio represents sampled anime with an AniList main-studio credit. Story magnets average those titles’ signed cosine scores. Popularity and Score use medians. Studios use the same scored works across active magnets, and attraction percentiles use all studios with scores. The minimum works setting and filters change which studios can appear in the field. Genre, format, year and score filters find studios with a sampled title meeting those criteria. The analysis charts cover the full sampled filmographies for the studios in scope.</p></article>
             <article><h3>Popularity and score</h3><p>Popularity uses AniList list users for anime and TMDB popularity for movies. Score uses AniList ratings out of 100 and TMDB ratings out of 10. With either magnet active, each magnet’s raw values become attraction percentiles from 0 to 1. The reference sample includes titles with values for every active metric. Ties share the average rank and a sample of one gets 0.5. Dot count and filters leave the reference sample fixed. The full ranking keeps titles with missing values and supports sorting by each magnet’s raw values.</p></article>
 
             <article><h3>Reading the magnets</h3><p>The field samples each magnet’s strongest matches, then fills remaining slots by average cosine or average attraction percentile. Similar scores draw a dot into the space between magnets. Nearby dots can shift it to make room. Hover, focus, or select a dot to see its links. Thicker links show which magnets pull more strongly on that dot. Coloring uses each title’s highest similarity score, or its highest attraction percentile when Popularity or Score is active. Hover or focus a dot, or use the full ranking table, to compare scores. Select up to three dots with a click, tap, Enter, or Space. Select again to remove a title, or click empty space to remove the latest selection.</p></article>

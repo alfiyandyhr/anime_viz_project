@@ -305,8 +305,14 @@
     function renderStudioChart() {
       clearChart(container);
 
-      const studios = ChartData.studios(context.anime, context.selectedIds)
-        .filter((item) => item.totalPopularity > 0 && Number.isFinite(item.averageScore));
+      const groupMode = Boolean(context.studioGroups);
+      const summaries = groupMode ? context.studioGroups.map(group => ({
+        studio: group.title, key: group.key, count: group.memberIds.length,
+        popularity: group.medianPopularity, score: group.medianScore
+      })) : ChartData.studios(context.anime, context.selectedIds).map(item => ({
+        ...item, key: item.studio, popularity: item.totalPopularity, score: item.averageScore
+      }));
+      const studios = summaries.filter(item => item.popularity > 0 && Number.isFinite(item.score));
 
       if (!studios.length) {
         renderEmpty(container, "No studios with score and popularity data match the filters.");
@@ -316,11 +322,14 @@
       // Draw smaller bubbles last so they remain reachable where circles overlap.
       studios.sort((a, b) => d3.descending(a.count, b.count));
 
+      const popularityLabel = groupMode ? "Median AniList list users" : "Total popularity";
+      const scoreLabel = groupMode ? "Median score" : "Average score";
       const { svg, x, y, draw } = drawPopularityAxes(studios, {
-        popularity: (item) => item.totalPopularity,
-        score: (item) => item.averageScore,
+        popularity: (item) => item.popularity,
+        score: (item) => item.score,
         label: "Studio score versus popularity bubble chart",
-        popularityLabel: "Total popularity (log scale)"
+        popularityLabel: `${popularityLabel} (log scale)`,
+        scoreLabel: `${scoreLabel} / 100`
       });
       draw();
 
@@ -330,11 +339,11 @@
 
       svg.append("g")
         .selectAll("circle")
-        .data(studios, (item) => item.studio)
+        .data(studios, (item) => item.key)
         .join("circle")
         .attr("class", "studio-dot")
-        .attr("cx", (item) => x(item.totalPopularity))
-        .attr("cy", (item) => y(item.averageScore))
+        .attr("cx", (item) => x(item.popularity))
+        .attr("cy", (item) => y(item.score))
         .attr("r", (item) => radius(item.count))
         .attr("fill", "var(--purple)")
         .attr("fill-opacity", 0.8)
@@ -344,9 +353,9 @@
           showTooltip(event, `
             <strong>${escapeHTML(item.studio)}</strong>
             <span>
-              Total popularity: ${formatNumber(item.totalPopularity)}<br>
-              Average score: ${item.averageScore.toFixed(1)}/100<br>
-              Matching titles: ${formatNumber(item.count)}
+              ${popularityLabel}: ${formatNumber(item.popularity)}<br>
+              ${scoreLabel}: ${item.score.toFixed(1)}/100<br>
+              ${groupMode ? "Sampled anime" : "Matching titles"}: ${formatNumber(item.count)}
             </span>
           `);
         })
@@ -365,10 +374,14 @@
         return;
       }
 
-      const topStudios = ChartData.studios(anime, context.selectedIds)
+      const studios = context.studioGroups ? context.studioGroups.map(group => ({
+        key: group.key, title: group.title, members: new Set(group.memberIds), count: group.memberIds.length
+      })) : ChartData.studios(anime, context.selectedIds).map(item => ({
+        key: item.studio, title: item.studio, members: new Set(item.ids), count: item.count
+      }));
+      const topStudios = studios
         .sort((a, b) => d3.descending(a.count, b.count))
-        .slice(0, 15)
-        .map((item) => item.studio);
+        .slice(0, 15);
 
       const topGenres = ChartData.genres(anime, context.selectedIds)
         .sort((a, b) => d3.descending(a.count, b.count))
@@ -377,15 +390,14 @@
 
       const cells = [];
 
-      topStudios.forEach((studio) => {
+      topStudios.forEach(({ key, title, members }) => {
+        const works = anime.filter(item => members.has(String(item.id)));
         topGenres.forEach((genre) => {
-          const matchingAnime = anime.filter((item) => (
-            item.studio_names.includes(studio)
-            && item.genres.includes(genre)
-          ));
+          const matchingAnime = works.filter(item => item.genres.includes(genre));
 
           cells.push({
-            studio,
+            studio: title,
+            studioKey: key,
             genre,
             count: matchingAnime.length,
             titles: matchingAnime.map((item) => item.title),
@@ -395,7 +407,7 @@
       });
 
       const width = Math.max(container.clientWidth, 560);
-      const height = Math.max(container.clientHeight, 480);
+      const height = context.studioGroups ? Math.max(128, 84 + 34 * topStudios.length) : Math.max(container.clientHeight, 480);
       const margin = { top: 64, right: 25, bottom: 20, left: 130 };
 
       const svg = d3.select(container)
@@ -408,7 +420,7 @@
         .padding(0.08);
 
       const y = d3.scaleBand()
-        .domain(topStudios)
+        .domain(topStudios.map(studio => studio.key))
         .range([margin.top, height - margin.bottom])
         .padding(0.08);
 
@@ -421,7 +433,7 @@
         .data(cells)
         .join("rect")
         .attr("x", (item) => x(item.genre))
-        .attr("y", (item) => y(item.studio))
+        .attr("y", (item) => y(item.studioKey))
         .attr("width", x.bandwidth())
         .attr("height", y.bandwidth())
         .attr("rx", 5)
@@ -462,13 +474,14 @@
         .attr("transform", `translate(${margin.left},0)`)
         .call(
           d3.axisLeft(y)
-            .tickFormat((value) => truncate(value, 22))
+            .tickFormat((key) => truncate(topStudios.find(studio => studio.key === key).title, 22))
             .tickSize(0)
         )
         .call((group) => group.select(".domain").remove());
     }
 
-    function drawPopularityAxes(data, { popularity, score, label, popularityLabel, rankLimit }) {
+    function drawPopularityAxes(data, { popularity, score, label, popularityLabel, rankLimit,
+      scoreLabel = rankLimit ? "TMDB score / 10" : "Average score / 100" }) {
       const zoomable = kind === "reception";
       const width = Math.max(container.clientWidth, 320);
       const height = Math.max(container.clientHeight, 473);
@@ -541,7 +554,7 @@
         .attr("x", -(margin.top + height - margin.bottom) / 2)
         .attr("y", 16)
         .attr("text-anchor", "middle")
-        .text(rankLimit ? "TMDB score / 10" : "Average score / 100");
+        .text(scoreLabel);
 
       const clipId = `reception-plot-clip-${++nextClipId}`;
       svg.append("clipPath").attr("id", clipId).append("rect")
@@ -767,7 +780,7 @@
         .attr("aria-label", item => item.title && (context.movieRankLimit
           ? `${item.title}: TMDB score ${item.vote_average} / 10; TMDB popularity rank #${formatNumber(item.popularity_rank)}; genres ${item.genres.join(", ") || "Unknown"}`
           : `${item.title}: score ${item.average_score} / 100; popularity ${formatNumber(item.popularity)}; favourites ${Number.isFinite(item.favourites) ? formatNumber(item.favourites) : 'Unknown'}; genres ${item.genres.join(", ") || "Unknown"}`) || item.genre && item.studio && `${item.studio} × ${item.genre}: ${item.count}`
-          || item.studio && `${item.studio}: total popularity ${formatNumber(item.totalPopularity)}; average score ${item.averageScore.toFixed(1)} / 100; ${item.count} matching titles`
+          || item.studio && `${item.studio}: ${context.studioGroups ? "median AniList list users" : "total popularity"} ${formatNumber(item.popularity)}; ${context.studioGroups ? "median" : "average"} score ${item.score.toFixed(1)} / 100; ${item.count} ${context.studioGroups ? "sampled anime" : "matching titles"}`
           || `${item.genre ?? item.year}: ${item.count} titles; average score ${averageScore(item)}; ${popularityLabel()} ${formatNumber(item.totalPopularity)}`)
         .on("keydown", selectable ? function (event, item) {
           if (["Enter", " "].includes(event.key)) {

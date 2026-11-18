@@ -14,7 +14,7 @@ The compact dropdown contains exactly four destinations:
 
 | View | Data and interactions |
 | --- | --- |
-| Dust & Magnet | Choose anime or movie titles and a field of 30, 60, or 90 dots. Both dust types include similarity connections, a field mirror, reception, genres, release years, and a full ranking. Select a dust dot or a title magnet to see it in the In Focus panel. Anime dust also shows studio charts. |
+| Dust & Magnet | Choose Anime titles, Anime studios, or Movie titles, with a field of up to 30, 60, or 90 dots. All three include similarity connections, a field mirror, reception, genres, release years, and a full ranking. Select a dust dot or a title magnet to see it in the In Focus panel. Both anime dust types also show studio charts. |
 | History | Scroll a pair of release timelines to see each year’s most popular anime and its closest movie match. Both titles have synopses and the connection shows cosine similarity. |
 | Network | Actor/character/work collaboration graph, defaulting to Current dust when a saved anime-dust context exists, otherwise Catalogue. A local selector switches scopes without changing other views. The 35-work display cap and sampled Japanese cast credits are disclosed. |
 | Full Catalogue | The loaded 1,000-title metadata sample, with its own search, filters, sorting, pagination, details and automatic shortlist comparison. Saved movies never narrow its scope. |
@@ -31,7 +31,7 @@ Open **Filter** for dust filters.
 Movie dust supports title and alias search,
 genre, and release year.
 
-Filters narrow the sampled candidates without refilling them. The field and
+In title modes, filters narrow the sampled candidates without refilling them. The field and
 linked charts share the displayed set. The full similarity ranking covers every
 title in the dust catalogue, marks displayed rows, and sorts by any active
 magnet or their arithmetic mean. Sorting and dragging preserve membership,
@@ -44,6 +44,15 @@ deselects the latest selection. Dragging and Reset positions preserve selection.
 Remove or Clear selection also updates the comparison. Every ranking row opens
 the title’s details independently of the selection.
 Catalogue shortlists are independent and remain in memory for that page visit.
+
+**Anime studios** groups the sampled anime by AniList main-studio credit. Select
+up to three studios to compare their coverage, filmography medians, and magnet
+scores. Reception, genres, and release years show their combined sampled anime
+and count each co-production once. Genres by studio keeps each studio’s own
+credits, so co-productions appear in each credited studio’s row. Clear the
+selection to analyse all studios in the field. The field, mirror, similarity
+connections, and full ranking continue to compare studios against the magnets.
+Network’s **Current dust** uses the same distinct anime as the title charts.
 
 ## Routes and session state
 
@@ -289,6 +298,14 @@ With **Movie titles**, try **Attack on Titan** with **Sci-Fi anime**. Each cohor
 score averages the signed cosines to its sampled titles. A cohort occupies one
 slot and contributes one score to the combined average. Its membership stays
 fixed when you filter the dust.
+
+**Anime studios** keeps the movie magnets from **Anime titles** when you switch
+between them. Story magnets use the mean signed cosine of a studio’s sampled
+anime, while **Popularity** and **Score** use medians. Each studio uses the same
+scored anime across all active magnets. The field starts at three scored works
+per studio. Search studio names under **Filter**, or lower **Minimum scored
+works** to see smaller filmographies. The field filters leave studio scores
+and sampled filmographies fixed, and the full ranking includes smaller studios.
 
 Choose **Popularity** to use AniList list-user counts for anime or TMDB
 popularity for movies. Choose **Score** to use AniList ratings out of 100 or

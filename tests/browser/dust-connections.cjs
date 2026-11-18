@@ -286,14 +286,20 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     await page.waitForFunction(() => AnivizMain.snapshot().metadataStatus === 'ready');
     await check();
     await chart.evaluate(el => el.scrollIntoView({block:'center'}));
-    const similarityLines = await members.getByRole('columnheader', {name:'Similarity', exact:true}).evaluate(el => {
+    // Read the heading and bounds together, since the visibility observer may redraw the chart on entry.
+    const layout = await page.waitForFunction(() => {
+      const map = document.querySelector('.dust-connection-map');
+      const members = document.querySelector('.dust-member-panel');
+      const heading = members?.querySelector('th.dust-member-similarity');
+      if (!map || !heading) return null;
       const range = document.createRange();
-      range.selectNodeContents(el);
-      return range.getClientRects().length;
+      range.selectNodeContents(heading);
+      return { similarityLines: range.getClientRects().length,
+        stacked: members.getBoundingClientRect().top >= map.getBoundingClientRect().bottom };
     });
+    const { similarityLines, stacked } = await layout.jsonValue();
     assert.equal(similarityLines, 1, 'the Similarity header fits on one line');
-    const [mobileMapBounds, mobileMemberBounds] = await Promise.all([map.boundingBox(), members.boundingBox()]);
-    assert.ok(mobileMemberBounds.y >= mobileMapBounds.y + mobileMapBounds.height,'member ranking stacks below the map on mobile');
+    assert.ok(stacked, 'member ranking stacks below the map on mobile');
     const overflow = await page.evaluate(() => ({width:innerWidth,scroll:document.documentElement.scrollWidth,
       outside:[...document.querySelectorAll('body *')].filter(el => {
         const rect=el.getBoundingClientRect(); return rect.right>innerWidth && rect.width>0;

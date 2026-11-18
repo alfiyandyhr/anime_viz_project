@@ -377,13 +377,13 @@ function renderDustRecommendations() {
   const snapshot = AnivizMain.snapshot();
   const { magnets, magnetKeys, mixed, displayedDust, direction, example } = snapshot;
   const savedMetrics = AnivizDust.METRIC_MAGNET_TYPES.map(type => snapshot[type]);
-  const reverse = direction === AnivizDust.REVERSE;
-  const noun = reverse ? "movies" : "anime";
+  const reverse = direction === AnivizDust.REVERSE, studios = direction === AnivizDust.STUDIOS;
+  const noun = studios ? "studios" : reverse ? "movies" : "anime";
   const container = document.querySelector("#recommendation-chart");
   const mirror = document.querySelector("#dust-mirror");
   renderDustLegend(snapshot);
   document.querySelector("#recommendation-content").hidden = false;
-  document.querySelector("#recommendation-chart-title").textContent = reverse ? "Movies shown" : "Anime shown";
+  document.querySelector("#recommendation-chart-title").textContent = studios ? "Studios shown" : reverse ? "Movies shown" : "Anime shown";
   document.querySelector("#movie-magnets").innerHTML = magnetKeys.map(key => {
     const index = magnets.findIndex(magnet => magnet.key === key);
     const magnet = magnets[index] || savedMetrics.find(magnet => magnet.key === key);
@@ -398,6 +398,15 @@ function renderDustRecommendations() {
     button.setAttribute("aria-pressed", magnets.some(magnet => magnet.key === button.dataset.magnetKey));
   });
   document.querySelector("#reset-magnets").disabled = !magnets.length;
+  if (studios && snapshot.metadataStatus !== "ready") {
+    const unavailable = snapshot.metadataStatus === "unavailable";
+    const message = unavailable ? "Studio credits could not be loaded." : "Loading AniList studio credits…";
+    container.innerHTML = `<div class="dust-empty" role="status"><p>${message}</p>${unavailable
+      ? '<button type="button" class="small-button ghost" id="studio-credits-retry">Retry studio credits</button>' : ""}</div>`;
+    renderEmpty(mirror, message);
+    document.querySelector("#studio-credits-retry")?.addEventListener("click", AnivizMain.loadMetricData);
+    return;
+  }
   if (!magnets.length) {
     dustChart = null;
     const message = magnetKeys.length ? "Check the data status of your saved magnets or add another magnet."
@@ -419,10 +428,13 @@ function renderDustRecommendations() {
     return;
   }
   renderDustChart(container, mirror, magnets, displayedDust, mixed);
+  if (studios && !displayedDust.length) {
+    document.querySelector("[data-dust-scope]").textContent = "No studios meet the current works minimum and filters.";
+  }
   highlightRecommendation();
 }
 
-function createDustView(container, matches, anchors, width, height, onMove, label, mixed) {
+function createDustView(container, matches, anchors, width, height, onMove, label, mixed, studios) {
   const svg = d3.select(container).append("svg").attr("viewBox", `0 0 ${width} ${height}`)
     .attr("width", width).attr("height", height).attr("class", "dust-map")
     .attr("aria-label", `${label} ${mixed ? "attraction to" : "similarity to"} ${anchors.map(({ magnet }) => magnet.title).join(", ")}`);
@@ -459,7 +471,7 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
   const dots = scene.append("g").selectAll("g").data(matches, (match) => match.key).join("g")
     .attr("class", "dust-node").attr("data-match-id", (match) => match.key)
     .attr("role", "button").attr("tabindex", 0).attr("aria-controls", "dust-focus recommendation-detail")
-    .attr("aria-label", (match) => `${match.record.title}. ${anchors.map(({ magnet }, index) => mixed ? AnivizDust.mixedEvidence(match, magnet, index)
+    .attr("aria-label", (match) => `${match.record.title}. ${studios ? `${AnivizDustDetails.studioCoverage(match)}. ` : ""}${anchors.map(({ magnet }, index) => mixed ? AnivizDust.mixedEvidence(match, magnet, index)
       : `${AnivizDust.magnetScoreLabel(magnet)}: ${match.scores[index].toFixed(3)}`).join(". ")}. Toggle selection for details or comparison.`)
     .on("mouseenter focus", (event, match) => {
       if (event.type === "focus") focused = match.key;
@@ -467,7 +479,9 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
       drawPreview();
       const rect = event.currentTarget.getBoundingClientRect();
       const pointer = event.type === "focus" ? { clientX: rect.x + rect.width / 2, clientY: rect.y + rect.height / 2 } : event;
-      showTooltip(pointer, `<strong>${escapeHTML(match.record.title)}</strong><span>${match.key.startsWith("anilist:") ? escapeHTML(humanize(match.record.format)) + " · " : ""}${match.record.year || "Year unknown"}</span>`
+      const subtitle = studios ? AnivizDustDetails.studioCoverage(match)
+        : `${match.key.startsWith("anilist:") ? escapeHTML(humanize(match.record.format)) + " · " : ""}${match.record.year || "Year unknown"}`;
+      showTooltip(pointer, `<strong>${escapeHTML(match.record.title)}</strong><span>${subtitle}</span>`
         + anchors.map(({ magnet, color }, index) => `<span class="dust-tooltip-score"><i style="background:${color}"></i>${mixed
           ? `<span>${escapeHTML(AnivizDust.magnetScoreLabel(magnet))}: ${AnivizDust.formatRawScore(match.rawScores[index], magnet)}<br>
             Attraction percentile: ${AnivizDust.formatPercentile(match.scores[index])}</span>`
@@ -495,7 +509,7 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
   const grains = dots.append("circle").attr("class", "dust-grain").attr("r", 4.5).attr("fill", AnivizMain.dustColor);
   let posterImages, posterTitles;
   function drawArtwork() {
-    if (!posterImages) return;
+    if (!posterImages || studios) return;
     const { lookup } = AnivizMain.snapshot();
     AnivizPosterZoom.drawArtwork(posterImages, match => {
       const record = lookup.get(match.key)?.record || match.record;
@@ -553,6 +567,7 @@ function createDustView(container, matches, anchors, width, height, onMove, labe
 
   const camera = AnivizPosterZoom.attach({
     container, svg, d3, label, extent: [[0, 0], [width, height]],
+    zoomContent: studios ? "studio names" : "posters",
     canDragFrom: target => !target.closest(".dust-magnet"),
     onStart() {
       hovered = focused = null;
@@ -613,9 +628,10 @@ function renderDustChart(container, mirror, magnets, matches, mixed) {
   for (const anchor of anchors) {
     Object.assign(anchor, constrainMagnetPosition(anchor, anchor.x, anchor.y, anchors, width, height));
   }
-  const noun = snapshot.direction === AnivizDust.REVERSE ? "movies" : "anime";
-  const views = [createDustView(container, matches, anchors, width, height, moveAnchor, `Displayed ${noun}`, mixed),
-    createDustView(mirror, matches, anchors, width, height, moveAnchor, `Mirror of ${noun}`, mixed)];
+  const studios = snapshot.direction === AnivizDust.STUDIOS;
+  const noun = studios ? "studios" : snapshot.direction === AnivizDust.REVERSE ? "movies" : "anime";
+  const views = [createDustView(container, matches, anchors, width, height, moveAnchor, `Displayed ${noun}`, mixed, studios),
+    createDustView(mirror, matches, anchors, width, height, moveAnchor, `Mirror of ${noun}`, mixed, studios)];
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const nodes = createDustNodes(matches, anchors, width, height, dustChart, mixed);
   // First entry is already gathered. Later changes start from the previous positions.

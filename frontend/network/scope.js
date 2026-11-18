@@ -13,6 +13,10 @@
       const active = versioned?.sessions?.[versioned.direction]?.state;
       if (versioned?.version === 2 && Array.isArray(active?.magnetKeys)) {
         if (versioned.direction === "anime-to-movies") return { movieDust: true };
+        if (versioned.direction === "movie-to-studios") {
+          if (!active.magnetKeys.length || !Array.isArray(active.supportingIds)) return null;
+          return { ids: [...new Set(active.supportingIds.filter(id => typeof id === "string" && /^\d+$/.test(id)))] };
+        }
         if (versioned.direction === "movie-to-anime") {
           if (!active.magnetKeys.some(key => typeof key === "string" && key.startsWith("tmdb:"))
             || !Array.isArray(active.candidateKeys) || !Array.isArray(active.displayedKeys)) return null;

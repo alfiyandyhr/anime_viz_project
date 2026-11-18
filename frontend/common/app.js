@@ -560,7 +560,7 @@ function openAnimeDetail(anime, { similarityHtml = "" } = {}) {
 let drawerTrigger;
 function openDrawer(label) {
   const modal = elements.drawer.matches('[aria-modal="true"]');
-  if (modal) drawerTrigger = document.activeElement;
+  if (modal && !elements.drawer.classList.contains("open")) drawerTrigger = document.activeElement;
   if (label) elements.drawer.setAttribute("aria-label", label);
   elements.drawer.scrollTop = 0;
   elements.drawer.classList.add("open");

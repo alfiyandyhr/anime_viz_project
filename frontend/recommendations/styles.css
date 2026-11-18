@@ -474,6 +474,7 @@ body[data-chapter="recommendations"] .filterbar { display: none; }
 .dust-reception .dust-linked-chart { height: 473px; min-height: 473px; }
 #dust-mirror .dust-map { height: 100%; }
 #dust-analysis [data-dust-chart="heatmap"] { margin-top: 0; min-height: 480px; }
+#dust-analysis .studio-heatmap { height: auto; min-height: 128px; }
 [data-dust-chips] { display: flex; flex-wrap: wrap; gap: 8px; }
 [data-dust-ranking-pages] { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 [data-dust-scope], [data-coverage] { color: var(--muted, #aab3cf); font-size: 0.85rem; }
