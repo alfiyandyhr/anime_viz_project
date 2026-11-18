@@ -135,10 +135,18 @@
           .attr('tabindex', 0).attr('aria-label', `Dust member ranking for ${title}`).attr('data-dust-member-scroll', '');
         const table = scroll.append('table').attr('aria-label', `Dust members for ${title}`)
           .style('--dust-color', matchColor(members[0]));
-        const headings = ['Rank', studios ? 'Studio' : noun === 'movies' ? 'Movie' : 'Anime', mixed ? scoreLabel : cohortLabel || 'Similarity'];
+        const memberScoreLabel = !mixed || magnet.kind === 'genre' ? 'Similarity' : scoreLabel;
+        const headings = ['Rank', studios ? 'Studio' : noun === 'movies' ? 'Movie' : 'Anime', memberScoreLabel];
         if (studios) headings.push('Scored / sampled');
-        table.append('thead').append('tr').selectAll('th').data(headings).join('th')
-          .attr('scope', 'col').classed('dust-member-similarity', label => label === 'Similarity').text(label => label);
+        const headerCells = table.append('thead').append('tr').selectAll('th').data(headings).join('th')
+          .attr('scope', 'col')
+          .classed('dust-member-similarity', label => label === 'Similarity')
+          .text(label => label);
+        if (!studios && AnivizDust.isMetricMagnet(magnet)) {
+          headerCells.filter(label => label === memberScoreLabel)
+            .classed('dust-member-metric', true).text('Attraction percentile ')
+            .append('span').text(AnivizDust.magnetScoreLabel(magnet));
+        }
         const rows = table.append('tbody').selectAll('tr').data(members).join('tr')
           .classed('dust-member-selected', isSelected)
           .on('click', (event, match) => {
