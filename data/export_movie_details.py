@@ -15,6 +15,66 @@ from semantic_similarity.common import (
 
 DATA = Path(__file__).resolve().parent
 TMDB_URL = "https://api.themoviedb.org/3"
+CAST_LIMIT = 5
+
+
+def credit_text(value):
+    return value.strip() if isinstance(value, str) else ""
+
+
+def credit_name(credit):
+    return credit_text(credit.get("name")) or credit_text(credit.get("original_name"))
+
+
+def movie_cast(cast):
+    def billing_order(credit):
+        order = credit.get("order")
+        return order if type(order) is int and order >= 0 else math.inf
+
+    people = {}
+    for credit in sorted((entry for entry in cast if isinstance(entry, dict)), key=billing_order):
+        person_id = credit.get("id")
+        if type(person_id) is not int or person_id < 1:
+            continue
+        if person_id not in people:
+            if len(people) == CAST_LIMIT:
+                continue
+            name = credit_name(credit)
+            if not name:
+                continue
+            order = billing_order(credit)
+            people[person_id] = {
+                "id": str(person_id), "name": name, "order": order if order != math.inf else None,
+                "characters": [],
+            }
+        character = credit_text(credit.get("character"))
+        characters = people[person_id]["characters"]
+        if character and character not in characters:
+            characters.append(character)
+    return list(people.values())
+
+
+def movie_writers(crew):
+    people = {}
+    for credit in crew:
+        if not isinstance(credit, dict) or credit.get("department") != "Writing":
+            continue
+        person_id = credit.get("id")
+        name = credit_name(credit)
+        if type(person_id) is not int or person_id < 1 or not name:
+            continue
+        writer = people.setdefault(person_id, {"id": str(person_id), "name": name, "jobs": []})
+        job = credit_text(credit.get("job"))
+        if job and job not in writer["jobs"]:
+            writer["jobs"].append(job)
+    return list(people.values())
+
+
+def movie_credits(credits, movie_id):
+    if (not isinstance(credits, dict) or credits.get("id", movie_id) != movie_id
+            or not isinstance(credits.get("cast"), list) or not isinstance(credits.get("crew"), list)):
+        raise CollectionError(f"TMDB did not return valid cast and crew credits for movie {movie_id}.")
+    return {"cast": movie_cast(credits["cast"]), "writers": movie_writers(credits["crew"])}
 
 
 def movie_details(movie, movie_id):
@@ -38,6 +98,7 @@ def movie_details(movie, movie_id):
         "vote_average": score if type(votes) is int and votes > 0
         and type(score) in (int, float) and 0 <= score <= 10 else None,
         "popularity": popularity,
+        **movie_credits(movie.get("credits"), movie_id),
     }
 
 
@@ -53,7 +114,9 @@ def export_details():
     def fetch(movie_id):
         if not hasattr(worker, "client"):
             worker.client = JsonClient("TMDB", 0.3, headers, api_key=None if token else key)
-        movie = worker.client.request(f"{TMDB_URL}/movie/{movie_id}", params={"language": "en-US"})
+        movie = worker.client.request(f"{TMDB_URL}/movie/{movie_id}", params={
+            "language": "en-US", "append_to_response": "credits",
+        })
         return movie_details(movie, movie_id)
 
     started = utc_now()
@@ -74,6 +137,7 @@ def export_details():
         "started_at_utc": started,
         "completed_at_utc": utc_now(),
         "ranking_note": "Descending TMDB popularity within the published movie sample, ties by TMDB ID.",
+        "cast_limit": CAST_LIMIT,
         "record_count": len(details),
         "movies": details,
     }

@@ -177,6 +177,13 @@ also work. AniList uses its public GraphQL API.
    next eligible movie fills its TMDB slot. The CSV records both candidate and
    final sample ranks.
 
+   Cast and writing credits arrive with each movie's TMDB detail request.
+   The staged `movie_details.json` stores up to five distinct cast members per
+   movie in TMDB billing order, with their person IDs, names, and available
+   character names. A person with multiple roles still occupies one slot.
+   Use the first three entries for a smaller cast sample.
+   [TMDB append to response](https://developer.themoviedb.org/docs/append-to-response) · [TMDB movie credits](https://developer.themoviedb.org/reference/movie-credits)
+
    The matcher uses reviewed ID pairs and compares normalized titles and
    aliases, format, release dates, runtime, and synopsis evidence for new
    matches. Alternate cuts and adaptations have their own entries. The command
@@ -225,6 +232,20 @@ git add data.json data/movie_recommendations.json data/movie_anime_scores.bin \
   data/movie_popularity.json data/movie_details.json data/history_movie_matches.json
 git commit -m "Refresh shared anime and movie catalogue"
 ```
+
+### Collect cast and writers for the published catalogue
+
+```bash
+python data/refresh_data.py --update-dataset --cast-and-writer-only
+```
+
+This collects credits for the TMDB IDs in the published recommendations and
+adds them to `data/movie_details.json`. Each movie's `cast` is an ordered list
+of `{id, name, order, characters}` records. Its `writers` list stores
+`{id, name, jobs}` for each distinct person credited in TMDB's Writing
+department, including screenplay, story, and source-material credits.
+Movies without either kind of credit have an empty list for that field.
+The existing similarity scores can be reused with both fields.
 
 ### Local output files
 

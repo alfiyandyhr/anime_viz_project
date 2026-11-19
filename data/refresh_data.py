@@ -14,7 +14,7 @@ import sys
 from tempfile import TemporaryDirectory, mkdtemp
 import unicodedata
 
-from export_movie_details import movie_details
+from export_movie_details import CAST_LIMIT, movie_credits, movie_details
 from export_movie_popularity import build_sidecar
 from export_recommendations import build_bundle
 
@@ -248,7 +248,7 @@ def collect_movies(state, client):
             if selection.get("adult"):
                 continue
             movie = client.request(f"{TMDB_URL}/movie/{movie_id}", params={
-                "language": LANGUAGE, "append_to_response": "keywords,alternative_titles",
+                "language": LANGUAGE, "append_to_response": "keywords,alternative_titles,credits",
             })
             if movie.get("id") != movie_id:
                 raise CollectionError(f"TMDB detail ID does not match movie {movie_id}.")
@@ -280,12 +280,43 @@ def collect_movies(state, client):
               f"{len(state['excluded'])} cross-source duplicates excluded", flush=True)
 
 
+def tmdb_client():
+    token, key = load_tmdb_credentials(TMDB_ENV_FILE)
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    return JsonClient("TMDB", 0.3, headers, api_key=None if token else key)
+
+
+def collect_credits(client, details, movie_ids):
+    for index, movie_id in enumerate(movie_ids, 1):
+        credits = client.request(f"{TMDB_URL}/movie/{movie_id}/credits", params={"language": LANGUAGE})
+        details[movie_id].update(movie_credits(credits, int(movie_id)))
+        if index % 100 == 0 or index == len(movie_ids):
+            print(f"TMDB: fetched cast and writing credits for {index}/{len(movie_ids)} movies", flush=True)
+
+
+def update_published_credits():
+    recommendations = read_json(DATA / RECOMMENDATIONS)
+    movie_ids = [str(movie["id"]) for movie in recommendations["movies"]]
+    path = DATA / "movie_details.json"
+    payload = read_json(path)
+    details = payload["movies"]
+    if (payload["schema_version"] != 1 or payload["source"] != "TMDB"
+            or not movie_ids or len(movie_ids) != payload["record_count"]
+            or len(movie_ids) != len(details) or set(movie_ids) != set(details)
+            or any(not re.fullmatch(r"[1-9][0-9]*", movie_id) for movie_id in movie_ids)):
+        raise CollectionError("Published TMDB details and recommendation movie IDs differ or are invalid.")
+
+    collect_credits(tmdb_client(), details, movie_ids)
+    payload.pop("cast_collected_at_utc", None)
+    payload.update(cast_limit=CAST_LIMIT, credits_collected_at_utc=utc_now())
+    write_json(path, payload)
+    print(f"Updated cast and writing credits for {len(movie_ids)} movies in {path}", flush=True)
+
+
 def update_dataset(resume):
     from anilist_service import AniListService, DASHBOARD_MEDIA_FIELDS
 
-    token, key = load_tmdb_credentials(TMDB_ENV_FILE)
-    headers = {"Authorization": f"Bearer {token}"} if token else {}
-    tmdb = JsonClient("TMDB", 0.3, headers, api_key=None if token else key)
+    tmdb = tmdb_client()
     config = {"limit": COUNT, "language": LANGUAGE, "anime_page_size": ANIME_PAGE_SIZE,
               "same_version": sorted([movie, anime] for movie, anime in SAME_VERSION.items()),
               "distinct_versions": sorted([movie, anime] for movie, anime in DISTINCT_VERSIONS)}
@@ -298,6 +329,13 @@ def update_dataset(resume):
     save_checkpoint(state)
     collect_anime(state, DASHBOARD_MEDIA_FIELDS)
     collect_movies(state, tmdb)
+    details = state["details"]
+    # Older checkpoints can be missing one or both kinds of credits.
+    missing_credits = [movie_id for movie_id, detail in details.items()
+                       if "cast" not in detail or "writers" not in detail]
+    if missing_credits:
+        collect_credits(tmdb, details, missing_credits)
+        save_checkpoint(state)
 
     folder = Path(mkdtemp(prefix="snapshot-", dir=WORKSPACE))
     try:
@@ -326,7 +364,6 @@ def update_dataset(resume):
         }, extra_fields=("candidate_rank",),
             ranking_note="First eligible unique TMDB IDs in observed popularity order after cross-source matching.")
 
-        details = state["details"]
         # Use observed list popularity and sample order, as the browser does.
         ranked = sorted(details, key=lambda movie_id: -details[movie_id]["popularity"])
         for rank, movie_id in enumerate(ranked, 1):
@@ -335,6 +372,7 @@ def update_dataset(resume):
             "schema_version": 1, "source": "TMDB", "record_count": len(details),
             "started_at_utc": started, "completed_at_utc": provenance["completed_at_utc"],
             "ranking_note": "Descending TMDB popularity within the retained sample, ties by candidate order.",
+            "cast_limit": CAST_LIMIT,
             "movies": details,
         })
         write_json(folder / "duplicate_report.json", {
@@ -427,10 +465,14 @@ def main():
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--update-dataset", action="store_true", help="Collect and stage a fresh shared catalogue.")
     action.add_argument("--recompute-scores", action="store_true", help="Score the staged catalogue and update web files.")
+    parser.add_argument("--cast-and-writer-only", action="store_true",
+                        help="With --update-dataset, update cast and writers for the published movies.")
     parser.add_argument("--resume", action="store_true", help="Continue an interrupted --update-dataset.")
     parser.add_argument("--batch-size", type=positive_int, help="Embedding batch size for --recompute-scores (default: 8).")
     parser.add_argument("--device", choices=("auto", "cpu", "mps", "cuda"), help="Scoring device (default: auto).")
     args = parser.parse_args()
+    if args.cast_and_writer_only and (not args.update_dataset or args.resume):
+        parser.error("--cast-and-writer-only requires --update-dataset and cannot be combined with --resume.")
     if args.resume and not args.update_dataset:
         parser.error("--resume only applies to --update-dataset.")
     if (args.batch_size or args.device) and not args.recompute_scores:
@@ -443,7 +485,9 @@ def main():
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 raise CollectionError("Another catalogue refresh or scoring command is running.") from None
-            if args.update_dataset:
+            if args.cast_and_writer_only:
+                update_published_credits()
+            elif args.update_dataset:
                 update_dataset(args.resume)
             else:
                 recompute_scores(args.batch_size or 8, args.device or "auto")
