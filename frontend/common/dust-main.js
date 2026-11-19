@@ -282,7 +282,10 @@
     highlightRecommendation();
   }
   function renderRanking() {
-    const { ranking, magnets, rankingOrder, mixed } = latest, size = 10;
+    const { ranking, magnets, rankingOrder, mixed, selectedKeys } = latest, size = 10;
+    const body = $('[data-dust-ranking-body]');
+    const focusedKey = document.activeElement?.dataset.dustRankSelect;
+    $('[data-dust-ranking-notice]').textContent = '';
     const total = Math.max(1, Math.ceil(ranking.length / size));
     rankingPage = Math.min(rankingPage, total - 1);
     const ordered = rankingOrder !== 'descending' ? ranking
@@ -300,7 +303,7 @@
     const average = AnivizDust.averageLabel(mixed);
     const coverageHeading = group ? (isReverse() ? 'Movie counts' : 'Anime counts') : isReverse() ? 'Year' : 'Format / year';
     $('[data-dust-ranking-head]').innerHTML = `<tr><th scope="col" aria-sort="${rankingOrder}">Rank</th><th scope="col">${title}</th>${magnets.map((magnet, i) => `<th scope="col">M${i + 1} · ${escapeHTML(mixed ? AnivizDust.magnetScoreLabel(magnet) : cohortLabels[i] || magnet.title)}</th>`).join('')}<th scope="col">${average}</th><th scope="col">${coverageHeading}</th><th scope="col">Displayed dust</th></tr>`;
-    $('[data-dust-ranking-body]').innerHTML = rows.map(match => {
+    body.innerHTML = rows.map(match => {
       const { record } = match;
       const artwork = latest.lookup.get(match.key).record;
       const cover = AnivizArtwork.dustThumbnail(artwork, match.key);
@@ -311,8 +314,12 @@
       const scores = match.scores.map((score, i) => mixed
         ? `<td title="${escapeAttribute(AnivizDust.mixedEvidence(match, magnets[i], i))}">${AnivizDust.formatRawScore(match.rawScores[i], magnets[i])}<br><small>Percentile ${AnivizDust.formatPercentile(score)}</small></td>`
         : `<td title="${escapeAttribute(cohortLabels[i] ? `${cohortLabels[i]}: ${score}` : `Cosine ${score}`)}">${AnivizDust.formatPercentile(score)}</td>`);
-      return `<tr><td>${match.rank ?? 'Unavailable'}</td><td><button type="button" class="recommendation-title-button anime-cell" data-dust-rank-id="${escapeAttribute(match.key)}" aria-haspopup="dialog" aria-controls="detail-drawer">${thumbnail}${escapeHTML(record.title)}</button></td>${scores.join('')}<td title="${mixed ? average : 'Average cosine'} ${match.score ?? 'unavailable'}">${AnivizDust.formatPercentile(match.score)}</td><td>${evidence}</td><td>${match.displayed ? 'Yes' : '—'}</td></tr>`;
+      const key = escapeAttribute(match.key);
+      const selected = selectedKeys.includes(match.key);
+      const comparison = match.displayed ? `<button type="button" class="small-button ghost" data-dust-rank-select="${key}" aria-label="Compare ${escapeAttribute(record.title)}" aria-pressed="${selected}"><span aria-hidden="true">✓</span> Compare</button>` : '—';
+      return `<tr${selected ? ' class="is-selected"' : ''}><td>${match.rank ?? 'Unavailable'}</td><td><button type="button" class="recommendation-title-button anime-cell" data-dust-rank-id="${key}" aria-haspopup="dialog" aria-controls="detail-drawer">${thumbnail}${escapeHTML(record.title)}</button></td>${scores.join('')}<td title="${mixed ? average : 'Average cosine'} ${match.score ?? 'unavailable'}">${AnivizDust.formatPercentile(match.score)}</td><td>${evidence}</td><td>${comparison}</td></tr>`;
     }).join('');
+    if (focusedKey) body.querySelector(`[data-dust-rank-select="${CSS.escape(focusedKey)}"]`)?.focus({ preventScroll: true });
     const pages = [];
     for (let page = 0; page < total; page++) if (page === 0 || page === total - 1 || Math.abs(page - rankingPage) <= 1) pages.push(page);
     $('[data-dust-ranking-pages]').innerHTML = total < 2 ? '' :
@@ -413,6 +420,12 @@
       if (button && !button.disabled) { rankingPage = Number(button.dataset.dustPage); renderRanking(); }
     });
     $('[data-dust-ranking-body]').addEventListener('click', event => {
+      const toggle = event.target.closest('[data-dust-rank-select]');
+      if (toggle) {
+        select(toggle.dataset.dustRankSelect);
+        if (pendingNotice.startsWith('Compare up to 3')) $('[data-dust-ranking-notice]').textContent = pendingNotice;
+        return;
+      }
       const button = event.target.closest('tr')?.querySelector('[data-dust-rank-id]');
       if (button) {
         button.focus({ preventScroll: true });

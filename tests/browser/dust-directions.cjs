@@ -394,8 +394,11 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
       await page.goto(url(`#${anchor}`));
       await ready();
       await page.waitForFunction(id => {
-        const top = document.getElementById(id).getBoundingClientRect().top;
-        return top >= 48 && top < 180;
+        const section = document.getElementById(id);
+        const top = section.getBoundingClientRect().top;
+        // The final chart can reach the document's scroll limit before its heading reaches the margin.
+        const maxScroll = document.scrollingElement.scrollHeight - innerHeight;
+        return top >= 48 && (top < 180 || (id === 'creators' && top < innerHeight && scrollY >= maxScroll - 1));
       }, anchor);
     }
     assert.match(await page.locator('#reception').innerText(), /Rank #1 is most popular in the movie sample/);

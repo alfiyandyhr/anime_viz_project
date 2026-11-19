@@ -284,6 +284,19 @@
             <p id="dust-connection-method">Select a magnet to rank the displayed titles by cosine similarity. Thicker curves show higher scores within that magnet’s range. Dust members lists the titles that score highest for the selected magnet. Scroll either list to see more titles.</p>
             <p id="dust-connection-selection">Outlined titles are selected for comparison in the playground and here. Click an outlined title to remove it. Click any other title to open its details and add it to the comparison if there’s room for it. Compare up to three titles.</p>
             <p data-coverage="connections"></p><div class="dust-linked-chart" role="region" aria-label="Similarity connections" data-dust-chart="connections"></div></article>
+          <article class="chart-card dust-analysis-wide"><h3 id="dust-ranking-title">Full anime ranking</h3>
+            <p data-dust-ranking-note></p>
+            <p>Use Compare to select or deselect displayed dust. Compare up to three entries at a time.</p>
+            <label class="dust-analysis-control">Rank by <select data-dust-ranking-sort><option value="average">Average similarity</option></select></label>
+            <label class="dust-analysis-control">Rank order <select data-dust-ranking-order>
+              <option value="ascending">Ascending (rank 1 first)</option>
+              <option value="descending">Descending (last rank first)</option>
+            </select></label>
+            <div class="table-wrapper" role="region" tabindex="0" aria-label="Full similarity ranking, scroll horizontally">
+              <table><thead data-dust-ranking-head></thead><tbody data-dust-ranking-body></tbody></table>
+            </div><nav data-dust-ranking-pages aria-label="Full similarity ranking pages"></nav>
+            <p data-dust-ranking-notice role="status"></p>
+          </article>
           <div class="dust-analysis-wide dust-reception">
             <article class="chart-card" id="reception"><h3>Score vs. popularity</h3>
               <p id="dust-studio-scope" hidden></p>
@@ -304,17 +317,6 @@
             <p data-coverage="studios"></p><div class="dust-linked-chart" data-dust-chart="studios" data-anime-chart></div></article>
           <article class="chart-card" data-anime-only><h3 id="dust-heatmap-title">Studio × genre</h3>
             <p data-coverage="heatmap"></p><div class="dust-linked-chart" role="region" tabindex="0" aria-label="Studio genre chart, scroll horizontally" data-dust-chart="heatmap" data-anime-chart></div></article>
-          <article class="chart-card dust-analysis-wide"><h3 id="dust-ranking-title">Full anime ranking</h3>
-            <p data-dust-ranking-note></p>
-            <label class="dust-analysis-control">Rank by <select data-dust-ranking-sort><option value="average">Average similarity</option></select></label>
-            <label class="dust-analysis-control">Rank order <select data-dust-ranking-order>
-              <option value="ascending">Ascending (rank 1 first)</option>
-              <option value="descending">Descending (last rank first)</option>
-            </select></label>
-            <div class="table-wrapper" role="region" tabindex="0" aria-label="Full similarity ranking, scroll horizontally">
-              <table><thead data-dust-ranking-head></thead><tbody data-dust-ranking-body></tbody></table>
-            </div><nav data-dust-ranking-pages aria-label="Full similarity ranking pages"></nav>
-          </article>
         </section>
 
         <details class="methodology">

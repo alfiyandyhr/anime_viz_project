@@ -479,8 +479,13 @@ body[data-chapter="recommendations"] .filterbar { display: none; }
 [data-dust-chips] { display: flex; flex-wrap: wrap; gap: 8px; }
 [data-dust-ranking-pages] { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 [data-dust-scope], [data-coverage] { color: var(--text-muted); font-size: 0.85rem; }
-[data-dust-notice]:empty { display: none; }
+[data-dust-notice]:empty, [data-dust-ranking-notice]:empty { display: none; }
 [data-dust-ranking-body] td { padding: 10px; }
+[data-dust-ranking-body] tr.is-selected { background: var(--primary-tint); }
+[data-dust-rank-select] { white-space: nowrap; }
+[data-dust-rank-select] span { visibility: hidden; }
+[data-dust-rank-select][aria-pressed="true"] { border-color: var(--purple); }
+[data-dust-rank-select][aria-pressed="true"] span { visibility: visible; }
 [data-dust-ranking-head] th { padding: 10px; text-align: left; }
 [data-dust-ranking-head] th:first-child,
 [data-dust-ranking-body] td:first-child { text-align: right; }

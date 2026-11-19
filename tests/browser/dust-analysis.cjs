@@ -157,8 +157,59 @@ async function verifyStudioAxes(chart) {
       assert.equal(await heading.getAttribute('aria-sort'), 'ascending');
       assert.deepEqual(await visibleIds(), rankedIds.slice(0, 10));
     }
+
+    const dustType = page.locator('#dust-type');
+    const selection = () => page.evaluate(() => AnivizMain.snapshot().selectedKeys);
+    const rankingToggles = page.locator('[data-dust-rank-select]');
+    const types = await dustType.locator('option:not([disabled])').evaluateAll(options => options.map(option => option.value));
+    assert.equal(types.length, 7);
+    for (const type of types) {
+      await dustType.selectOption(type);
+      await rankingToggles.first().waitFor();
+      assert.ok(await page.locator('#dust-ranking-title').evaluate(title => {
+        const card = title.closest('article');
+        return card.previousElementSibling.contains(document.querySelector('#dust-connection-title'))
+          && card.nextElementSibling.contains(document.querySelector('#reception'))
+          && card.nextElementSibling.contains(document.querySelector('#dust-mirror'));
+      }), type);
+      const toggle = rankingToggles.first();
+      const key = await toggle.getAttribute('data-dust-rank-select');
+      const dot = page.locator(`#recommendation-chart [data-match-id="${key}"]`);
+
+      await dot.press('Enter');
+      assert.equal(await toggle.getAttribute('aria-pressed'), 'true', type);
+      assert.equal(await toggle.locator('xpath=ancestor::tr').getAttribute('class'), 'is-selected', type);
+      await page.getByRole('button', { name: 'Next ranking page' }).click();
+      assert.deepEqual(await selection(), [key], type);
+      await page.getByRole('button', { name: 'Previous ranking page' }).click();
+      assert.equal(await toggle.getAttribute('aria-pressed'), 'true', type);
+
+      await toggle.press('Space');
+      assert.deepEqual(await selection(), [], type);
+      assert.equal(await toggle.getAttribute('aria-pressed'), 'false', type);
+      assert.ok(await toggle.evaluate(button => button === document.activeElement), type);
+      await page.keyboard.press('Enter');
+      assert.deepEqual(await selection(), [key], type);
+      assert.equal(await dot.getAttribute('aria-pressed'), 'true', type);
+      await toggle.press('Enter');
+      assert.deepEqual(await selection(), [], type);
+    }
+    await dustType.selectOption('anime-titles');
+    await rankingToggles.first().waitFor();
+    const keys = await rankingToggles.evaluateAll(buttons => buttons.slice(0, 3).map(button => button.dataset.dustRankSelect));
+    assert.equal(keys.length, 3);
+    for (let i = 0; i < keys.length; i++) await rankingToggles.nth(i).click();
+    await rankingToggles.nth(3).click();
+    assert.match(await page.locator('[data-dust-ranking-notice]').textContent(), /Compare up to 3 anime/);
+    assert.deepEqual(await selection(), keys);
+    await page.reload();
+    await page.waitForFunction(() => window.AnivizMain?.snapshot()?.metadataStatus === 'ready');
+    assert.deepEqual(await selection(), keys);
+    assert.deepEqual(await page.locator('[data-dust-rank-select][aria-pressed="true"]')
+      .evaluateAll(buttons => buttons.map(button => button.dataset.dustRankSelect)), keys);
+
     await page.goto(new URL('frontend/explorer/index.html', base).href);
     await verifyStudioAxes(page.locator('[data-catalogue-chart="studios"]'));
-    console.log('Verified chart tooltips, read-only marks, studio axes in both views, bubble areas, correlations and trendlines, 15 heatmap studios, and ranking directions.');
+    console.log('Verified chart tooltips, read-only marks, studio axes in both views, bubble areas, correlations and trendlines, 15 heatmap studios, and ranking order, placement, and selection.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
