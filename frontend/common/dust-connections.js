@@ -142,10 +142,11 @@
           .attr('scope', 'col')
           .classed('dust-member-similarity', label => label === 'Similarity')
           .text(label => label);
-        if (!group && AnivizDust.isMetricMagnet(magnet)) {
+        const titlePercentile = mixed && magnet.kind === undefined;
+        if (!group && (titlePercentile || AnivizDust.isMetricMagnet(magnet))) {
           headerCells.filter(label => label === memberScoreLabel)
-            .classed('dust-member-metric', true).text('Attraction percentile ')
-            .append('span').text(AnivizDust.magnetScoreLabel(magnet));
+            .classed('dust-member-percentile', true).text('Attraction percentile ')
+            .append('span').text(titlePercentile ? 'Similarity' : AnivizDust.magnetScoreLabel(magnet));
         }
         const rows = table.append('tbody').selectAll('tr').data(members).join('tr')
           .classed('dust-member-selected', isSelected)

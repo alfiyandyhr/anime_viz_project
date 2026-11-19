@@ -17,6 +17,14 @@ const switchTo = (page, direction) => page.selectOption('#dust-type', direction)
 const choosePopularity = page => page.getByRole('radio', { name: 'Popularity' }).check();
 const ready = page => dot(page).first().waitFor();
 const mixed = page => page.waitForFunction(() => AnivizMain.snapshot().mixed && AnivizMain.snapshot().ranking.length === 1000);
+const assertTitleMemberLayout = async page => {
+  const table = page.getByRole('table', { name: 'Dust members for Inception' });
+  const heading = table.getByRole('columnheader', { name: 'Attraction percentile Similarity', exact: true });
+  assert.equal((await heading.innerText()).toLowerCase(), 'attraction percentile\nsimilarity');
+  assert.match(await table.locator('.dust-member-score').first().getAttribute('title'), /Cosine to Inception/);
+  assert.ok(await table.evaluate(el => el.parentElement.scrollWidth <= el.parentElement.clientWidth),
+    'the member table fits within its scroll region');
+};
 const assertTooltip = async (page, title) => {
   await dot(page).first().locator('.dust-hit-area').hover({ force: true });
   const tooltip = page.locator('#tooltip');
@@ -83,6 +91,7 @@ const state = page => page.evaluate(() => {
     assert.match(await page.locator('#recommendation-detail').textContent(), /AniList list users/);
     assert.match(await page.locator('#dust-mirror .dust-node').first().getAttribute('aria-label'), /Attraction percentile/);
     await page.locator('[data-dust-chart="connections"]').scrollIntoViewIfNeeded();
+    await assertTitleMemberLayout(page);
     await page.locator(`[data-dust-connection-movie="${anime}"]`).click();
     assert.match(await page.locator('[data-coverage="connections"]').innerText(), /Attraction percentile · AniList list users/);
     assert.match(await page.locator('.dust-connection-score').first().getAttribute('title'), /AniList list users/);
@@ -194,6 +203,8 @@ const state = page => page.evaluate(() => {
     assert.ok(await phone.getByRole('checkbox', { name: 'Color dust by highest attraction percentile' }).isVisible());
     await dot(phone).first().press('Enter');
     assert.match(await phone.locator('#dust-focus').innerText(), /AniList list users/);
+    await phone.locator('[data-dust-chart="connections"]').scrollIntoViewIfNeeded();
+    await assertTitleMemberLayout(phone);
     assert.ok(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     console.log('Popularity browser checks passed for both directions, retry, and mobile.');
   } finally {

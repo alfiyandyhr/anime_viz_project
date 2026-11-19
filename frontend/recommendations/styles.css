@@ -576,8 +576,8 @@ body[data-chapter="recommendations"] .filterbar { display: none; }
 .dust-member-scroll th:first-child { width: 3.25rem; }
 .dust-member-scroll th:last-child { width: 5.25rem; overflow-wrap: anywhere; }
 .dust-member-scroll th.dust-member-similarity { width: 6rem; white-space: nowrap; }
-.dust-member-scroll th.dust-member-metric { width: clamp(7rem, 42%, 11rem); overflow-wrap: normal; }
-.dust-member-metric span { display: block; }
+.dust-member-scroll th.dust-member-percentile { width: clamp(7rem, 42%, 11rem); overflow-wrap: normal; }
+.dust-member-percentile span { display: block; }
 .dust-member-scroll :is(th, td):is(:first-child, :last-child) { text-align: right; font-variant-numeric: tabular-nums; }
 .dust-member-scroll td:nth-child(2) { padding-block: 0; }
 .dust-member-scroll tbody tr:last-child td { border-bottom: 0; }
