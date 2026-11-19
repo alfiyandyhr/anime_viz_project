@@ -48,6 +48,7 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
     await dot(pair[1], '#dust-mirror').press('Space');
     assert.deepEqual(await selection(), pair);
     assert.match(await page.locator('#recommendation-detail').innerText(), /Comparing 2 studios/);
+    assert.equal(await page.getByRole('rowheader', { name: 'AniList users', exact: true }).count(), 1);
     assert.equal(await page.locator('#recommendation-chart .dust-node').count(), displayed.length);
     assert.match(await page.locator('#dust-studio-scope').innerText(), new RegExp(`${titleScope.length} distinct catalogue anime`));
 
@@ -168,8 +169,11 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
       assert.equal(await chart('connections').locator('.dust-connection-rank').first().innerText(), '1');
       assert.equal(await chart('connections').locator('.dust-connection-title').first().innerText(), studio);
       const members = chart('connections').getByRole('table', { name: `Dust members for ${kind === 'score' ? 'Score' : 'Popularity'}` });
-      assert.equal(await members.locator('thead th').last().textContent(), 'Anime counts');
-      assert.equal(await members.locator('tbody tr').first().locator('td').last().textContent(), String(count));
+      assert.deepEqual(await members.locator('thead th').allTextContents(),
+        ['Rank', 'Studio', kind === 'score' ? 'Average score' : 'AniList users', 'Attraction percentile', 'Title counts']);
+      const cells = await members.locator('tbody tr').first().locator('td').allTextContents();
+      assert.match(cells[3], /^\d\.\d{3}$/);
+      assert.equal(cells[4], String(count));
     }
     assert.deepEqual(errors, []);
 

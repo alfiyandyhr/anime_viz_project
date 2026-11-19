@@ -34,6 +34,9 @@ async function assertMagnetSearchFocus(page) {
 
   for (const dustType of [animeTitles, movieTitles]) {
     await page.selectOption('#dust-type', dustType);
+    assert.deepEqual(await favorites.allTextContents(), dustType === animeTitles
+      ? ['Inception', 'Interstellar', 'The Matrix', 'The Dark Knight']
+      : ['Attack on Titan', 'ONE PIECE', 'Naruto', 'Death Note']);
     assert.equal(await example.getAttribute('aria-pressed'), 'true');
     await example.click();
     assert.equal(await example.getAttribute('aria-pressed'), 'false');

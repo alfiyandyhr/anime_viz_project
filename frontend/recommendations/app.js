@@ -201,8 +201,8 @@ function resetMagnetPicker() {
   search.placeholder = `Search ${label} titles or aliases`;
   document.querySelector("#movie-search-label").textContent = `Add ${label === "anime" ? "an" : "a"} ${label} magnet · up to 3`;
   const titles = magnet === "anilist"
-    ? [example, "ONE PIECE", "Naruto", "Your Name.", "Death Note"]
-    : [example, "Interstellar", "The Matrix", "The Dark Knight", "Titanic"];
+    ? [example, "ONE PIECE", "Naruto", "Death Note"]
+    : [example, "Interstellar", "The Matrix", "The Dark Knight"];
   document.querySelector("#movie-suggestions").innerHTML = `<span>Try a favorite</span>` + titles
     .map(title => records.find(record => record.title === title)).filter(Boolean)
     .map(record => `<button type="button" data-magnet-key="${escapeAttribute(AnivizDust.keyFor(magnet, record.id))}">${escapeHTML(record.title)}</button>`).join("");

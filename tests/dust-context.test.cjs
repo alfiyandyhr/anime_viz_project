@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { createContext, joinRecords, rankCorpus, createScoreAccessor, FORWARD, REVERSE, STUDIOS, ACTORS, STORAGE_KEY } = require('../frontend/common/dust-context.js');
+const { createContext, joinRecords, rankCorpus, createScoreAccessor, formatRawScore,
+  FORWARD, REVERSE, STUDIOS, ACTORS, STORAGE_KEY } = require('../frontend/common/dust-context.js');
 const ChartData = require('../frontend/common/chart-data.js');
 const { getDustMatches } = require('../frontend/recommendations/dust-magnet.js');
 const root = path.resolve(__dirname, '..');
@@ -23,6 +24,16 @@ function setup() {
   context.setSources(data, scores); context.setMetadata(dashboard.anime); context.setMagnets(movieKeys);
   return { context, memory, storage, notices };
 }
+test('raw metric labels group digits and round averages while retaining their units', () => {
+  assert.equal(formatRawScore(1079782, { kind: 'popularity' }), '1,079,782');
+  assert.equal(formatRawScore(1234.56789, { kind: 'popularity' }), '1,234.568');
+  assert.equal(formatRawScore(1234, { kind: 'genre-count' }), '1,234');
+  assert.equal(formatRawScore(90, { kind: 'score', scale: 100 }), '90 / 100');
+  assert.equal(formatRawScore(73.66666666666667, { kind: 'score', scale: 100 }), '73.667 / 100');
+  assert.equal(formatRawScore(7.123456, { kind: 'score', scale: 10 }), '7.123 / 10');
+  assert.equal(formatRawScore(0.44, { kind: 'genre' }), '0.440');
+  assert.equal(formatRawScore(null, { kind: 'score', scale: 100 }), 'Unavailable');
+});
 test('string ID joins preserve shared catalogue IDs and unknown metrics', () => {
   const lookup = joinRecords(data.anime, dashboard.anime);
   assert.equal(lookup.size, 1000);

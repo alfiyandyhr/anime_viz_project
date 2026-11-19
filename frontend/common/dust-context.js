@@ -27,6 +27,7 @@
   };
   const groupFor = direction => DIRECTIONS[direction].group;
   const isMovieDust = direction => DIRECTIONS[direction].dust === "tmdb";
+  const popularityLabel = direction => isMovieDust(direction) ? "TMDB popularity" : "AniList users";
   const titleNoun = (direction, count) => isMovieDust(direction) ? (count === 1 ? "movie" : "movies") : "anime";
   const normalizeStrength = value => Number.isFinite(value) ? Math.round(Math.max(0, Math.min(2, value)) * 10) / 10 : 1;
   const keyFor = (catalogue, id) => `${catalogue}:${id}`;
@@ -52,10 +53,12 @@
   const isMetricKey = (direction, key) => METRIC_MAGNET_TYPES.some(kind => key === metricMagnetKey(direction, kind));
   const averageLabel = mixed => mixed ? "Average attraction percentile" : "Average similarity";
   const formatPercentile = value => Number.isFinite(value) ? value.toFixed(3) : "Unavailable";
+  const metricNumber = new Intl.NumberFormat("en-US", { maximumFractionDigits: 3 });
   function formatRawScore(value, magnet) {
     if (!Number.isFinite(value)) return "Unavailable";
-    if (magnet.kind === "score") return `${value} / ${magnet.scale}`;
-    return magnet.kind === "popularity" || isCountMagnet(magnet) ? String(value) : formatPercentile(value);
+    if (!isMetricMagnet(magnet)) return formatPercentile(value);
+    const formatted = metricNumber.format(value);
+    return magnet.kind === "score" ? `${formatted} / ${magnet.scale}` : formatted;
   }
   function mixedEvidence(match, magnet, index) {
     const raw = formatRawScore(match.rawScores[index], magnet);
@@ -130,7 +133,8 @@
 
   function genreCountMagnet(direction, genre, memberIds = [], total = 0) {
     const title = `${genre} ${titleNoun(direction)}`;
-    return { key: genreCountPrefix(direction) + genre, kind: "genre-count", title, metric: title,
+    return { key: genreCountPrefix(direction) + genre, kind: "genre-count", title,
+      metric: `${genre} ${titleNoun(direction, 1)} count`,
       memberIds: new Set(memberIds), eligible: total, total };
   }
 
@@ -445,7 +449,7 @@
         const source = metricSource;
         const status = direction === ORIGINAL_CREATORS && source.status === "ready" ? creditStatus() : source.status;
         const definitions = {
-          popularity: { title: "Popularity", metric: group ? "Total popularity" : movie ? "TMDB popularity" : "AniList list users" },
+          popularity: { title: "Popularity", metric: popularityLabel(direction) },
           score: { title: "Score", metric: group ? "Average score" : movie ? "TMDB score" : "AniList score", scale: movie ? 10 : 100 }
         };
         metricMagnets = Object.fromEntries(METRIC_MAGNET_TYPES.map(kind => [kind, {
@@ -658,8 +662,8 @@
     };
     return api;
   }
-  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, STUDIOS, ACTORS, ORIGINAL_CREATORS, MOVIE_ACTORS, MOVIE_WRITERS, DIRECTIONS, groupFor, isMovieDust, titleNoun,
-    METRIC_MAGNET_TYPES, isMetricMagnet,
+  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, STUDIOS, ACTORS, ORIGINAL_CREATORS, MOVIE_ACTORS, MOVIE_WRITERS, DIRECTIONS,
+    groupFor, isMovieDust, popularityLabel, titleNoun, METRIC_MAGNET_TYPES, isMetricMagnet,
     keyFor, catalogueFor, magnetScoreLabel, cohortDescription,
     averageLabel, formatPercentile, formatRawScore, mixedEvidence, defaults, joinRecords,
     passesFilters, createScoreAccessor, forwardVectors, rankCorpus, sampleDust, createContext };

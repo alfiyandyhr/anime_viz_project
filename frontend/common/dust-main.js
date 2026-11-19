@@ -310,7 +310,7 @@
       const thumbnail = cover ? `<img src="${escapeAttribute(cover)}" alt="" loading="lazy">` : '';
       const year = record.year || 'Unknown';
       const format = group || isReverse() ? '' : escapeHTML(humanize(record.format)) + ' / ';
-      const evidence = group ? record.memberIds.length : format + year;
+      const evidence = group ? formatNumber(record.memberIds.length) : format + year;
       const scores = match.scores.map((score, i) => mixed
         ? `<td title="${escapeAttribute(AnivizDust.mixedEvidence(match, magnets[i], i))}">${AnivizDust.formatRawScore(match.rawScores[i], magnets[i])}<br><small>Percentile ${AnivizDust.formatPercentile(score)}</small></td>`
         : `<td title="${escapeAttribute(cohortLabels[i] ? `${cohortLabels[i]}: ${score}` : `Cosine ${score}`)}">${AnivizDust.formatPercentile(score)}</td>`);

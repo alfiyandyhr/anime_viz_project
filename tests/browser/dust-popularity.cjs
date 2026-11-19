@@ -19,8 +19,8 @@ const ready = page => dot(page).first().waitFor();
 const mixed = page => page.waitForFunction(() => AnivizMain.snapshot().mixed && AnivizMain.snapshot().ranking.length === 1000);
 const assertTitleMemberLayout = async page => {
   const table = page.getByRole('table', { name: 'Dust members for Inception' });
-  const heading = table.getByRole('columnheader', { name: 'Attraction percentile Similarity', exact: true });
-  assert.equal((await heading.innerText()).toLowerCase(), 'attraction percentile\nsimilarity');
+  await table.waitFor();
+  assert.deepEqual(await table.locator('thead th').allTextContents(), ['Rank', 'Anime', 'Similarity', 'Attraction percentile']);
   assert.match(await table.locator('.dust-member-score').first().getAttribute('title'), /Cosine to Inception/);
   assert.ok(await table.evaluate(el => el.parentElement.scrollWidth <= el.parentElement.clientWidth),
     'the member table fits within its scroll region');
@@ -74,7 +74,7 @@ const state = page => page.evaluate(() => {
     await add(page).press('Enter');
     await mixed(page);
     await colorByPercentile.check();
-    assert.doesNotMatch(await page.locator('#movie-magnets').innerText(), /AniList list users|eligible/);
+    assert.doesNotMatch(await page.locator('#movie-magnets').innerText(), /AniList users|eligible/);
     assert.ok(await page.locator('#popularity-magnet-source').isHidden());
     assert.equal(await page.getByRole('slider', { name: 'Popularity strength' }).inputValue(), '1');
     const combined = await state(page);
@@ -84,18 +84,44 @@ const state = page => page.evaluate(() => {
     assert.match(await page.locator('[data-dust-ranking-head]').textContent(), average);
     assert.match(await page.locator('#recommendation-score-note').innerText(), /attraction percentile/);
     await assertTooltip(page, 'Inception');
-    assert.match(await page.locator('#tooltip').innerText(), /AniList list users: \d+\nAttraction percentile:/);
+    assert.match(await page.locator('#tooltip').innerText(), /AniList users: \d{1,3}(,\d{3})+\nAttraction percentile:/);
     await dot(page).first().press('Enter');
     await dot(page).nth(1).press('Space');
+    await dot(page).nth(2).press('Enter');
     assert.match(await page.locator('#dust-focus').innerText(), average);
-    assert.match(await page.locator('#recommendation-detail').textContent(), /AniList list users/);
+    const comparison = page.locator('.dust-comparison-table');
+    const popularityRow = comparison.getByRole('row', { name: /M3 · AniList users/ });
+    assert.match(await popularityRow.locator('strong').first().innerText(), /^\d{1,3}(,\d{3})+$/);
+    assert.match(await popularityRow.locator('small').first().innerText(), /^Percentile \d\.\d{3}$/);
+    const values = await page.evaluate(() => {
+      const { displayedDust, selectedKeys } = AnivizMain.snapshot();
+      return selectedKeys.map(key => {
+        const { rawScores, score } = displayedDust.find(match => match.key === key);
+        return { popularity: rawScores[2], cosine: rawScores[0], average: score };
+      });
+    });
+    assert.equal(values.length, 3);
+    const meters = row => row.locator('meter').evaluateAll(nodes => nodes.map(({ min, max, value }) => [min, max, value]));
+    const popularityMax = Math.max(...values.map(row => row.popularity));
+    assert.deepEqual(await meters(popularityRow), values.map(row => [0, popularityMax, row.popularity]));
+    assert.deepEqual(await meters(comparison.getByRole('row', { name: /M1 · Cosine to Inception/ })),
+      values.map(row => [-1, 1, row.cosine]));
+    assert.deepEqual(await meters(comparison.getByRole('row', { name: average })), values.map(row => [0, 1, row.average]));
+    assert.match(await page.locator('#recommendation-detail').textContent(), /AniList users/);
     assert.match(await page.locator('#dust-mirror .dust-node').first().getAttribute('aria-label'), /Attraction percentile/);
     await page.locator('[data-dust-chart="connections"]').scrollIntoViewIfNeeded();
     await assertTitleMemberLayout(page);
     await page.locator(`[data-dust-connection-movie="${anime}"]`).click();
-    assert.match(await page.locator('[data-coverage="connections"]').innerText(), /Attraction percentile · AniList list users/);
-    assert.match(await page.locator('.dust-connection-score').first().getAttribute('title'), /AniList list users/);
-    assert.match(await page.locator('.dust-member-score').first().innerText(), /Raw/);
+    assert.match(await page.locator('[data-coverage="connections"]').innerText(), /AniList users · Attraction percentile/);
+    const connectionScore = page.locator('.dust-connection-score').first();
+    assert.match(await connectionScore.getAttribute('title'), /AniList users/);
+    assert.match(await connectionScore.innerText(), /^\d{1,3}(,\d{3})+\nPercentile \d\.\d{3}$/);
+    const popularityMembers = page.getByRole('table', { name: 'Dust members for Popularity' });
+    assert.deepEqual(await popularityMembers.locator('thead th').allTextContents(),
+      ['Rank', 'Anime', 'AniList users', 'Attraction percentile']);
+    const [, , popularityValue, percentile] = await popularityMembers.locator('tbody tr').first().locator('td').allTextContents();
+    assert.match(popularityValue, /^\d{1,3}(,\d{3})+$/);
+    assert.match(percentile, /^\d\.\d{3}$/);
     assert.equal(combined.ranking.filter(row => row[3] === null).length, catalogue.anime.length - animeEligible);
     if (animeEligible < catalogue.anime.length) {
       await page.locator('[data-dust-page="99"]').click();
@@ -157,6 +183,9 @@ const state = page => page.evaluate(() => {
     assert.ok(await page.locator('#popularity-magnet-source').isHidden());
     assert.equal(await page.locator('#recommendation-chart .dust-magnet').last().locator('title').textContent(), 'Popularity');
     await assertTooltip(page, 'Attack on Titan');
+    await page.locator(`[data-dust-member-movie="${movies}"]`).click();
+    assert.deepEqual(await popularityMembers.locator('thead th').allTextContents(),
+      ['Rank', 'Movie', 'TMDB popularity', 'Attraction percentile']);
     await dot(page).first().press('Enter');
     const movieBlend = await state(page);
     assert.deepEqual(movieBlend.magnetKeys, ['anilist:16498', movies]);
@@ -192,6 +221,23 @@ const state = page => page.evaluate(() => {
     await page.locator('#retry-popularity').click();
     await mixed(page);
     assert.deepEqual((await state(page)).ranking, movieBlend.ranking);
+
+    await switchTo(page, 'movie-writers');
+    await choosePopularity(page);
+    await add(page).click();
+    await page.waitForFunction(() => AnivizMain.snapshot().mixed);
+    await page.locator('[data-dust-member-movie="anilist:16498"]').click();
+    const similarityMembers = page.getByRole('table', { name: 'Dust members for Attack on Titan' });
+    await similarityMembers.waitFor();
+    assert.deepEqual(await similarityMembers.locator('thead th').allTextContents(),
+      ['Rank', 'Movie writer', 'Similarity', 'Attraction percentile']);
+    await page.locator(`[data-dust-member-movie="${movies}"]`).click();
+    assert.deepEqual(await popularityMembers.locator('thead th').allTextContents(),
+      ['Rank', 'Movie writer', 'TMDB popularity', 'Attraction percentile', 'Title counts']);
+    for (const index of [0, 1, 2]) await dot(page).nth(index).press('Enter');
+    assert.equal(await page.locator('#recommendation-detail h3').innerText(), 'Comparing 3 movie writers');
+    assert.equal(await comparison.getByRole('rowheader', { name: 'TMDB popularity', exact: true }).count(), 1);
+    assert.equal(await comparison.getByRole('rowheader', { name: 'M2 · TMDB popularity', exact: true }).count(), 1);
     assert.deepEqual(errors, []);
 
     const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
@@ -202,7 +248,7 @@ const state = page => page.evaluate(() => {
     await mixed(phone);
     assert.ok(await phone.getByRole('checkbox', { name: 'Color dust by highest attraction percentile' }).isVisible());
     await dot(phone).first().press('Enter');
-    assert.match(await phone.locator('#dust-focus').innerText(), /AniList list users/);
+    assert.match(await phone.locator('#dust-focus').innerText(), /AniList users/);
     await phone.locator('[data-dust-chart="connections"]').scrollIntoViewIfNeeded();
     await assertTitleMemberLayout(phone);
     assert.ok(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));

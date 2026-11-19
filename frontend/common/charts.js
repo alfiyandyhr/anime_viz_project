@@ -617,7 +617,7 @@
       const chart = drawPopularityAxes(data, {
         popularity, score, rankLimit,
         label: rankLimit ? "TMDB score versus popularity rank scatterplot" : "Score versus popularity scatterplot",
-        popularityLabel: rankLimit ? "TMDB popularity rank" : "Popularity — AniList list users (log scale)"
+        popularityLabel: rankLimit ? "TMDB popularity rank" : "AniList users (log scale)"
       });
       const { svg, x, y, correlation, clip, extent } = chart;
       context.onCorrelation?.(correlation, data.length);

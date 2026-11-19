@@ -562,7 +562,7 @@ body[data-chapter="recommendations"] .filterbar { display: none; }
 .dust-connection-rank, .dust-connection-score { font-variant-numeric: tabular-nums; }
 .dust-connection-rank { color: var(--text-muted); text-align: right; }
 .dust-connection-score { color: var(--dust-color); }
-.dust-connection-score small, .dust-member-score small { display: block; color: var(--text-muted); }
+.dust-connection-score small { display: block; color: var(--text-muted); }
 .dust-member-panel { min-width: 0; }
 .dust-member-panel h4 { margin: 0 0 8px; font-size: .95rem; }
 .dust-member-magnets {
@@ -578,15 +578,12 @@ body[data-chapter="recommendations"] .filterbar { display: none; }
   max-height: 18rem; overflow: auto;
   border: 1px solid var(--border); border-radius: 9px; background: var(--surface);
 }
-.dust-member-scroll table { min-width: 0; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
-.dust-member-scroll :is(th, td) { padding: 6px 8px; font-size: .78rem; }
+.dust-member-scroll table { min-width: 0; border-collapse: separate; border-spacing: 0; }
+.dust-member-scroll :is(th, td) { padding: 6px clamp(4px, 1vw, 8px); font-size: .78rem; }
 .dust-member-scroll th { font-size: .68rem; }
-.dust-member-scroll th:first-child { width: 3.25rem; }
-.dust-member-scroll th:last-child { width: 5.25rem; overflow-wrap: anywhere; }
-.dust-member-scroll th.dust-member-similarity { width: 6rem; white-space: nowrap; }
-.dust-member-scroll th.dust-member-percentile { width: clamp(7rem, 42%, 11rem); overflow-wrap: normal; }
-.dust-member-percentile span { display: block; }
-.dust-member-scroll :is(th, td):is(:first-child, :last-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.dust-member-scroll th:not(:nth-child(2)) { width: 1%; }
+.dust-member-scroll :is(td:not(:nth-child(2)), .dust-member-similarity) { white-space: nowrap; }
+.dust-member-scroll :is(th, td):not(:nth-child(2)) { text-align: right; font-variant-numeric: tabular-nums; }
 .dust-member-scroll td:nth-child(2) { padding-block: 0; }
 .dust-member-scroll tbody tr:last-child td { border-bottom: 0; }
 .dust-member-title {
@@ -722,7 +719,7 @@ body[data-chapter="dust-magnet"] .dust-selection { margin: 0; padding-top: 4px; 
 .dust-comparison-cover { display: block; margin-bottom: 8px; border-radius: 6px; object-fit: cover; background: var(--surface-light); }
 .dust-comparison-table thead button { display: block; margin-top: 8px; }
 .dust-comparison-table meter { display: block; width: 100%; height: 10px; margin-top: 6px; accent-color: var(--purple); }
-.dust-comparison-table .dust-movie-metric th { color: var(--magnet-color); }
+.dust-comparison-table .dust-movie-metric :is(th, strong) { color: var(--magnet-color); }
 .dust-comparison-table meter::-webkit-meter-bar { background: var(--surface-light); border: none; }
 .dust-comparison-table meter::-webkit-meter-optimum-value { background: var(--magnet-color, var(--purple)); }
 .dust-comparison-table meter::-moz-meter-bar { background: var(--magnet-color, var(--purple)); }

@@ -84,26 +84,29 @@
     const selected = snapshot.selectedKeys.map(key => snapshot.displayedDust.find(row => row.key === key)).filter(Boolean);
     const recordFor = match => snapshot.lookup.get(match.key)?.record || match.record;
     const number = value => Number.isFinite(value) ? formatNumber(value) : 'Unknown';
+    const meter = (value, min, max, label) =>
+      `<meter min="${min}" max="${max}" value="${value}" aria-label="${attr(label)}"></meter>`;
     const score = (value, min, max, label, exact = label) => Number.isFinite(value)
-      ? `<span class="dust-metric-value"${exact !== label ? ` tabindex="0" title="${attr(exact)}" aria-label="${attr(exact)}"` : ''}>${escape(label)}</span><meter min="${min}" max="${max}" value="${value}" aria-label="${attr(exact)}"></meter>` : 'Unknown';
+      ? `<span class="dust-metric-value"${exact !== label ? ` tabindex="0" title="${attr(exact)}" aria-label="${attr(exact)}"` : ''}>${escape(label)}</span>${meter(value, min, max, exact)}` : 'Unknown';
     function table(matches) {
       const records = matches.map(recordFor);
       const values = reverse || group ? records : records.map(root.AnivizChartData.comparisonValues);
       const runtimeMax = Math.max(1, ...values.map(row => Number.isFinite(row.runtime) ? row.runtime : 0));
+      const showTitleScore = !magnets.some(magnet => magnet.kind === 'score');
       const metadataRows = group ? [
         [`Catalogue ${titleNoun}`, value => number(value.memberIds.length)],
         ['Average score', value => Number.isFinite(value.averageScore) ? `${value.averageScore.toFixed(1)} / ${reverse ? 10 : 100}` : 'Unknown'],
-        ['Total popularity', value => number(value.totalPopularity)]
+        [root.AnivizDust.popularityLabel(snapshot.direction), value => number(value.totalPopularity)]
       ] : reverse ? [
         ['Release year', value => value.year ?? 'Unknown'],
         ['Genres', value => escape(value.genres?.join(', ') || 'Unknown')],
         ['Runtime', value => score(value.runtime, 0, runtimeMax, `${number(value.runtime)} min`)],
-        ['TMDB score', value => score(value.vote_average, 0, 10, `${number(value.vote_average)} / 10`)]
+        ...(showTitleScore ? [['TMDB score', value => score(value.vote_average, 0, 10, `${number(value.vote_average)} / 10`)]] : [])
       ] : [
         ['Format / year', value => `${value.format ? escape(humanize(value.format)) : 'Unknown'} / ${value.year ?? 'Unknown'}`],
         ['Episodes', value => value.episodes ? `${number(value.episodes)}${value.duration ? ` × ${number(value.duration)} min` : ''}` : 'Unknown'],
         ['Estimated runtime', value => score(value.runtime, 0, runtimeMax, `${number(value.runtime)} min`)],
-        ['AniList score', value => score(value.score, 0, 100, `${number(value.score)} / 100`)],
+        ...(showTitleScore ? [['AniList score', value => score(value.score, 0, 100, `${number(value.score)} / 100`)]] : []),
         ['Status', value => value.status ? escape(humanize(value.status)) : 'Unknown']
       ];
       const rows = [
@@ -111,17 +114,28 @@
         ...magnets.map((magnet, index) => {
           const cohort = magnet.kind === 'genre';
           const label = mixed || cohort ? root.AnivizDust.magnetScoreLabel(magnet) : magnet.title;
+          const metric = root.AnivizDust.isMetricMagnet(magnet);
+          const min = metric ? 0 : -1;
+          const max = metric && magnet.kind !== 'score'
+            ? Math.max(0, ...matches.map(match => match.rawScores[index]).filter(Number.isFinite)) || 1
+            : magnet.scale ?? 1;
           return [`M${index + 1} · ${label}`, (_, i) => {
-            const match = matches[i], value = match.scores[index];
-            if (mixed) return `<small>Raw ${root.AnivizDust.formatRawScore(match.rawScores[index], magnet)}</small><br>${
-              score(value, 0, 1, root.AnivizDust.formatPercentile(value), root.AnivizDust.mixedEvidence(match, magnet, index))}`;
-            return score(value, -1, 1, value.toFixed(3), cohort ? `${label}: ${value}` : `Cosine ${value}`);
+            const match = matches[i], value = match.rawScores[index];
+            if (mixed) {
+              const raw = root.AnivizDust.formatRawScore(value, magnet);
+              const percentile = root.AnivizDust.formatPercentile(match.scores[index]);
+              const bar = Number.isFinite(value) ? meter(value, min, max, `${label}: ${raw}`) : '';
+              return `<strong class="dust-metric-value">${raw}</strong><br><small>Percentile ${percentile}</small>${bar}`;
+            }
+            return score(value, min, max, value.toFixed(3), cohort ? `${label}: ${value}` : `Cosine ${value}`);
           }];
         }),
         [mixed ? root.AnivizDust.averageLabel(true) : group ? 'Mean story similarity across magnets' : 'Average cosine similarity', (_, i) =>
           score(matches[i].score, mixed ? 0 : -1, 1, matches[i].score.toFixed(3),
             `${mixed ? root.AnivizDust.averageLabel(true) : 'Average cosine'} ${matches[i].score}`)]
       ];
+      const scaleNote = magnets.some(magnet => root.AnivizDust.isMetricMagnet(magnet) && magnet.kind !== 'score')
+        ? ' Popularity and count bars are scaled to the largest value in each row.' : '';
       return `<div class="dust-comparison-scroll" role="region" tabindex="0" aria-label="Selected ${noun} comparison, scroll horizontally">
         <table class="dust-comparison-table"><caption class="sr-only">Selected ${noun} comparison</caption>
         <thead><tr><th scope="col">Compare ${noun}</th>${records.map((item, i) => {
@@ -133,7 +147,7 @@
           </th>`;
         }).join('')}</tr></thead>
         <tbody>${rows.map(([label, cell], index) => `<tr${index >= metadataRows.length && index < metadataRows.length + magnets.length ? ` style="--magnet-color:${color(magnets[index - metadataRows.length].key)}" class="dust-movie-metric"` : ''}><th scope="row">${escape(label)}</th>${values.map((value, i) => `<td>${cell(value, i)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
-        <p class="table-note">${group ? `Each magnet uses all catalogue ${titleNoun} with data for that magnet. ` : reverse ? '' : 'Estimated runtime multiplies episodes by minutes per episode. '}${mixed ? 'Meters show attraction percentiles from 0 to 1.' : 'Cosine scores range from −1 to 1.'}</p>`;
+        <p class="table-note">${group ? `Each magnet uses all catalogue ${titleNoun} with data for that magnet. ` : reverse ? '' : 'Estimated runtime multiplies episodes by minutes per episode. '}${mixed ? `Magnet bars show the highlighted values.${scaleNote}` : 'Cosine scores range from −1 to 1.'}</p>`;
     }
     const focused = focusedMagnet ? null : selected.at(-1);
     const record = focusedMagnet || (focused && recordFor(focused));

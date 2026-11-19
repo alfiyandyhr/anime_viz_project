@@ -39,7 +39,7 @@
       drawLines = null;
       const magnet = magnets[magnetIndex];
       const cohortLabel = magnet?.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : '';
-      const scoreLabel = mixed ? `Attraction percentile · ${AnivizDust.magnetScoreLabel(magnet)}`
+      const scoreLabel = mixed ? `${AnivizDust.magnetScoreLabel(magnet)} · Attraction percentile`
         : group ? 'Mean signed cosine similarity' : cohortLabel || 'Signed cosine similarity';
       onCoverage(`${displayedDust.length} displayed ${noun} · ${scoreLabel}.`);
       if (!magnetKeys.length || !displayedDust.length) {
@@ -59,10 +59,8 @@
       const title = titleFor(magnetIndex);
       const evidence = match => mixed ? AnivizDust.mixedEvidence(match, magnet, magnetIndex)
         : cohortLabel ? `${cohortLabel}: ${match.similarity}` : `Cosine ${match.similarity}`;
-      const showScores = cells => {
-        cells.attr('title', evidence).text(match => match.similarity.toFixed(3));
-        if (mixed) cells.append('small').text(match => `Raw ${AnivizDust.formatRawScore(match.rawScores[magnetIndex], magnet)}`);
-      };
+      const metricValue = match => AnivizDust.formatRawScore(match.rawScores[magnetIndex], magnet);
+      const percentile = match => AnivizDust.formatPercentile(match.similarity);
       const comparison = d3.select(container).append('div').attr('class', 'dust-connection-comparison');
       const card = comparison.append('section').attr('class', 'dust-connection-map')
         .attr('aria-label', `Similarity connections for ${title}`);
@@ -90,7 +88,7 @@
       const panels = card.append('div').attr('class', 'dust-connection-panels');
       const lists = [ranking.slice(0, midpoint), ranking.slice(midpoint)].map((matches, index) => {
         if (!matches.length) return null;
-        const label = mixed ? (index === 0 ? 'Highest attraction' : 'Lowest attraction') : (index === 0 ? 'Most similar' : 'Least similar');
+        const label = mixed ? (index === 0 ? 'Highest scoring' : 'Lowest scoring') : (index === 0 ? 'Most similar' : 'Least similar');
         const ranks = matches.length === 1 ? `Rank ${matches[0].rank}` : `Ranks ${matches[0].rank}–${matches.at(-1).rank}`;
         const section = panels.append('div').attr('class', 'dust-connection-panel');
         const heading = section.append('h4');
@@ -113,7 +111,8 @@
         rows.append('span').attr('class', 'dust-connection-rank').text(match => match.rank);
         rows.append('span').attr('class', 'dust-connection-title').text(match => match.record.title)
           .attr('title', match => group ? AnivizDustDetails.groupCoverage(match, snapshot.direction, magnetIndex, magnet) : null);
-        showScores(rows.append('span').attr('class', 'dust-connection-score'));
+        const scores = rows.append('span').attr('class', 'dust-connection-score').attr('title', evidence).text(metricValue);
+        if (mixed) scores.append('small').text(match => `Percentile ${percentile(match)}`);
         const panel = list.node(), end = panel.scrollHeight - panel.clientHeight;
         panel.scrollTop = index === 0 ? offsets[index] : end - offsets[index];
         list.on('scroll', () => {
@@ -135,19 +134,16 @@
           .attr('tabindex', 0).attr('aria-label', `Dust member ranking for ${title}`).attr('data-dust-member-scroll', '');
         const table = scroll.append('table').attr('aria-label', `Dust members for ${title}`)
           .style('--dust-color', matchColor(members[0]));
-        const memberScoreLabel = !mixed || magnet.kind === 'genre' ? 'Similarity' : scoreLabel;
+        const memberScoreLabel = AnivizDust.isMetricMagnet(magnet)
+          ? AnivizDust.magnetScoreLabel(magnet) : 'Similarity';
+        const showTitleCounts = group && AnivizDust.METRIC_MAGNET_TYPES.includes(magnet.kind);
         const headings = ['Rank', group?.label || (noun === 'movies' ? 'Movie' : 'Anime'), memberScoreLabel];
-        if (group) headings.push(AnivizDust.isMovieDust(snapshot.direction) ? 'Movie counts' : 'Anime counts');
-        const headerCells = table.append('thead').append('tr').selectAll('th').data(headings).join('th')
+        if (mixed) headings.push('Attraction percentile');
+        if (showTitleCounts) headings.push('Title counts');
+        table.append('thead').append('tr').selectAll('th').data(headings).join('th')
           .attr('scope', 'col')
           .classed('dust-member-similarity', label => label === 'Similarity')
           .text(label => label);
-        const titlePercentile = mixed && magnet.kind === undefined;
-        if (!group && (titlePercentile || AnivizDust.isMetricMagnet(magnet))) {
-          headerCells.filter(label => label === memberScoreLabel)
-            .classed('dust-member-percentile', true).text('Attraction percentile ')
-            .append('span').text(titlePercentile ? 'Similarity' : AnivizDust.magnetScoreLabel(magnet));
-        }
         const rows = table.append('tbody').selectAll('tr').data(members).join('tr')
           .classed('dust-member-selected', isSelected)
           .on('click', (event, match) => {
@@ -159,8 +155,9 @@
           .attr('data-dust-member-id', match => `${selectedMagnetKey}:${match.key}`)
           .attr('aria-pressed', isSelected).attr('aria-haspopup', match => group || isSelected(match) ? null : 'dialog')
           .attr('aria-controls', group ? 'recommendation-detail' : 'recommendation-detail detail-drawer').text(match => match.record.title);
-        showScores(rows.append('td').attr('class', 'dust-member-score'));
-        if (group) rows.append('td').text(match => match.record.memberIds.length);
+        rows.append('td').attr('class', 'dust-member-score').attr('title', evidence).text(metricValue);
+        if (mixed) rows.append('td').text(percentile);
+        if (showTitleCounts) rows.append('td').text(match => match.record.memberIds.length.toLocaleString('en-US'));
         scroll.node().scrollTop = memberScrollTop;
       } else {
         memberPanel.append('p').attr('class', 'dust-member-empty').text(`None of the displayed ${noun} have their highest score for ${title}.`);

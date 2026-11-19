@@ -56,7 +56,7 @@ async function verifyCreatorPickers(page) {
     await picker.getByRole('radio', { name: 'Title count' }).check();
     await page.getByRole('button', { name: 'Add title count magnet' }).click();
     await page.locator('[data-dust-ranking-sort]').selectOption(movieGenre);
-    assert.match(await page.locator('[data-dust-ranking-head]').textContent(), /Science Fiction movies/);
+    assert.match(await page.locator('[data-dust-ranking-head]').textContent(), /Science Fiction movie count/);
     const counts = await page.evaluate(() => {
       const { ranking, titleLookup, activeMagnetKeys } = AnivizMain.snapshot();
       const leader = ranking[0];
@@ -66,6 +66,19 @@ async function verifyCreatorPickers(page) {
     });
     assert.deepEqual(counts.activeMagnetKeys, ['anilist:16498', movieGenre, titleCount]);
     assert.deepEqual(counts.raw, counts.expected);
+    const memberLabel = dustType === 'movie-writers' ? 'Movie writer' : 'Movie actor';
+    for (const [key, title, countLabel] of [
+      [movieGenre, 'Science Fiction movies', 'Science Fiction movie count'],
+      [titleCount, 'Title count', 'Title count']
+    ]) {
+      await page.locator(`[data-dust-member-movie="${key}"]`).click();
+      const table = page.getByRole('table', { name: `Dust members for ${title}` });
+      assert.deepEqual(await table.locator('thead th').allTextContents(),
+        ['Rank', memberLabel, countLabel, 'Attraction percentile']);
+      const [, , countValue, percentile] = await table.locator('tbody tr').first().locator('td').allTextContents();
+      assert.match(countValue, /^\d+$/);
+      assert.match(percentile, /^\d\.\d{3}$/);
+    }
     await remove(page, movieGenre);
     await remove(page, titleCount);
   }
