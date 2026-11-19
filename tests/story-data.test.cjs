@@ -88,6 +88,17 @@ test('validation rejects dashboard data, duplicate years and cross-year records'
   assert.throws(() => model.validate({ ...payload, years: [{ year: 1963, anime: [{ id: 1, title: 'Wrong year', year: 1964 }] }] }));
 });
 
+test('match year span sums descending gaps across the five highest-ranked dated matches', () => {
+  const matches = [2025, 2016, 2014, 2013, 2016, 1984].map(year => ({ work: { year } }));
+  assert.deepEqual(model.matchYearSpan(matches), {
+    years: [2025, 2016, 2016, 2014, 2013], gaps: [9, 0, 2, 1], span: 12
+  });
+  assert.deepEqual(matches.map(({ work }) => work.year), [2025, 2016, 2014, 2013, 2016, 1984]);
+  assert.equal(model.matchYearSpan(matches.slice(0, 4)), null);
+  assert.equal(model.matchYearSpan([...matches.slice(0, 4), { work: {} }, matches[5]]), null);
+  assert.equal(model.matchYearSpan(Array(5).fill(matches[0])).span, 0);
+});
+
 test('the anime timeline ranks the five highest-scoring live-action movies for every annual winner', () => {
   const archive = model.validate(require('../story.json'));
   const bundle = require('../data/history_movie_matches.json');

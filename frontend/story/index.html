@@ -38,6 +38,7 @@
   <script src="../common/data-loader.js" defer></script>
   <script src="../common/title-artwork.js" defer></script>
   <script src="data.js" defer></script>
+  <script src="match-span.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 
@@ -66,46 +67,45 @@
     </header>
 
     <main class="stage history-stage" id="story-main" tabindex="-1">
-      <div class="history-journey" id="history-journey">
-        <div class="history-panel">
-          <header class="history-header">
-            <div>
-              <p class="history-kicker">The AniMoViz archive <span id="history-range"></span></p>
-              <h1>Screen Echoes</h1>
-              <p class="history-intro" id="history-intro">Scroll to explore each year’s most popular anime and its closest live-action movie matches.</p>
+      <header class="history-header">
+        <div>
+          <p class="history-kicker">The AniMoViz archive <span id="history-range"></span></p>
+          <h1>Screen Echoes</h1>
+          <p class="history-intro" id="history-intro">Scroll inside the timeline to explore each year’s most popular anime and its closest live-action movie matches.</p>
+        </div>
+        <div class="history-controls" id="history-controls" hidden>
+          <fieldset class="history-perspective" aria-label="Timeline perspective">
+            <label><input type="radio" name="history-perspective" value="anime" checked><span>Anime Timeline</span></label>
+            <label><input type="radio" name="history-perspective" value="movie"><span>Movie Timeline</span></label>
+          </fieldset>
+          <div class="history-year-control">
+            <label id="year-label" for="year-picker">Anime release year</label>
+            <div class="history-year-buttons">
+              <button type="button" id="previous-year" aria-label="Previous year">←</button>
+              <select id="year-picker"></select>
+              <button type="button" id="next-year" aria-label="Next year">→</button>
             </div>
-            <div class="history-controls" id="history-controls" hidden>
-              <fieldset class="history-perspective" aria-label="Timeline perspective">
-                <label><input type="radio" name="history-perspective" value="anime" checked><span>Anime Timeline</span></label>
-                <label><input type="radio" name="history-perspective" value="movie"><span>Movie Timeline</span></label>
-              </fieldset>
-              <div class="history-year-control">
-                <label id="year-label" for="year-picker">Anime release year</label>
-                <div class="history-year-buttons">
-                  <button type="button" id="previous-year" aria-label="Previous year">←</button>
-                  <select id="year-picker"></select>
-                  <button type="button" id="next-year" aria-label="Next year">→</button>
-                </div>
-              </div>
-              <div class="history-match-control">
-                <label for="match-count">Connections</label>
-                <select id="match-count">
-                  <option value="1" selected>1</option>
-                  <option value="2">2</option>
-                  <option value="3">3</option>
-                  <option value="4">4</option>
-                  <option value="5">5</option>
-                </select>
-              </div>
-            </div>
-          </header>
-
-          <div class="history-load" id="history-load" role="status" hidden>
-            <span></span>
-            <button type="button" id="retry-data" hidden>Retry</button>
           </div>
-          <noscript><p>Enable JavaScript to explore the anime and movie timelines.</p></noscript>
+          <div class="history-match-control">
+            <label for="match-count">Connections</label>
+            <select id="match-count">
+              <option value="1" selected>1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+            </select>
+          </div>
+        </div>
+      </header>
 
+      <div class="history-load" id="history-load" role="status" hidden>
+        <span></span>
+        <button type="button" id="retry-data" hidden>Retry</button>
+      </div>
+      <noscript><p>Enable JavaScript to explore the anime and movie timelines.</p></noscript>
+      <div class="history-journey" id="history-journey" role="region" aria-label="Release timelines" aria-describedby="history-intro" tabindex="0" hidden>
+        <div class="history-panel">
           <section class="history-pair" id="history-pair" aria-label="Anime and movie matches" hidden>
             <article class="history-card history-anime" id="history-anime"></article>
             <figure class="history-visual">
@@ -145,14 +145,55 @@
             </figure>
             <article class="history-card history-movie" id="history-movie"></article>
           </section>
-
-          <footer class="history-note" id="history-note" hidden>
-            <p id="history-method"></p>
-            <p><span aria-hidden="true">↓</span> Scroll to explore by year</p>
-          </footer>
         </div>
         <div id="history-travel" aria-hidden="true"></div>
       </div>
+      <p class="history-note" id="history-method" hidden></p>
+      <details class="history-match-span" id="history-match-span" hidden>
+        <summary>Match year span</summary>
+        <div class="history-span-content">
+          <div class="history-span-controls">
+            <fieldset class="history-perspective" aria-label="Match direction">
+              <label><input type="radio" name="history-span-direction" value="anime" checked><span>Anime → Movies</span></label>
+              <label><input type="radio" name="history-span-direction" value="movie"><span>Movie → Anime</span></label>
+            </fieldset>
+            <div class="history-span-year-control">
+              <label for="history-span-year">Year</label>
+              <select id="history-span-year" disabled></select>
+            </div>
+          </div>
+          <div class="history-load" id="history-span-status" hidden>
+            <span role="status"></span>
+            <button type="button" hidden>Retry</button>
+          </div>
+          <div class="history-span-results" hidden>
+            <div class="history-span-heading" aria-live="polite" aria-atomic="true">
+              <h2 id="history-span-title"></h2>
+              <p id="history-span-value" hidden></p>
+              <p id="history-span-caption"></p>
+            </div>
+            <section id="history-span-calculation" aria-labelledby="history-span-years-heading" hidden>
+              <h3 id="history-span-years-heading">Match release years, newest first</h3>
+              <div class="history-span-steps" aria-hidden="true"></div>
+              <p class="history-span-equation"><span class="sr-only"></span><span></span></p>
+            </section>
+            <section class="history-span-comparison" aria-labelledby="history-span-comparison-heading">
+              <h3 id="history-span-comparison-heading"></h3>
+              <p id="history-span-comparison-description"></p>
+              <ul class="history-span-bars"></ul>
+            </section>
+            <details class="history-span-genres" hidden>
+              <summary>View all 5 matches and genres</summary>
+              <table>
+                <thead>
+                  <tr><th scope="col">Match</th><th scope="col">Year</th><th scope="col">Genres</th><th scope="col">Cosine similarity</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </details>
+          </div>
+        </div>
+      </details>
     </main>
   </div>
 
