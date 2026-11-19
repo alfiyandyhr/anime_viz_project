@@ -24,6 +24,7 @@ SEMANTIC = DATA / "semantic_similarity"
 sys.path[:0] = [str(SEMANTIC), str(ROOT / "backend")]
 
 from collect_anime import ANILIST_URL, normalise_anime
+from collect_anime_credits import collect_anime_creators
 from collect_movies import ATTRIBUTION, TMDB_URL, normalise_movie
 from common import (
     OUTPUT, TMDB_ENV_FILE, CollectionError, JsonClient, checkpoint_path, clean_text,
@@ -313,6 +314,35 @@ def update_published_credits():
     print(f"Updated cast and writing credits for {len(movie_ids)} movies in {path}", flush=True)
 
 
+def published_anime_ids(path):
+    payload = read_json(path)
+    anime = payload.get("anime") if isinstance(payload, dict) else None
+    if not isinstance(anime, list) or not anime or any(not isinstance(row, dict) for row in anime):
+        raise CollectionError(f"Missing published anime records in {path}.")
+    ids = [str(row.get("id")) for row in anime]
+    if len(ids) != len(set(ids)) or any(not re.fullmatch(r"[1-9][0-9]*", anime_id) for anime_id in ids):
+        raise CollectionError(f"Invalid or duplicate published anime IDs in {path}.")
+    return [int(anime_id) for anime_id in ids]
+
+
+def update_published_anime_credits():
+    anime_ids = published_anime_ids(ROOT / "data.json")
+    scored_ids = published_anime_ids(DATA / RECOMMENDATIONS)
+    if set(anime_ids) != set(scored_ids):
+        raise CollectionError("Published dashboard and recommendation anime IDs differ.")
+
+    credits = collect_anime_creators(JsonClient("AniList", 2.1), anime_ids)
+    path = DATA / "anime_credits.json"
+    write_json(path, {
+        "schema_version": 1,
+        "source": "AniList",
+        "record_count": len(anime_ids),
+        "credits_collected_at_utc": utc_now(),
+        "anime": credits,
+    }, compact=True)
+    print(f"Updated original-creator credits for {len(anime_ids)} anime in {path}", flush=True)
+
+
 def update_dataset(resume):
     from anilist_service import AniListService, DASHBOARD_MEDIA_FIELDS
 
@@ -465,14 +495,19 @@ def main():
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--update-dataset", action="store_true", help="Collect and stage a fresh shared catalogue.")
     action.add_argument("--recompute-scores", action="store_true", help="Score the staged catalogue and update web files.")
-    parser.add_argument("--cast-and-writer-only", action="store_true",
-                        help="With --update-dataset, update cast and writers for the published movies.")
-    parser.add_argument("--resume", action="store_true", help="Continue an interrupted --update-dataset.")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--cast-and-writer-only", action="store_true",
+                      help="With --update-dataset, update cast and writers for the published movies.")
+    mode.add_argument("--anime-creator-only", action="store_true",
+                      help="With --update-dataset, collect original creators for the published anime.")
+    mode.add_argument("--resume", action="store_true", help="Continue an interrupted full --update-dataset.")
     parser.add_argument("--batch-size", type=positive_int, help="Embedding batch size for --recompute-scores (default: 8).")
     parser.add_argument("--device", choices=("auto", "cpu", "mps", "cuda"), help="Scoring device (default: auto).")
     args = parser.parse_args()
-    if args.cast_and_writer_only and (not args.update_dataset or args.resume):
-        parser.error("--cast-and-writer-only requires --update-dataset and cannot be combined with --resume.")
+    if args.cast_and_writer_only and not args.update_dataset:
+        parser.error("--cast-and-writer-only requires --update-dataset.")
+    if args.anime_creator_only and not args.update_dataset:
+        parser.error("--anime-creator-only requires --update-dataset.")
     if args.resume and not args.update_dataset:
         parser.error("--resume only applies to --update-dataset.")
     if (args.batch_size or args.device) and not args.recompute_scores:
@@ -487,6 +522,8 @@ def main():
                 raise CollectionError("Another catalogue refresh or scoring command is running.") from None
             if args.cast_and_writer_only:
                 update_published_credits()
+            elif args.anime_creator_only:
+                update_published_anime_credits()
             elif args.update_dataset:
                 update_dataset(args.resume)
             else:

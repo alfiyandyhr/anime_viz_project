@@ -261,6 +261,24 @@ Both lists include `profile_path` when TMDB provides a portrait.
 Movies without either kind of credit have an empty list for that field.
 The existing similarity scores can be reused with both fields.
 
+### Collect original creators for the published anime catalogue
+
+```bash
+python data/refresh_data.py --update-dataset --anime-creator-only
+```
+
+This looks up the existing AniList IDs in `data.json` and verifies that they
+match the anime IDs in the published recommendations. It writes
+`data/anime_credits.json`, keyed by AniList anime ID. The command requires no
+TMDB credentials or embedding dependencies.
+
+`original_creators` includes each person's ID, name, and roles credited by
+AniList as Original Creator, Original Story, or Original Work. Records include
+portrait and AniList links when available. The published `data.json` already
+holds sampled Japanese voice actors and their character names in `voice_actors`.
+Dust & Magnet can use the existing title scores for future creator groups, so
+`--recompute-scores` is unnecessary.
+
 ### Local output files
 
 `data/refresh_data.py` is the entry point for both steps. It calls the scorer
