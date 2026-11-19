@@ -62,13 +62,14 @@
     }
     return people;
   }
-  function actorGroups(titles, field, prefix) {
+  function personGroups(titles, field, prefix) {
     return [...creditedPeople(titles, field).values()].map(({ id, name, image, profile_path, works }) => ({
       key: `${prefix}:${id}`, id, title: name, image, profile_path, ...summarize([...works.values()], new Set())
     }));
   }
-  const voiceActors = anime => actorGroups(anime, "voice_actors", "anilist:staff");
-  const movieActors = movies => actorGroups(movies, "cast", "tmdb:person");
+  const voiceActors = anime => personGroups(anime, "voice_actors", "anilist:staff");
+  const movieActors = movies => personGroups(movies, "cast", "tmdb:person");
+  const movieWriters = movies => personGroups(movies, "writers", "tmdb:person");
   function timeline(anime, selectedIds = []) {
     const selected = new Set(selectedIds.map(String)), groups = new Map();
     anime.filter(row => Number.isFinite(row.year)).forEach(row => {
@@ -99,5 +100,5 @@
   }
   const hasMovieReception = movie => Number.isInteger(movie.popularity_rank) && movie.popularity_rank >= 1
     && Number.isFinite(movie.vote_average) && movie.vote_average >= 0 && movie.vote_average <= 10;
-  return { genres, studios, creditedPeople, voiceActors, movieActors, timeline, correlation, comparisonValues, hasMovieReception };
+  return { genres, studios, creditedPeople, voiceActors, movieActors, movieWriters, timeline, correlation, comparisonValues, hasMovieReception };
 });

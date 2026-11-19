@@ -46,9 +46,12 @@
     const { direction } = snapshot;
     const movie = root.AnivizDust.isMovieDust(direction);
     const studio = direction === root.AnivizDust.STUDIOS;
+    const writer = direction === root.AnivizDust.MOVIE_WRITERS;
     const provider = root.AnivizDust.DIRECTIONS[direction].dust;
     const noun = root.AnivizDust.titleNoun(direction);
-    const credit = movie ? 'Sampled TMDB cast credits' : studio ? 'AniList main-studio credits' : 'AniList Japanese main-role credits';
+    const credit = writer ? 'TMDB Writing department credits'
+      : movie ? 'Sampled TMDB cast credits' : studio ? 'AniList main-studio credits' : 'AniList Japanese main-role credits';
+    const workAttribute = studio ? 'data-studio-work' : writer ? 'data-writer-work' : 'data-actor-work';
     const image = movie ? root.AnivizArtwork.moviePortrait(record) : record.image;
     const portrait = root.AnivizArtwork.detailHero('', image, `Portrait of ${record.title}`, attr);
     const link = movie ? `https://www.themoviedb.org/person/${attr(record.id)}`
@@ -62,7 +65,7 @@
       <p class="recommendation-detail-meta">${groupCoverage(match, direction, snapshot.magnets.length === 1 ? 0 : undefined)} · ${credit}</p>
       ${magnetScores(match, snapshot.magnets, color, helpers)}
       <div class="recommendation-context"><h4>${evidenceTitle}</h4>
-        ${supporting.length ? `<ul>${supporting.map(work => `<li><button type="button" class="recommendation-title-button" data-${studio ? 'studio' : 'actor'}-work="${provider}:${attr(work.id)}" aria-haspopup="dialog" aria-controls="detail-drawer">${escape(work.title)}</button>${Number.isFinite(work.similarity) ? ` · ${work.similarity.toFixed(3)}` : ''}</li>`).join('')}</ul>` : '<p>No title scores are available for this view.</p>'}</div>
+        ${supporting.length ? `<ul>${supporting.map(work => `<li><button type="button" class="recommendation-title-button" ${workAttribute}="${provider}:${attr(work.id)}" aria-haspopup="dialog" aria-controls="detail-drawer">${escape(work.title)}</button>${Number.isFinite(work.similarity) ? ` · ${work.similarity.toFixed(3)}` : ''}</li>`).join('')}</ul>` : '<p>No title scores are available for this view.</p>'}</div>
       <a class="button button-secondary" href="${link}" target="_blank" rel="noopener noreferrer">Explore on ${movie ? 'TMDB' : 'AniList'} ↗</a>`;
   }
 
@@ -134,7 +137,7 @@
     const cover = record?.cover?.extra_large || record?.cover?.large || '';
     const banner = record?.banner_image || cover;
     const tags = record?.tags || [];
-    const focusLabel = movie ? 'Movie in focus' : `${(!focusedMagnet && group?.label) || 'Anime'} in focus`;
+    const focusLabel = `${(!focusedMagnet && group?.label) || (movie ? 'Movie' : 'Anime')} in focus`;
     const placeholder = group
       ? `<div class="dust-detail-placeholder"><p class="chart-kicker">${focusLabel}</p><p>Select a ${group.label.toLowerCase()} to see magnet scores and explore credited ${titleNoun} below.</p></div>`
       : `<div class="dust-detail-placeholder"><p class="chart-kicker">${focusLabel}</p><h3>Every dot has a story.</h3><p>Select a dot or a title magnet to explore its storyline and genres.</p></div>`;

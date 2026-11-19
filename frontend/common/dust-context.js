@@ -9,7 +9,7 @@
   const STORAGE_KEY = "aniviz-dust-session-v2";
   const LEGACY_KEY = "aniviz-dust-session-v1";
   const FORWARD = "movie-to-anime", REVERSE = "anime-to-movies", STUDIOS = "movie-to-studios";
-  const ACTORS = "movie-to-actors", MOVIE_ACTORS = "anime-to-actors";
+  const ACTORS = "movie-to-actors", MOVIE_ACTORS = "anime-to-actors", MOVIE_WRITERS = "anime-to-writers";
   const DIRECTIONS = {
     [FORWARD]: { magnet: "tmdb", dust: "anilist", example: "Inception" },
     [REVERSE]: { magnet: "anilist", dust: "tmdb", example: "Attack on Titan" },
@@ -18,7 +18,9 @@
     [ACTORS]: { magnet: "tmdb", dust: "anilist", example: "Inception",
       group: { prefix: "anilist:staff", label: "Voice actor", noun: "voice actors" } },
     [MOVIE_ACTORS]: { magnet: "anilist", dust: "tmdb", example: "Attack on Titan",
-      group: { prefix: "tmdb:person", label: "Movie actor", noun: "movie actors" } }
+      group: { prefix: "tmdb:person", label: "Movie actor", noun: "movie actors" } },
+    [MOVIE_WRITERS]: { magnet: "anilist", dust: "tmdb", example: "Attack on Titan",
+      group: { prefix: "tmdb:person", label: "Movie writer", noun: "movie writers" } }
   };
   const groupFor = direction => DIRECTIONS[direction].group;
   const isMovieDust = direction => DIRECTIONS[direction].dust === "tmdb";
@@ -345,7 +347,10 @@
             record: { ...record, ...movieDetails[record.id], ...reception, average_score: reception?.vote_average ?? null }
           }];
         }));
-        if (group) summaries = ChartData.movieActors([...titleLookup.values()].map(row => row.record));
+        if (group) {
+          const movies = [...titleLookup.values()].map(row => row.record);
+          summaries = direction === MOVIE_WRITERS ? ChartData.movieWriters(movies) : ChartData.movieActors(movies);
+        }
       } else {
         titleLookup = new Map([...joinRecords(data?.anime || [], metadata)].map(([id, row]) =>
           [keyFor("anilist", id), { record: row.anime, metadata: row.metadata }]));
@@ -514,7 +519,7 @@
         movieDetailsStatus = status;
         if (!isMovieDust(direction)) return snapshot();
         refreshLookup();
-        if (direction === MOVIE_ACTORS) return derive({ rescore: true });
+        if (groupFor(direction)) return derive({ rescore: true });
         return publish();
       },
       setMoviePopularity(payload, status) {
@@ -591,7 +596,7 @@
     };
     return api;
   }
-  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, STUDIOS, ACTORS, MOVIE_ACTORS, DIRECTIONS, groupFor, isMovieDust, titleNoun,
+  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, STUDIOS, ACTORS, MOVIE_ACTORS, MOVIE_WRITERS, DIRECTIONS, groupFor, isMovieDust, titleNoun,
     METRIC_MAGNET_TYPES, isMetricMagnet,
     keyFor, catalogueFor, magnetScoreLabel, cohortDescription,
     averageLabel, formatPercentile, formatRawScore, mixedEvidence, defaults, joinRecords,

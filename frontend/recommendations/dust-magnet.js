@@ -402,9 +402,10 @@ function renderDustRecommendations() {
   const creditStatus = movie ? snapshot.movieDetailsStatus : snapshot.metadataStatus;
   if (group && creditStatus !== "ready") {
     const unavailable = creditStatus === "unavailable";
-    const credits = studios ? "studio credits" : movie ? "movie cast credits" : "voice actor credits";
+    const writers = direction === AnivizDust.MOVIE_WRITERS;
+    const credits = writers ? "writing credits" : studios ? "studio credits" : movie ? "movie cast credits" : "voice actor credits";
     const message = unavailable ? `${group.label} credits could not be loaded.` : `Loading ${movie ? "TMDB" : "AniList"} ${credits}…`;
-    const retryId = studios ? "studio-credits-retry" : "actor-credits-retry";
+    const retryId = writers ? "writer-credits-retry" : studios ? "studio-credits-retry" : "actor-credits-retry";
     container.innerHTML = `<div class="dust-empty" role="status"><p>${message}</p>${unavailable
       ? `<button type="button" class="small-button ghost" id="${retryId}">Retry ${credits}</button>` : ""}</div>`;
     renderEmpty(mirror, message);

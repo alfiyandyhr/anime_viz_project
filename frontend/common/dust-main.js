@@ -10,13 +10,14 @@
     [AnivizDust.STUDIOS]: 'anime-studios',
     [AnivizDust.ACTORS]: 'anime-voice-actors',
     [AnivizDust.REVERSE]: 'movie-titles',
-    [AnivizDust.MOVIE_ACTORS]: 'movie-actors'
+    [AnivizDust.MOVIE_ACTORS]: 'movie-actors',
+    [AnivizDust.MOVIE_WRITERS]: 'movie-writers'
   };
   const magnetColors = new Map();
   const isReverse = () => AnivizDust.isMovieDust(latest.direction);
   const isStudio = () => latest.direction === AnivizDust.STUDIOS;
-  const isActor = () => [AnivizDust.ACTORS, AnivizDust.MOVIE_ACTORS].includes(latest.direction);
   const dustGroup = () => AnivizDust.groupFor(latest.direction);
+  const isMoviePersonDust = () => isReverse() && Boolean(dustGroup());
   const dustNoun = () => dustGroup()?.noun || (isReverse() ? "movies" : "anime");
   const detailHelpers = () => ({ escapeHTML, escapeAttribute, humanize, formatNumber });
   const color = key => magnetColors.get(key);
@@ -163,7 +164,8 @@
     }
     if (switched || !snapshot.activeMagnetKeys.includes(focusedMagnetKey)) focusedMagnetKey = null;
     if (switched) loadLayout();
-    const reverse = isReverse(), studios = isStudio(), actors = isActor(), group = dustGroup();
+    const reverse = isReverse(), studios = isStudio(), group = dustGroup();
+    const people = group && !studios;
     const used = new Set();
     snapshot.activeMagnetKeys.forEach(key => {
       let value = magnetColors.get(key);
@@ -183,14 +185,14 @@
     const studioGroups = studios ? keysInScope.map(key => snapshot.lookup.get(key)?.record).filter(Boolean) : null;
     const provider = AnivizDust.DIRECTIONS[snapshot.direction].dust;
     const titleFor = id => snapshot.titleLookup.get(AnivizDust.keyFor(provider, id)).record;
-    const records = group ? (actors
+    const records = group ? (people
       ? [...new Set(snapshot.displayedDust.flatMap(match => match.record.memberIds))]
       : snapshot.supportingIds).map(titleFor)
       : snapshot.displayedKeys.map(key => snapshot.lookup.get(key).record);
-    const receptionTitles = actors && snapshot.selectedKeys.length ? snapshot.supportingIds.map(titleFor) : records;
+    const receptionTitles = people && snapshot.selectedKeys.length ? snapshot.supportingIds.map(titleFor) : records;
     const dustColors = new Map(snapshot.displayedDust.map(match => [match.key, dustColor(match)]));
     const metric = $('[data-dust-genre-metric]').value;
-    const selectedIds = actors ? (snapshot.selectedKeys.length ? snapshot.supportingIds : [])
+    const selectedIds = people ? (snapshot.selectedKeys.length ? snapshot.supportingIds : [])
       : studios ? [] : snapshot.selectedKeys.flatMap(key => {
         const record = snapshot.lookup.get(key)?.record;
         return record ? [String(record.id)] : [];
@@ -221,7 +223,7 @@
     $('#dust-limit').value = snapshot.dustLimit;
     const unit = group?.noun || 'titles';
     const scoreLabel = snapshot.mixed ? 'attraction percentiles' : group ? 'mean story similarity' : 'similarity scores';
-    $('#recommendation-score-note').textContent = `Zoom in for ${studios ? 'studio names' : actors ? 'portraits' : 'posters'}. Hover or focus for ${scoreLabel}. Thicker links show a stronger pull. Select up to 3 ${unit}.`;
+    $('#recommendation-score-note').textContent = `Zoom in for ${studios ? 'studio names' : people ? 'portraits' : 'posters'}. Hover or focus for ${scoreLabel}. Thicker links show a stronger pull. Select up to 3 ${unit}.`;
     const colorNote = snapshot.colorByMagnet ? ` Color identifies each ${group?.label.toLowerCase() || 'title'}’s highest-scoring magnet.` : '';
     $('#dust-connection-method').textContent = `Select a magnet to rank the displayed ${unit} by ${snapshot.mixed ? 'attraction percentile' : group ? 'mean signed cosine similarity' : 'cosine similarity'}. Thicker curves show higher scores within that magnet’s range.${colorNote} Dust members lists the ${unit} that score highest for the selected magnet. Scroll either list to see more ${unit}.`;
     const notes = {
@@ -348,7 +350,7 @@
     movieDetailsRequest = AnivizData.movieDetails(recommendationState.data)
       .then(details => {
         context.setMovieDetails(details);
-        if (latest.direction === AnivizDust.MOVIE_ACTORS) renderRecommendations();
+        if (isMoviePersonDust()) renderRecommendations();
         else if (isReverse()) dustChart?.views?.forEach(view => view.drawArtwork());
         if (!isReverse() && focusedMagnetKey) renderFocus();
         if (isReverse() && elements.drawer.classList.contains('open')) {
@@ -359,10 +361,10 @@
       }, () => {
         movieDetailsRequest = null;
         context.setMovieDetails(null, 'unavailable');
-        if (latest.direction === AnivizDust.MOVIE_ACTORS) renderRecommendations();
+        if (isMoviePersonDust()) renderRecommendations();
       })
       .finally(restoreScroll);
-    if (latest.direction === AnivizDust.MOVIE_ACTORS) renderRecommendations();
+    if (isMoviePersonDust()) renderRecommendations();
   }
   function bind() {
     let storage;
@@ -404,8 +406,8 @@
     });
     for (const panel of [$('#dust-focus'), elements.drawerContent]) {
       panel.addEventListener('click', event => {
-        const button = event.target.closest('[data-studio-work], [data-actor-work]');
-        if (button) inspectTitle(button.dataset.studioWork || button.dataset.actorWork);
+        const button = event.target.closest('[data-studio-work], [data-actor-work], [data-writer-work]');
+        if (button) inspectTitle(button.dataset.studioWork || button.dataset.actorWork || button.dataset.writerWork);
       });
     }
     $('#recommendation-detail').addEventListener('click', event => {
@@ -451,14 +453,19 @@
       ? { ...particles, positions: new Map(positions.map(node => [node.key, node])), stop() {} } : null;
   }
   function updateDustTypeControls() {
-    const reverse = isReverse(), studios = isStudio(), actors = isActor(), group = dustGroup();
+    const reverse = isReverse(), studios = isStudio(), group = dustGroup();
     const groupLabel = group?.label.toLowerCase();
     $('#dust-type').value = dustTypeByDirection[latest.direction];
     $('#dust-limit-control span').textContent = group ? `${group.label} dots` : reverse ? 'Movie dots' : 'Anime dots';
     $('#filter-title').textContent = `Filter ${dustNoun()}`;
     $('#dust-filter-search-label').textContent = group ? `Search ${groupLabel} names` : reverse ? 'Search titles or aliases' : 'Search titles, studios, or actors';
-    elements.searchInput.placeholder = studios ? 'e.g. MADHOUSE' : actors ? (reverse ? 'e.g. Keanu Reeves' : 'e.g. Kana Hanazawa')
-      : reverse ? 'e.g. Pacific Rim' : 'e.g. Attack on Titan';
+    const searchExamples = {
+      [AnivizDust.STUDIOS]: 'MADHOUSE',
+      [AnivizDust.ACTORS]: 'Kana Hanazawa',
+      [AnivizDust.MOVIE_ACTORS]: 'Keanu Reeves',
+      [AnivizDust.MOVIE_WRITERS]: 'Christopher Nolan'
+    };
+    elements.searchInput.placeholder = `e.g. ${searchExamples[latest.direction] || (reverse ? 'Pacific Rim' : 'Attack on Titan')}`;
     $('#dust-ranking-title').textContent = `Full ${groupLabel || (reverse ? 'movie' : 'anime')} ranking`;
     $('#reception h3').textContent = reverse ? 'Score vs. popularity rank'
       : group ? 'Score vs. popularity of catalogue anime' : 'Score vs. popularity';
@@ -468,9 +475,9 @@
     $('#dust-connection-title').textContent = group ? `How do ${group.noun} compare against each magnet?` : 'Which stories are similar—and which differ?';
     $('#dust-connection-selection').textContent = studios
       ? 'Select up to three studios here or in the field to focus the analysis below on their catalogue anime. Select a studio again to remove it.'
-      : actors ? `Select up to three ${group.noun} here or in the field to filter ${reverse ? 'Score vs. popularity rank' : 'Score vs. popularity'} to their ${AnivizDust.titleNoun(latest.direction)} and highlight their contributions in the other charts. Select an actor again to remove them.`
+      : group ? `Select up to three ${group.noun} here or in the field to filter ${reverse ? 'Score vs. popularity rank' : 'Score vs. popularity'} to their ${AnivizDust.titleNoun(latest.direction)} and highlight their contributions in the other charts. Select a dot again to remove it.`
         : 'Outlined titles are selected for comparison in the playground and here. Click an outlined title to remove it. Click any other title to open its details and add it to the comparison if there’s room for it. Compare up to three titles.';
-    $('#dust-mirror-guide').textContent = `Zoom in for ${studios ? 'studio names' : actors ? 'portraits' : 'posters'}. Select a title magnet to show it in the In Focus panel. Drag magnets or use arrow keys to move them. Select ${group?.noun || 'titles'} to compare them, or click empty space to remove the latest selection.`;
+    $('#dust-mirror-guide').textContent = `Zoom in for ${studios ? 'studio names' : group ? 'portraits' : 'posters'}. Select a title magnet to show it in the In Focus panel. Drag magnets or use arrow keys to move them. Select ${group?.noun || 'titles'} to compare them, or click empty space to remove the latest selection.`;
     $('[data-dust-genre-metric] option[value="popularity"]').textContent = reverse ? 'Popularity score' : 'Popularity';
     $('#creators h3').textContent = studios ? 'Score vs. popularity by studio' : reverse ? 'Creators' : 'Studios';
     $('#dust-heatmap-title').textContent = studios ? 'Genres by studio' : 'Studio × genre';
@@ -484,7 +491,7 @@
     if (scrollRestored || !recommendationState.data
       || (latest.magnets.some(magnet => !AnivizDust.isMetricMagnet(magnet)) && !recommendationState.scores)
       || (!isReverse() && latest.metadataStatus === 'loading')
-      || (latest.direction === AnivizDust.MOVIE_ACTORS && ['idle', 'loading'].includes(latest.movieDetailsStatus))
+      || (isMoviePersonDust() && ['idle', 'loading'].includes(latest.movieDetailsStatus))
       || AnivizDust.METRIC_MAGNET_TYPES.some(type => latest.magnetKeys.includes(latest[type].key)
         && ['idle', 'loading'].includes(latest[type].status))) return;
     scrollRestored = true;

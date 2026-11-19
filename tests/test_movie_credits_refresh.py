@@ -21,7 +21,7 @@ class MovieCreditsRefreshTests(unittest.TestCase):
         crew = [
             {**writer, "department": "Directing", "job": "Director"},
             screenplay,
-            {**writer, "job": "Story"},
+            {**writer, "job": "Story", "profile_path": "/writer-portrait.jpg"},
             screenplay,
             {"id": 80, "name": "Another Writer", "department": "Writing", "job": "Novel"},
         ]
@@ -58,7 +58,8 @@ class MovieCreditsRefreshTests(unittest.TestCase):
                                             "profile_path": "/portrait.jpg"})
             self.assertEqual(collected[1]["name"], "Same Name")
             self.assertEqual(details["writers"], [
-                {"id": "525", "name": "Christopher Nolan", "jobs": ["Screenplay", "Story"]},
+                {"id": "525", "name": "Christopher Nolan", "jobs": ["Screenplay", "Story"],
+                 "profile_path": "/writer-portrait.jpg"},
                 {"id": "80", "name": "Another Writer", "jobs": ["Novel"]},
             ])
             csv_text = (folder / refresh.MOVIE_CSV).read_text(encoding="utf-8")

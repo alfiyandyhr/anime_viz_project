@@ -2,6 +2,7 @@
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const { movies } = require('../../data/movie_details.json');
+const { popularity, vote_average } = require('../../data/movie_popularity.json');
 const { anime } = require('../../data.json');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 
@@ -40,28 +41,6 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       await page.keyboard.press('Escape');
     }
 
-    await page.goto(new URL('frontend/dust-magnet/index.html', base).href);
-    await field.locator('.dust-node').first().waitFor();
-    await type.selectOption('movie-actors');
-    await field.locator('[data-match-id^="tmdb:person:"]').first().waitFor();
-    assert.equal(await page.locator('#title-magnet-label').textContent(), 'Anime');
-    const { first, second, allMovies, selectedMovies, portrait } = await page.evaluate(() => {
-      const { displayedDust, titleLookup } = AnivizMain.snapshot();
-      const groups = displayedDust.map(({ record }) => record);
-      const overlap = (a, b) => a !== b && a.memberIds.some(id => b.memberIds.includes(id));
-      const first = groups.find(a => a.profile_path && groups.some(b => overlap(a, b)));
-      const second = groups.find(b => overlap(first, b));
-      const ids = actors => [...new Set(actors.flatMap(actor => actor.memberIds))]
-        .filter(id => AnivizChartData.hasMovieReception(titleLookup.get(`tmdb:${id}`).record)).sort();
-      return { first: first.key, second: second.key, allMovies: ids(groups),
-        selectedMovies: ids([first, second]), portrait: first.profile_path };
-    });
-    for (const plot of [field, page.locator('#dust-mirror')]) {
-      for (let step = 0; step < 3; step++) await plot.getByRole('button', { name: 'Zoom in', exact: true }).click();
-      const image = plot.locator(`[data-match-id="${first}"] img`);
-      assert.equal(await image.getAttribute('src'), `https://image.tmdb.org/t/p/w185${portrait}`);
-      await plot.getByRole('button', { name: 'Reset zoom', exact: true }).click();
-    }
     const reception = chart('reception');
     const points = reception.locator('.filmography-dot');
     async function assertFilmography(ids) {
@@ -69,24 +48,64 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       await points.first().waitFor();
       assert.deepEqual(await pointIds(points), ids);
     }
-    await assertFilmography(allMovies);
-    await node(first).press('Enter');
-    assert.match(await page.locator('#dust-focus').innerText(), /Sampled TMDB cast credits/);
-    await chart('connections').locator(`[data-dust-connection-id$=":${second}"]`).press('Enter');
-    await assertFilmography(selectedMovies);
-    await pressMoviePoint(reception);
-    assert.deepEqual(await page.evaluate(() => AnivizMain.snapshot().selectedKeys), [first, second]);
-    for (const kind of ['genres', 'years']) {
-      const plot = chart(kind);
-      await plot.scrollIntoViewIfNeeded();
-      const marks = plot.locator('[role="img"][tabindex="0"]');
-      await marks.first().waitFor();
-      assert.ok(await marks.evaluateAll(nodes => nodes.some(mark =>
-        mark.__data__.selectedCount > 0 && mark.getAttribute('stroke') === 'var(--text)')), kind);
+
+    await page.goto(new URL('frontend/dust-magnet/index.html', base).href);
+    await field.locator('.dust-node').first().waitFor();
+    for (const [dustType, creditsField, creditLabel] of [
+      ['movie-actors', 'cast', /Sampled TMDB cast credits/],
+      ['movie-writers', 'writers', /TMDB Writing department credits/]
+    ]) {
+      await type.selectOption(dustType);
+      await field.locator('[data-match-id^="tmdb:person:"]').first().waitFor();
+      assert.equal(await page.locator('#title-magnet-label').textContent(), 'Anime');
+      const groups = await page.evaluate(() => AnivizMain.snapshot().displayedDust.map(({ record }) => record));
+      const overlap = (a, b) => a !== b && a.memberIds.some(id => b.memberIds.includes(id));
+      const lead = groups.find(a => a.profile_path && groups.some(b => overlap(a, b)));
+      assert.ok(lead, `Expected two displayed ${dustType} with a shared title and a portrait`);
+      const first = lead.key;
+      const partner = groups.find(b => overlap(lead, b));
+      const second = partner.key;
+      const credits = Object.entries(movies).filter(([, movie]) => movie[creditsField].some(credit => credit.id === lead.id));
+      assert.deepEqual([...lead.memberIds].sort(), credits.map(([id]) => id).sort());
+      assert.ok(credits.some(([, movie]) => movie[creditsField].some(credit =>
+        credit.id === lead.id && credit.profile_path === lead.profile_path)));
+      const ids = people => [...new Set(people.flatMap(person => person.memberIds))]
+        .filter(id => Number.isFinite(vote_average[id]) && Number.isFinite(popularity[id])).sort();
+      const allMovies = ids(groups);
+      const selectedMovies = ids([lead, partner]);
+      assert.ok(selectedMovies.length > 0 && selectedMovies.length < allMovies.length);
+      for (const plot of [field, page.locator('#dust-mirror')]) {
+        for (let step = 0; step < 3; step++) await plot.getByRole('button', { name: 'Zoom in', exact: true }).click();
+        const image = plot.locator(`[data-match-id="${first}"] img`);
+        assert.equal(await image.getAttribute('src'), `https://image.tmdb.org/t/p/w185${lead.profile_path}`);
+        await plot.getByRole('button', { name: 'Reset zoom', exact: true }).click();
+      }
+      await assertFilmography(allMovies);
+      await node(first).press('Enter');
+      const focus = page.locator('#dust-focus');
+      assert.match(await focus.innerText(), creditLabel);
+      const workAttribute = creditsField === 'writers' ? 'data-writer-work' : 'data-actor-work';
+      const work = focus.locator(`[${workAttribute}]`).first();
+      const movieKey = await work.getAttribute(workAttribute);
+      await work.click();
+      await assertCredits(drawer, movieKey.split(':').at(-1));
+      await page.keyboard.press('Escape');
+      await chart('connections').locator(`[data-dust-connection-id$=":${second}"]`).press('Enter');
+      await assertFilmography(selectedMovies);
+      await pressMoviePoint(reception);
+      assert.deepEqual(await page.evaluate(() => AnivizMain.snapshot().selectedKeys), [first, second]);
+      for (const kind of ['genres', 'years']) {
+        const plot = chart(kind);
+        await plot.scrollIntoViewIfNeeded();
+        const marks = plot.locator('[role="img"][tabindex="0"]');
+        await marks.first().waitFor();
+        assert.ok(await marks.evaluateAll(nodes => nodes.some(mark =>
+          mark.__data__.selectedCount > 0 && mark.getAttribute('stroke') === 'var(--text)')), kind);
+      }
+      await node(first).press('Enter');
+      await node(second).press('Enter');
+      await assertFilmography(allMovies);
     }
-    await node(first).press('Enter');
-    await node(second).press('Enter');
-    await assertFilmography(allMovies);
 
     await type.selectOption('movie-titles');
     const titleDot = field.locator('.dust-node').first();
@@ -135,7 +154,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     await page.keyboard.press('Escape');
     await pressMoviePoint(page.locator('[data-catalogue-chart="reception"]'));
     assert.deepEqual(errors, []);
-    console.log('Verified movie actor portraits, linked chart filtering, catalogue counts, and movie credits across entry points.');
+    console.log('Verified movie actor and writer portraits, linked chart filtering, catalogue counts, and movie credits across entry points.');
   } finally {
     await browser.close();
   }

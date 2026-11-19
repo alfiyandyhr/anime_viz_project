@@ -13,7 +13,7 @@ Set **Dust type** to **Movie titles** for movie dots and Attack on Titan as the 
 
 | View | Data and interactions |
 | --- | --- |
-| Dust & Magnet | Choose Anime titles, Anime studios, Anime voice actors, Movie titles, or Movie actors, with a field of up to 30, 60, or 90 dots. Each type includes similarity connections, a field mirror, reception, genres, release years, and a full ranking. Select a dust dot or a title magnet to see it in the In Focus panel. Anime dust types also show studio charts. |
+| Dust & Magnet | Choose Anime titles, Anime studios, Anime voice actors, Movie titles, Movie actors, or Movie writers, with a field of up to 30, 60, or 90 dots. Each type includes similarity connections, a field mirror, reception, genres, release years, and a full ranking. Select a dust dot or a title magnet to see it in the In Focus panel. Anime dust types also show studio charts. |
 | History | Scroll a pair of release timelines to see each year’s most popular anime and its closest movie match. Both titles have synopses and the connection shows cosine similarity. |
 | Full Catalogue | The loaded 1,000-title metadata sample, with its own search, filters, sorting, pagination, details and automatic shortlist comparison. Saved movies never narrow its scope. |
 
@@ -66,9 +66,12 @@ Popularity sums archived TMDB popularity scores across credited movies, and
 Score averages the available ratings out of 10. Zoom in on the field or its
 mirror for available TMDB portraits. Select up to three actors to filter Score
 vs. popularity rank to their distinct credited movies and highlight the same
-movies in the genre and release-year charts. The Movie catalogue counts distinct
-actors and writers across the current filters. Writing credits come from TMDB’s
-Writing department.
+movies in the genre and release-year charts.
+
+**Movie writers** uses the same magnets and linked chart behavior as Movie actors,
+with movies grouped by their TMDB Writing department credits. Zoom in on either
+field for available writer portraits. The Movie catalogue counts distinct actors
+and writers across the current filters.
 
 ## Routes and session state
 
@@ -254,6 +257,7 @@ adds them to `data/movie_details.json`. Each movie's `cast` is an ordered list
 of `{id, name, order, characters}` records. Its `writers` list stores
 `{id, name, jobs}` for each distinct person credited in TMDB's Writing
 department, including screenplay, story, and source-material credits.
+Both lists include `profile_path` when TMDB provides a portrait.
 Movies without either kind of credit have an empty list for that field.
 The existing similarity scores can be reused with both fields.
 

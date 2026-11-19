@@ -72,6 +72,9 @@ def movie_writers(crew):
         if type(person_id) is not int or person_id < 1 or not name:
             continue
         writer = people.setdefault(person_id, {"id": str(person_id), "name": name, "jobs": []})
+        profile = image_path(credit.get("profile_path"))
+        if profile:
+            writer.setdefault("profile_path", profile)
         job = credit_text(credit.get("job"))
         if job and job not in writer["jobs"]:
             writer["jobs"].append(job)

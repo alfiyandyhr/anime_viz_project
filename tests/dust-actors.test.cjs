@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { ACTORS, FORWARD, MOVIE_ACTORS, REVERSE, createContext } = require('../frontend/common/dust-context.js');
+const { ACTORS, FORWARD, MOVIE_ACTORS, MOVIE_WRITERS, REVERSE, createContext } = require('../frontend/common/dust-context.js');
 
 test('voice actors aggregate by AniList staff ID and retain a distinct anime selection across reload', () => {
   const lead = { id: 42, name: 'Lead' };
@@ -116,4 +116,48 @@ test('movie actors use the anime matrix column and deduplicate credits for score
   restored.setSources(data, matrix);
   restored.setMoviePopularity(moviePopularity, 'ready');
   assert.deepEqual(restored.setMovieDetails(details).selectedKeys, [firstKey, secondKey]);
+});
+
+test('movie writers use writing credits and keep their filters and selection separate from movie actors', () => {
+  const writer = { id: '7', name: 'Writer', jobs: ['Story'] };
+  const coWriter = { id: '8', name: 'Co-writer', jobs: ['Screenplay'] };
+  const details = {
+    101: { writers: [writer, { ...writer, jobs: ['Screenplay'] }, coWriter] },
+    102: { writers: [{ ...writer, profile_path: '/writer.jpg' }] },
+    103: { cast: [writer] },
+    104: { writers: [coWriter] }
+  };
+  const data = {
+    anime: [{ id: 1, title: 'Attack on Titan' }],
+    movies: [
+      { id: 101, title: 'First', genres: ['Thriller'] },
+      { id: 102, title: 'Second', genres: ['Comedy'] },
+      { id: 103, title: 'Third', genres: ['Drama'] },
+      { id: 104, title: 'Fourth', genres: ['Thriller'] }
+    ]
+  };
+  const matrix = [-0.5, 0.75, 1, 0.5];
+  const memory = new Map();
+  const storage = { getItem: key => memory.get(key), setItem: (key, value) => memory.set(key, value) };
+  const context = createContext({ storage });
+  context.setSources(data, matrix, { seedExample: true });
+  context.setDirection(MOVIE_WRITERS);
+  const snapshot = context.setMovieDetails(details);
+  const firstKey = 'tmdb:person:7', secondKey = 'tmdb:person:8';
+  const match = snapshot.ranking.find(row => row.key === firstKey);
+  assert.equal(match.score, 0.125);
+  assert.equal(match.record.profile_path, '/writer.jpg');
+  assert.deepEqual(match.record.memberIds, ['101', '102']);
+  assert.deepEqual(context.setSelection([firstKey, secondKey]).supportingIds, ['101', '102', '104']);
+  assert.deepEqual(context.setFilters({ search: 'Writer', genre: 'Comedy' }).displayedKeys, [firstKey]);
+  assert.deepEqual(context.setDirection(MOVIE_ACTORS).selectedKeys, []);
+  assert.deepEqual(context.snapshot().lookup.get(firstKey).record.memberIds, ['103']);
+  context.setSelection([firstKey]);
+  assert.deepEqual(context.setDirection(MOVIE_WRITERS).filters.search, 'Writer');
+  assert.deepEqual(context.snapshot().supportingIds, ['101', '102']);
+
+  const restored = createContext({ storage });
+  assert.ok(restored.restore());
+  assert.equal(restored.setSources(data, matrix).direction, MOVIE_WRITERS);
+  assert.deepEqual(restored.setMovieDetails(details).selectedKeys, [firstKey]);
 });
