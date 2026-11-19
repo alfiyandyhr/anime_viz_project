@@ -180,7 +180,7 @@
     $('#dust-color-by-magnet').checked = snapshot.colorByMagnet;
     if (colorMetricChanged) {
       $('#dust-color-label').textContent = snapshot.mixed
-        ? 'Color dust by highest attraction percentile' : 'Color dust by strongest attraction';
+        ? 'Color dust by strongest magnet' : 'Color dust by strongest attraction';
     }
     if (recolor) refreshDustColors();
     const keysInScope = snapshot.selectedKeys.length ? snapshot.selectedKeys : snapshot.displayedKeys;
