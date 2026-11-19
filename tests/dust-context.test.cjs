@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { createContext, joinRecords, rankCorpus, createScoreAccessor, FORWARD, REVERSE, STORAGE_KEY } = require('../frontend/common/dust-context.js');
+const { createContext, joinRecords, rankCorpus, createScoreAccessor, FORWARD, REVERSE, STUDIOS, ACTORS, STORAGE_KEY } = require('../frontend/common/dust-context.js');
 const ChartData = require('../frontend/common/chart-data.js');
 const { getDustMatches } = require('../frontend/recommendations/dust-magnet.js');
 const root = path.resolve(__dirname, '..');
@@ -493,6 +493,67 @@ test('cohort vectors are reused within a bundle and saved choices are revalidate
   assert.deepEqual(unavailable.magnetKeys, []);
   assert.deepEqual(unavailable.ranking, []);
   assert.equal(unavailable.rankingSortKey, 'average');
+});
+
+test('anime group count magnets use distinct catalogue credits and fixed midranks', () => {
+  const [alpha, beta, gamma, delta] = ['Alpha', 'Beta', 'Gamma', 'Delta'].map((name, id) => ({ id: id + 1, name }));
+  const metadata = [
+    { id: 1, title: 'First', credits: [alpha, alpha] },
+    { id: 2, title: 'Second', credits: [alpha, beta], genres: ['Drama'] },
+    { id: 3, title: 'Third', credits: [beta, gamma], genres: ['Comedy'] },
+    { id: 4, title: 'Catalogue only', credits: [alpha], genres: ['Action', 'Fantasy'] },
+    { id: 5, title: 'Another catalogue title', credits: [alpha], genres: ['Action'] },
+    { id: 6, title: 'No genres', credits: [delta] },
+    { id: 7, title: 'No credits', credits: [], genres: ['Music'] }
+  ].map(({ credits, ...record }) => ({ ...record, studios: credits, voice_actors: credits }));
+  const fixture = {
+    anime: [{ id: 1, title: 'First', genres: ['Action', 'Action', 'Drama'] }, ...metadata.slice(1, 3)],
+    movies: [{ id: 101, title: 'Inception', genres: ['Action'] }]
+  };
+  const action = 'anilist:anime-genre:Action', fantasy = 'anilist:anime-genre:Fantasy';
+  const titles = 'anilist:title-count', movieGenre = 'tmdb:genre:Action';
+  for (const direction of [STUDIOS, ACTORS]) {
+    const saved = new Map();
+    const storage = { getItem: key => saved.get(key), setItem: (key, value) => saved.set(key, value) };
+    const context = createContext({ storage });
+    context.setSources(fixture, null);
+    context.setMetadata(metadata);
+    const choices = context.setDirection(direction).animeGenreMagnets;
+    assert.deepEqual(choices.map(magnet => magnet.title), ['Action anime', 'Comedy anime', 'Drama anime', 'Fantasy anime']);
+    const metrics = context.setMagnets([action, titles]);
+    assert.equal(metrics.mixed, true);
+    assert.deepEqual(metrics.ranking.map(row => [row.record.title, row.rawScores, row.scores]), [
+      ['Alpha', [3, 4], [1, 1]],
+      ['Beta', [0, 2], [1 / 3, 2 / 3]],
+      ['Gamma', [0, 1], [1 / 3, 1 / 6]],
+      ['Delta', [0, 1], [1 / 3, 1 / 6]]
+    ]);
+    assert.deepEqual(context.setMagnets([action]).ranking[0].supportingWorks.map(work => work.id), ['1', '4', '5']);
+    assert.deepEqual(context.setMagnets([titles]).ranking[0].supportingWorks.map(work => work.id), ['1', '2', '4', '5']);
+    context.setMagnets([action, titles]);
+    context.setDustLimit(30);
+    const filtered = context.setFilters({ search: 'Alpha', genre: 'Drama' });
+    assert.deepEqual(filtered.displayedDust.map(row => [row.rawScores, row.scores]), [[[3, 4], [1, 1]]]);
+
+    const matrix = [0.25, 0.75, -0.25];
+    context.setSources(fixture, matrix);
+    assert.deepEqual(context.setMagnets([movieGenre, action, titles]).ranking[0].rawScores, [0.5, 3, 4]);
+    const beforeReload = context.setMagnets([fantasy, titles]);
+    context.setRankingSort(fantasy);
+    context.setSelection(beforeReload.displayedKeys);
+    const restored = createContext({ storage });
+    assert.equal(restored.restore(), true);
+    const pending = restored.setSources(fixture, null);
+    assert.deepEqual(pending.magnetSlots.map(magnet => magnet.title), ['Fantasy anime', 'Title count']);
+    assert.deepEqual(pending.activeMagnetKeys, []);
+    const reloaded = restored.setMetadata(metadata);
+    assert.deepEqual(reloaded.activeMagnetKeys, [fantasy, titles]);
+    assert.deepEqual(reloaded.selectedKeys, beforeReload.displayedKeys);
+    assert.equal(reloaded.rankingSortKey, fantasy);
+    assert.deepEqual(reloaded.ranking[0].rawScores, [1, 4]);
+    assert.deepEqual(restored.setDirection(FORWARD).magnetKeys, []);
+    assert.deepEqual(restored.setDirection(REVERSE).animeGenreMagnets, []);
+  }
 });
 
 test('published genre affinities match the matrix in both directions', () => {

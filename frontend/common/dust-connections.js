@@ -106,13 +106,13 @@
           .attr('aria-pressed', isSelected)
           .attr('aria-haspopup', match => group || isSelected(match) ? null : 'dialog')
           .attr('aria-controls', group ? 'recommendation-detail' : 'recommendation-detail detail-drawer')
-          .attr('aria-label', match => `Dust rank ${match.rank} of ${ranking.length}: ${match.record.title}. ${mixed ? evidence(match) : `${AnivizDust.magnetScoreLabel(magnet)}: ${match.similarity}`}.${group ? ` ${AnivizDustDetails.groupCoverage(match, snapshot.direction, magnetIndex)}.` : ''}`)
+          .attr('aria-label', match => `Dust rank ${match.rank} of ${ranking.length}: ${match.record.title}. ${mixed ? evidence(match) : `${AnivizDust.magnetScoreLabel(magnet)}: ${match.similarity}`}.${group ? ` ${AnivizDustDetails.groupCoverage(match, snapshot.direction, magnetIndex, magnet)}.` : ''}`)
           .attr('title', match => match.record.title)
           .on('click', (event, match) => onSelect(match.key));
         rows.append('span').attr('class', 'dust-connection-dot').attr('aria-hidden', 'true');
         rows.append('span').attr('class', 'dust-connection-rank').text(match => match.rank);
         rows.append('span').attr('class', 'dust-connection-title').text(match => match.record.title)
-          .attr('title', match => group ? AnivizDustDetails.groupCoverage(match, snapshot.direction, magnetIndex) : null);
+          .attr('title', match => group ? AnivizDustDetails.groupCoverage(match, snapshot.direction, magnetIndex, magnet) : null);
         showScores(rows.append('span').attr('class', 'dust-connection-score'));
         const panel = list.node(), end = panel.scrollHeight - panel.clientHeight;
         panel.scrollTop = index === 0 ? offsets[index] : end - offsets[index];

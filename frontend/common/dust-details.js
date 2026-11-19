@@ -34,16 +34,17 @@
     }).join('')}<small>${mixed ? `Right column: attraction percentile (0–1)<br>${root.AnivizDust.averageLabel(true)}: ${root.AnivizDust.formatPercentile(match.score)}` : match.record.memberIds ? 'Mean signed cosine similarity' : 'Cosine similarity · higher means closer'}</small></div>`;
   }
 
-  function groupCoverage(match, direction, index) {
+  function groupCoverage(match, direction, index, magnet) {
     const count = match.record.memberIds.length;
     const titles = `${count} catalogue ${root.AnivizDust.titleNoun(direction, count)}`;
-    return index === undefined ? titles : `${match.contributingCounts[index]} of ${titles} scored`;
+    if (index === undefined || magnet?.kind === 'title-count') return titles;
+    return `${match.contributingCounts[index]} of ${titles} ${magnet?.kind === 'anime-genre' ? 'in this genre' : 'scored'}`;
   }
 
   function renderGroup({ snapshot, match, color, helpers, heading = 'h3' }) {
     const { escapeHTML: escape, escapeAttribute: attr } = helpers;
     const { record } = match;
-    const { direction } = snapshot;
+    const { direction, magnets } = snapshot;
     const movie = root.AnivizDust.isMovieDust(direction);
     const studio = direction === root.AnivizDust.STUDIOS;
     const writer = direction === root.AnivizDust.MOVIE_WRITERS;
@@ -62,7 +63,7 @@
     const evidenceTitle = snapshot.magnets.some(magnet => !root.AnivizDust.isMetricMagnet(magnet))
       ? `Strongest supporting ${noun} by mean story similarity` : `${movie ? 'Movies' : 'Anime'} with metric data (up to five)`;
     return `${portrait}<${heading}>${escape(record.title)}</${heading}>
-      <p class="recommendation-detail-meta">${groupCoverage(match, direction, snapshot.magnets.length === 1 ? 0 : undefined)} · ${credit}</p>
+      <p class="recommendation-detail-meta">${groupCoverage(match, direction, magnets.length === 1 ? 0 : undefined, magnets[0])} · ${credit}</p>
       ${magnetScores(match, snapshot.magnets, color, helpers)}
       <div class="recommendation-context"><h4>${evidenceTitle}</h4>
         ${supporting.length ? `<ul>${supporting.map(work => `<li><button type="button" class="recommendation-title-button" ${workAttribute}="${provider}:${attr(work.id)}" aria-haspopup="dialog" aria-controls="detail-drawer">${escape(work.title)}</button>${Number.isFinite(work.similarity) ? ` · ${work.similarity.toFixed(3)}` : ''}</li>`).join('')}</ul>` : '<p>No title scores are available for this view.</p>'}</div>

@@ -53,7 +53,7 @@ connections, and full ranking continue to compare studios against the magnets.
 
 **Anime voice actors** groups the Full Catalogue by AniList Japanese main-role
 credits. Each title contributes once to an actor’s filmography. Movie magnets
-average those titles’ signed cosine similarity to that movie. Genre cohorts
+average those titles’ signed cosine similarity to that movie. Movie genre magnets
 average across the cohort’s movies. Popularity sums AniList list users, and Score
 averages available anime scores. Zoom in on an actor for their AniList portrait.
 The linked charts show distinct anime credited to actors in the field. Select up
@@ -342,17 +342,22 @@ fixed when you filter the dust.
 between them. **Popularity** sums AniList list-user counts and **Score** averages
 available ratings across each studio’s catalogue filmography, matching Full
 Catalogue. A movie magnet averages signed cosine similarities to that movie
-across the studio’s anime in the similarity matrix. A genre magnet averages the
+across the studio’s anime in the similarity matrix. A **Movie genre** magnet averages the
 cosines from every pair of a studio anime and a movie in the cohort. Each magnet
 uses all works with data for that magnet. Search studio names under **Filter**.
 Filters change the field while studio scores and filmographies stay fixed.
+
+With **Anime studios** or **Anime voice actors**, choose **Anime genre** to
+count distinct credited catalogue anime in a genre, or **Title count** to count
+every distinct anime in the filmography. Both magnets use attraction percentiles
+and keep their counts fixed when you filter the field.
 
 Choose **Popularity** to use AniList list-user counts for anime or TMDB
 popularity for movies. Choose **Score** to use AniList ratings out of 100 or
 TMDB ratings out of 10. You can combine both with a title or genre cohort
 within the same three slots.
 
-With either metric active, each magnet's raw values become midrank percentiles
+With a count, Popularity, or Score magnet active, each magnet's raw values become midrank percentiles
 from 0 to 1 over dust with values for every active magnet. The field and
 combined ranking use those percentiles. Individual ranking sorts and score
 evidence expose the raw values. Titles with missing values stay in the full

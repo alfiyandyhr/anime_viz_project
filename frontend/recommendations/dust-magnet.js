@@ -375,8 +375,7 @@ function refreshDustColors() {
 
 function renderDustRecommendations() {
   const snapshot = AnivizMain.snapshot();
-  const { magnets, magnetKeys, mixed, displayedDust, direction, example } = snapshot;
-  const savedMetrics = AnivizDust.METRIC_MAGNET_TYPES.map(type => snapshot[type]);
+  const { magnets, magnetKeys, magnetSlots, mixed, displayedDust, direction, example } = snapshot;
   const movie = AnivizDust.isMovieDust(direction), studios = direction === AnivizDust.STUDIOS;
   const group = AnivizDust.groupFor(direction);
   const noun = group?.noun || AnivizDust.titleNoun(direction);
@@ -385,9 +384,9 @@ function renderDustRecommendations() {
   renderDustLegend(snapshot);
   document.querySelector("#recommendation-content").hidden = false;
   document.querySelector("#recommendation-chart-title").textContent = `${noun[0].toUpperCase() + noun.slice(1)} shown`;
-  document.querySelector("#movie-magnets").innerHTML = magnetKeys.map(key => {
-    const index = magnets.findIndex(magnet => magnet.key === key);
-    const magnet = magnets[index] || savedMetrics.find(magnet => magnet.key === key);
+  document.querySelector("#movie-magnets").innerHTML = magnetSlots.map(magnet => {
+    const { key } = magnet;
+    const index = magnets.indexOf(magnet);
     const description = AnivizDust.isMetricMagnet(magnet) ? (index < 0 ? "Inactive" : "")
       : magnet.kind === "genre" ? AnivizDust.cohortDescription(magnet) : magnet.year || "";
     return `<div class="movie-magnet-chip" style="--magnet-color:${AnivizMain.color(magnet.key) || "currentColor"}">

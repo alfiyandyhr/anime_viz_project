@@ -24,6 +24,7 @@
   };
   const groupFor = direction => DIRECTIONS[direction].group;
   const isMovieDust = direction => DIRECTIONS[direction].dust === "tmdb";
+  const supportsAnimeCounts = direction => direction === STUDIOS || direction === ACTORS;
   const titleNoun = (direction, count) => isMovieDust(direction) ? (count === 1 ? "movie" : "movies") : "anime";
   const normalizeStrength = value => Number.isFinite(value) ? Math.round(Math.max(0, Math.min(2, value)) * 10) / 10 : 1;
   const keyFor = (catalogue, id) => `${catalogue}:${id}`;
@@ -33,7 +34,12 @@
     popularity: { value: "totalPopularity", count: "popularityCount" },
     score: { value: "averageScore", count: "scoreCount" }
   };
-  const isMetricMagnet = magnet => METRIC_MAGNET_TYPES.includes(magnet.kind);
+  const ANIME_GENRE_PREFIX = "anilist:anime-genre:";
+  const TITLE_COUNT_KEY = "anilist:title-count";
+  const isAnimeGenreKey = key => key.startsWith(ANIME_GENRE_PREFIX) && key.length > ANIME_GENRE_PREFIX.length;
+  const isAnimeCountKey = key => key === TITLE_COUNT_KEY || isAnimeGenreKey(key);
+  const isCountMagnet = magnet => magnet.kind === "anime-genre" || magnet.kind === "title-count";
+  const isMetricMagnet = magnet => isCountMagnet(magnet) || METRIC_MAGNET_TYPES.includes(magnet.kind);
   const magnetScoreLabel = magnet => isMetricMagnet(magnet) ? magnet.metric
     : magnet.kind === "genre" ? magnet.title : `Cosine to ${magnet.title}`;
   const cohortDescription = magnet => `${magnet.source} · ${magnet.memberIds.length} ${magnet.noun}`;
@@ -44,7 +50,7 @@
   function formatRawScore(value, magnet) {
     if (!Number.isFinite(value)) return "Unavailable";
     if (magnet.kind === "score") return `${value} / ${magnet.scale}`;
-    return magnet.kind === "popularity" ? String(value) : formatPercentile(value);
+    return magnet.kind === "popularity" || isCountMagnet(magnet) ? String(value) : formatPercentile(value);
   }
   function mixedEvidence(match, magnet, index) {
     const raw = formatRawScore(match.rawScores[index], magnet);
@@ -117,6 +123,12 @@
     }));
   }
 
+  function animeGenreMagnet(genre, memberIds = [], total = 0) {
+    const title = `${genre} anime`;
+    return { key: ANIME_GENRE_PREFIX + genre, kind: "anime-genre", title, metric: title,
+      memberIds: new Set(memberIds), eligible: total, total };
+  }
+
   function midrankPercentiles(column, eligible) {
     const sorted = [...eligible].sort((a, b) => column[a] - column[b]);
     const percentiles = Array(column.length).fill(null);
@@ -153,12 +165,20 @@
   function scoreGroups(records, magnets, storyScores, metricValues, groups, direction, mixed) {
     const titleIndexes = new Map(records.map((record, index) => [id(record.id), index]));
     const metricsOnly = storyScores.every(column => column === null);
+    const contributes = (magnet, workId) => magnet.kind === "title-count"
+      || (magnet.kind === "anime-genre" ? magnet.memberIds.has(workId)
+        : Number.isFinite(metricValues[magnet.kind]?.get(workId)));
     const summaries = groups.map(group => {
       const works = group.memberIds.map(memberId => {
         const index = titleIndexes.get(memberId);
         return { id: memberId, scores: storyScores.map(column => column?.[index]) };
       });
       const aggregates = magnets.map((magnet, index) => {
+        if (isCountMagnet(magnet)) {
+          const count = magnet.kind === "title-count" ? group.count
+            : group.memberIds.filter(memberId => magnet.memberIds.has(memberId)).length;
+          return { value: count, count };
+        }
         const metric = GROUP_METRICS[magnet.kind];
         if (metric) return { value: group[metric.value], count: group[metric.count] };
         const scores = works.map(work => work.scores[index]).filter(Number.isFinite);
@@ -167,7 +187,7 @@
       const supportingWorks = works.flatMap(work => {
         const scores = work.scores.filter(Number.isFinite);
         if (scores.length) return [{ id: work.id, similarity: mean(scores) }];
-        return metricsOnly && magnets.some(magnet => Number.isFinite(metricValues[magnet.kind]?.get(work.id)))
+        return metricsOnly && magnets.some(magnet => contributes(magnet, work.id))
           ? [{ id: work.id, similarity: null }] : [];
       }).sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0));
       return { aggregates, supportingWorks };
@@ -248,7 +268,8 @@
     const { magnet, dust } = DIRECTIONS[direction];
     const typedIds = (values, catalogue) => ids(Array.isArray(values) ? values : []).filter(key => key.startsWith(`${catalogue}:`));
     const magnetKeys = ids(Array.isArray(value.magnetKeys) ? value.magnetKeys : [])
-      .filter(key => key.startsWith(`${magnet}:`) || isMetricKey(direction, key)).slice(0, 3);
+      .filter(key => key.startsWith(`${magnet}:`) || isMetricKey(direction, key)
+        || supportsAnimeCounts(direction) && isAnimeCountKey(key)).slice(0, 3);
     return {
       state: { ...state, magnetKeys,
         magnetStrengths: Object.fromEntries(magnetKeys.map(key => [key, normalizeStrength(value.magnetStrengths?.[key])])
@@ -292,9 +313,9 @@
       [FORWARD]: { status: "loading", snapshotDate: null, values: {} },
       [REVERSE]: { status: "idle", snapshotDate: null, values: {} }
     };
-    let cohorts = [];
+    let cohorts = [], animeGenreMagnets = new Map(), titleCount;
     let catalogue = new Map(), lookup = new Map(), titleLookup = new Map(), groups = [];
-    let magnets = [], vectors = [], candidates = [], displayed = [], ranking = [];
+    let magnets = [], magnetSlots = [], vectors = [], candidates = [], displayed = [], ranking = [];
     let metricMagnets = {};
     let persistent = true, warned = false, revision = 0, colorByMagnet = false;
     const listeners = new Set();
@@ -319,7 +340,8 @@
     function snapshot() {
       const state = session.state;
       const visible = new Set(state.displayedKeys);
-      return { ...state, version: VERSION, direction, revision, colorByMagnet, magnets, genreCohorts: cohorts, candidateDust: candidates, displayedDust: displayed,
+      return { ...state, version: VERSION, direction, revision, colorByMagnet, magnets, magnetSlots, genreCohorts: cohorts,
+        animeGenreMagnets: [...animeGenreMagnets.values()], titleCount, candidateDust: candidates, displayedDust: displayed,
         ranking, lookup, titleLookup, metadataStatus, movieDetailsStatus, persistent, ...metricMagnets, mixed: magnets.some(isMetricMagnet),
         activeMagnetKeys: magnets.map(magnet => magnet.key),
         missingMetadataIds: direction === FORWARD ? state.candidateKeys.filter(key => !lookup.get(key)?.metadata) : [],
@@ -367,6 +389,19 @@
       // Prefer groups with more catalogue titles when scores tie.
       groups = summaries.sort((a, b) => b.count - a.count).map(({ ids, ...summary }) => ({ ...summary, memberIds: ids }));
       lookup = group ? new Map(groups.map(record => [record.key, { record }])) : titleLookup;
+      animeGenreMagnets = new Map();
+      titleCount = undefined;
+      if (supportsAnimeCounts(direction)) {
+        const total = groups.length;
+        titleCount = { key: TITLE_COUNT_KEY, kind: "title-count", title: "Title count", metric: "Title count",
+          eligible: total, total };
+        const creditedIds = new Set(groups.flatMap(record => record.memberIds));
+        const creditedAnime = [...creditedIds].map(memberId => titleLookup.get(keyFor("anilist", memberId)).record);
+        for (const { genre, memberIds } of genreCohorts(creditedAnime, "anilist")) {
+          const magnet = animeGenreMagnet(genre, memberIds, total);
+          animeGenreMagnets.set(magnet.key, magnet);
+        }
+      }
     }
     function activate() {
       const { magnet } = DIRECTIONS[direction];
@@ -378,7 +413,8 @@
       refreshLookup();
     }
     function validMagnets(values) {
-      return ids(values).filter(key => catalogue.has(key) || isMetricKey(direction, key)).slice(0, 3);
+      return ids(values).filter(key => catalogue.has(key) || isMetricKey(direction, key)
+        || supportsAnimeCounts(direction) && isAnimeCountKey(key)).slice(0, 3);
     }
     function derive({ rescore = false, resample = false, rerank = false } = {}) {
       const state = session.state;
@@ -401,9 +437,10 @@
             ? groups.filter(row => Number.isFinite(row[GROUP_METRICS[kind].value])).length
             : records.filter(record => Number.isFinite(source.values[kind]?.get(id(record.id)))).length
         }]));
-        const availableMetrics = new Map(Object.values(metricMagnets).filter(magnet => magnet.eligible)
-          .map(magnet => [magnet.key, magnet]));
-        magnets = state.magnetKeys.map(key => catalogue.get(key) || availableMetrics.get(key)).filter(Boolean);
+        const metrics = new Map(Object.values(metricMagnets).map(magnet => [magnet.key, magnet]));
+        magnetSlots = state.magnetKeys.map(key => catalogue.get(key) || metrics.get(key)
+          || (key === TITLE_COUNT_KEY ? titleCount : animeGenreMagnets.get(key) || animeGenreMagnet(key.slice(ANIME_GENRE_PREFIX.length))));
+        magnets = magnetSlots.filter(magnet => !isMetricMagnet(magnet) || magnet.eligible);
         vectors = scoreDust(records, magnets, direction, pairScore, cohortVectors, source.values, groups);
       }
       if (rescore || resample) {
@@ -597,7 +634,7 @@
     return api;
   }
   return { VERSION, STORAGE_KEY, FORWARD, REVERSE, STUDIOS, ACTORS, MOVIE_ACTORS, MOVIE_WRITERS, DIRECTIONS, groupFor, isMovieDust, titleNoun,
-    METRIC_MAGNET_TYPES, isMetricMagnet,
+    METRIC_MAGNET_TYPES, isMetricMagnet, supportsAnimeCounts,
     keyFor, catalogueFor, magnetScoreLabel, cohortDescription,
     averageLabel, formatPercentile, formatRawScore, mixedEvidence, defaults, joinRecords,
     passesFilters, createScoreAccessor, forwardVectors, rankCorpus, sampleDust, createContext };
