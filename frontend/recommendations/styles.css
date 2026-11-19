@@ -1,4 +1,7 @@
 /* Movie-to-anime discovery */
+:root { --dust-magnet-violet: #6D44B6; }
+[data-theme="dark"] { --dust-magnet-violet: #BD93F9; }
+
 [hidden] { display: none !important; }
 .recommendation-picker, .selected-movie, .recommendation-chart-card, .recommendation-detail {
   padding: 26px;

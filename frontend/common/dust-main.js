@@ -432,7 +432,9 @@
     const layout = context.getLayout();
     recommendationState.magnetPositions = { ...layout.magnetPositions };
     magnetColors.clear();
-    Object.entries(layout.magnetColors || {}).forEach(([key, value]) => magnetColors.set(key, value));
+    Object.entries(layout.magnetColors || {}).forEach(([key, value]) => {
+      magnetColors.set(key, value === 'var(--color-primary-strong)' ? DUST_MAGNET_VIOLET : value);
+    });
     const particles = layout.particles;
     const positions = Array.isArray(particles?.positions) ? particles.positions.filter(node =>
       typeof node?.key === 'string' && Number.isFinite(node.x) && Number.isFinite(node.y)) : [];
