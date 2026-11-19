@@ -29,14 +29,14 @@ geometry refresh after a score change.
 
 # Genre cohort magnets
 
-1. With **Anime titles**, keep Inception and add **Genre cohort → Science Fiction movies**.
+1. With **Anime titles**, keep Inception and add **Movie genre → Science Fiction movies**.
    Its chip shows **TMDB · 214 movies**. The combined full-ranking top 30 has six
    new titles compared with Inception alone.
 2. Focus a dot in the field or mirror, compare two dots, select the cohort in
    Similarity connections, and inspect the full ranking. Each labels the score
    **Science Fiction movies**. Sort by the cohort and remove it.
    The ranking returns to average similarity with the remaining magnets.
-3. Switch to **Movie titles** and add **Sci-Fi anime** (165 AniList anime).
+3. Switch to **Movie titles** and add **Anime genre → Sci-Fi anime** (165 AniList anime).
    Try it on its own. The **Science Fiction** dust genre filter narrows the movie
    dots while the cohort scores and 1,000-row ranking stay fixed.
 4. Move the cohort magnet and reload. Verify the position and magnets restore
@@ -45,6 +45,11 @@ geometry refresh after a score change.
 5. Add Action and Romance to the Sci-Fi anime cohort for a three-cohort field.
    Reload and switch dust types to verify all three restore together. Try a
    fourth magnet and confirm the picker reports the shared three-slot limit.
+6. In **Movie actors** and **Movie writers**, add **Movie genre → Science Fiction movies**
+   and **Title count** below Popularity and Score. Sort by Science Fiction movies
+   and compare the raw counts with the first creator’s credited movies. In
+   **Anime studios** and **Anime voice actors**, check that **Anime genre** and
+   **Title count** also appear below Popularity and Score.
 
 Run `node tests/browser/dust-genres.cjs` with the Playwright setup below.
 

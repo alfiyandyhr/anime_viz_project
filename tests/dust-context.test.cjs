@@ -518,7 +518,7 @@ test('anime group count magnets use distinct catalogue credits and fixed midrank
     const context = createContext({ storage });
     context.setSources(fixture, null);
     context.setMetadata(metadata);
-    const choices = context.setDirection(direction).animeGenreMagnets;
+    const choices = context.setDirection(direction).genreCountMagnets;
     assert.deepEqual(choices.map(magnet => magnet.title), ['Action anime', 'Comedy anime', 'Drama anime', 'Fantasy anime']);
     const metrics = context.setMagnets([action, titles]);
     assert.equal(metrics.mixed, true);
@@ -552,7 +552,7 @@ test('anime group count magnets use distinct catalogue credits and fixed midrank
     assert.equal(reloaded.rankingSortKey, fantasy);
     assert.deepEqual(reloaded.ranking[0].rawScores, [1, 4]);
     assert.deepEqual(restored.setDirection(FORWARD).magnetKeys, []);
-    assert.deepEqual(restored.setDirection(REVERSE).animeGenreMagnets, []);
+    assert.deepEqual(restored.setDirection(REVERSE).genreCountMagnets, []);
   }
 });
 

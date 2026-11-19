@@ -161,3 +161,63 @@ test('movie writers use writing credits and keep their filters and selection sep
   assert.equal(restored.setSources(data, matrix).direction, MOVIE_WRITERS);
   assert.deepEqual(restored.setMovieDetails(details).selectedKeys, [firstKey]);
 });
+
+test('movie creator count magnets use distinct credits, fixed percentiles, and restore after credits load', () => {
+  const [lead, coLead, other] = ['Lead', 'Co-lead', 'Other'].map((name, index) => ({ id: index + 1, name }));
+  const details = {
+    101: { cast: [lead, lead, coLead], writers: [other, other, coLead] },
+    102: { cast: [lead], writers: [other] },
+    103: { cast: [other], writers: [lead] }
+  };
+  const data = {
+    anime: [{ id: 1, title: 'Attack on Titan', genres: ['Action'] }],
+    movies: [
+      { id: 101, title: 'First', genres: ['Action', 'Action', 'Comedy'] },
+      { id: 102, title: 'Second', genres: ['Drama'] },
+      { id: 103, title: 'Third', genres: ['Drama'] },
+      { id: 104, title: 'Uncredited', genres: ['Fantasy'] }
+    ]
+  };
+  const action = 'tmdb:movie-genre:Action', titles = 'tmdb:title-count', animeGenre = 'anilist:genre:Action';
+  const matrix = [0.25, 0.75, -0.5, 1];
+  for (const [direction, leader] of [[MOVIE_ACTORS, lead], [MOVIE_WRITERS, other]]) {
+    const memory = new Map();
+    const storage = { getItem: key => memory.get(key), setItem: (key, value) => memory.set(key, value) };
+    const context = createContext({ storage });
+    context.setSources(data, null);
+    context.setDirection(direction);
+    const ready = context.setMovieDetails(details);
+    assert.deepEqual(ready.genreCountMagnets.map(magnet => magnet.title), ['Action movies', 'Comedy movies', 'Drama movies']);
+
+    const counts = context.setMagnets([action, titles]);
+    assert.equal(counts.mixed, true);
+    assert.deepEqual(counts.ranking.map(row => [row.record.title, row.rawScores, row.scores]), [
+      [leader.name, [1, 2], [.75, 1]],
+      [coLead.name, [1, 1], [.75, .25]],
+      [leader === lead ? other.name : lead.name, [0, 1], [0, .25]]
+    ]);
+    assert.deepEqual(context.setMagnets([action]).ranking[0].supportingWorks.map(work => work.id), ['101']);
+    assert.deepEqual(context.setMagnets([titles]).ranking[0].supportingWorks.map(work => work.id), ['101', '102']);
+
+    context.setSources(data, matrix);
+    const combined = context.setMagnets([animeGenre, action, titles]);
+    const leaderKey = `tmdb:person:${leader.id}`;
+    const filtered = context.setFilters({ search: leader.name, genre: 'Drama' });
+    assert.deepEqual(filtered.displayedKeys, [leaderKey]);
+    assert.deepEqual(filtered.displayedDust[0].rawScores, [.5, 1, 2]);
+    assert.deepEqual(filtered.displayedDust[0].scores, combined.ranking.find(row => row.key === leaderKey).scores);
+    context.setSelection([leaderKey]);
+    context.setRankingSort(action);
+
+    const restored = createContext({ storage });
+    assert.equal(restored.restore(), true);
+    const pending = restored.setSources(data, matrix);
+    assert.deepEqual(pending.magnetSlots.map(magnet => magnet.title), ['Action anime', 'Action movies', 'Title count']);
+    assert.deepEqual(pending.activeMagnetKeys, [animeGenre]);
+    const reloaded = restored.setMovieDetails(details);
+    assert.deepEqual(reloaded.activeMagnetKeys, [animeGenre, action, titles]);
+    assert.deepEqual(reloaded.selectedKeys, [leaderKey]);
+    assert.equal(reloaded.rankingSortKey, action);
+    assert.deepEqual(restored.setDirection(REVERSE).magnetKeys, [animeGenre]);
+  }
+});

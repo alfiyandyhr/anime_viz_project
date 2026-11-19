@@ -66,7 +66,7 @@ const state = page => page.evaluate(() => {
     const colorBySimilarity = page.getByRole('checkbox', { name: 'Color dust by strongest attraction' });
     const colorByPercentile = page.getByRole('checkbox', { name: 'Color dust by highest attraction percentile' });
     assert.ok(await colorBySimilarity.isVisible());
-    await page.getByRole('radio', { name: 'Genre cohort' }).check();
+    await page.getByRole('radio', { name: 'Movie genre' }).check();
     await page.selectOption('#genre-magnet-choice', 'tmdb:genre:Science Fiction');
     await page.locator('#add-genre-magnet').click();
     const cosine = await state(page);

@@ -9,7 +9,7 @@ Explore story similarities between anime and live-action movies in a visualizati
 ## Three views
 
 The root URL opens **Dust & Magnet** with **Anime titles** as dust and Inception as the example magnet.
-Set **Dust type** to **Movie titles** for movie dots and Attack on Titan as the first-use example. Choose the **Movie** magnet type with anime dust or **Anime** with movie dust to search by title, alias, or year. **Genre cohort** also draws from the other catalogue. Use **Popularity** or **Score** to attract dust by audience size or rating. Fill up to three slots and remove any magnet with ×.
+Set **Dust type** to **Movie titles** for movie dots and Attack on Titan as the first-use example. Choose the **Movie** magnet type with anime dust or **Anime** with movie dust to search by title, alias, or year. **Movie genre** with anime dust and **Anime genre** with movie dust compare against a genre from the other catalogue. Use **Popularity** or **Score** to attract dust by audience size or rating. Fill up to three slots and remove any magnet with ×.
 
 | View | Data and interactions |
 | --- | --- |
@@ -237,7 +237,7 @@ shows when the similarity scores finished. Reload after the updated files are
 available to see the new dates.
 
 After both steps finish, open the two Catalogue tabs and try both Dust & Magnet
-directions with a title, a Genre cohort, Popularity, and Score. Commit the web
+directions with a title, a genre from the other catalogue, Popularity, and Score. Commit the web
 files together and push or merge into the branch configured for GitHub Pages.
 
 ```bash
@@ -331,9 +331,9 @@ research snapshot.
 ## Dust & Magnet recommendations
 
 Open the root URL, choose **Dust & Magnet** in the dropdown, or visit
-`frontend/dust-magnet/index.html`. Start with a title search or pick **Genre cohort**.
-With **Anime titles**, try **Inception** with **Science Fiction movies**.
-With **Movie titles**, try **Attack on Titan** with **Sci-Fi anime**. Each cohort
+`frontend/dust-magnet/index.html`. With **Anime titles**, try **Inception** with
+**Movie genre → Science Fiction movies**. With **Movie titles**, try
+**Attack on Titan** with **Anime genre → Sci-Fi anime**. Each cohort
 score averages the signed cosines to its sampled titles. A cohort occupies one
 slot and contributes one score to the combined average. Its membership stays
 fixed when you filter the dust.
@@ -348,9 +348,11 @@ uses all works with data for that magnet. Search studio names under **Filter**.
 Filters change the field while studio scores and filmographies stay fixed.
 
 With **Anime studios** or **Anime voice actors**, choose **Anime genre** to
-count distinct credited catalogue anime in a genre, or **Title count** to count
-every distinct anime in the filmography. Both magnets use attraction percentiles
-and keep their counts fixed when you filter the field.
+count distinct credited catalogue anime in a genre. With **Movie actors** or
+**Movie writers**, choose **Movie genre** to count distinct credited catalogue
+movies in a genre. For any of these four dust types, **Title count** counts every
+distinct title in the creator’s catalogue filmography. Count magnets use attraction
+percentiles and keep their counts fixed when you filter the field.
 
 Choose **Popularity** to use AniList list-user counts for anime or TMDB
 popularity for movies. Choose **Score** to use AniList ratings out of 100 or

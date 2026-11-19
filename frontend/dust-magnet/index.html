@@ -97,12 +97,18 @@
           </label>
           <fieldset class="magnet-type-picker" id="magnet-type" disabled>
             <legend>Magnet type</legend>
-            <label><input type="radio" name="magnet-type" value="title" checked> <span id="title-magnet-label">Movie</span></label>
-            <label><input type="radio" name="magnet-type" value="genre"> <span id="genre-magnet-label">Genre cohort</span></label>
-            <label data-anime-count-magnet hidden><input type="radio" name="magnet-type" value="anime-genre"> Anime genre</label>
-            <label data-anime-count-magnet hidden><input type="radio" name="magnet-type" value="title-count"> Title count</label>
-            <label><input type="radio" name="magnet-type" value="popularity"> Popularity</label>
-            <label><input type="radio" name="magnet-type" value="score"> Score</label>
+            <div class="magnet-type-row">
+              <label><input type="radio" name="magnet-type" value="title" checked> <span id="title-magnet-label">Movie</span></label>
+              <label><input type="radio" name="magnet-type" value="genre"> <span id="genre-magnet-label">Movie genre</span></label>
+            </div>
+            <div class="magnet-type-row">
+              <label><input type="radio" name="magnet-type" value="popularity"> Popularity</label>
+              <label><input type="radio" name="magnet-type" value="score"> Score</label>
+            </div>
+            <div class="magnet-type-row" id="count-magnet-types" hidden>
+              <label><input type="radio" name="magnet-type" value="genre-count"> <span id="genre-count-magnet-label">Anime genre</span></label>
+              <label><input type="radio" name="magnet-type" value="title-count"> Title count</label>
+            </div>
           </fieldset>
           <div class="recommendation-controls" id="title-magnet-search">
             <label class="movie-search-label" for="movie-search">
@@ -318,7 +324,7 @@
             <article><h3>Genre cohorts</h3><p>Genre magnets use mean cosine similarity. For each dust title, the score is the arithmetic mean of its signed cosine similarities to every sampled title with that genre in the magnet catalogue. A title can belong to multiple cohorts and contribute to each of their scores. Each magnet contributes one score to the combined average. Filters narrow the dust while the cohorts stay fixed.</p></article>
             <article><h3>Anime studios</h3><p>Studios group anime by AniList main-studio credit. As in Full Catalogue, Popularity sums list-user counts and Score averages available ratings. A movie magnet averages the studio’s signed cosine similarities to that movie. A Movie genre magnet averages over every scored pair of a studio anime and a movie in the cohort. Each magnet uses all works with data for that magnet. Filters affect which studios appear in the field. The analysis charts cover the catalogue filmographies of the selected studios, or all studios in the field when the selection is empty.</p></article>
             <article><h3>Anime voice actors</h3><p>Voice actors group anime by AniList Japanese main-role credits. A movie magnet averages the similarities of an actor’s credited anime to that movie. A Movie genre magnet averages across the cohort’s movies. Popularity sums list-user counts, and Score averages available ratings. Score vs. popularity shows anime credited to the selected actors, or all actors in the field when the selection is empty. Shared titles count once.</p></article>
-            <article><h3>Anime genre and Title count</h3><p>Anime genre counts distinct credited catalogue anime in the chosen genre for each studio or voice actor. Title count counts their full catalogue filmography. Both use attraction percentiles. Filters change the field while the counts and reference sample stay fixed.</p></article>
+            <article><h3>Genre and title counts</h3><p>Anime genre counts distinct credited catalogue anime in the chosen genre for each studio or voice actor. Movie genre counts distinct credited catalogue movies in the chosen genre for each actor or writer. Title count counts each creator’s full catalogue filmography. Both count magnets use attraction percentiles. Filters change the field while the counts and reference sample stay fixed.</p></article>
             <article><h3>Movie actors</h3><p>Movie actors group movies by their top five sampled TMDB cast credits. Anime and genre magnets average similarities across each actor’s credited movies. Popularity sums archived TMDB popularity, and Score averages available TMDB ratings. Score vs. popularity rank shows movies credited to the selected actors, or to all actors in the field when the selection is empty. Shared movies count once.</p></article>
             <article><h3>Movie writers</h3><p>Movie writers group movies by TMDB Writing department credits, including screenplay, story, and source material. The magnets and linked charts follow the same rules as Movie actors. Zoom in for available writer portraits.</p></article>
             <article><h3>Attraction percentiles</h3><p>Popularity uses AniList list users for anime and TMDB popularity for movies. Score uses AniList ratings out of 100 and TMDB ratings out of 10. With a count, Popularity, or Score magnet active, each magnet’s raw values become attraction percentiles from 0 to 1. The reference sample includes dust with values for every active magnet. Ties share the average percentile and a sample of one gets 0.5. Dot count and filters leave the reference sample fixed. The full ranking keeps entries with missing values and supports sorting by each magnet’s raw values.</p></article>

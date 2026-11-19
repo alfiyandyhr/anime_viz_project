@@ -192,7 +192,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
       return { color, fontSize, fontWeight, marginBottom };
     });
     assert.deepEqual(await radioTextStyle(page.locator('#title-magnet-label')),
-      await radioTextStyle(page.locator('#magnet-type label').filter({ hasText: 'Genre cohort' })));
+      await radioTextStyle(page.locator('#genre-magnet-label')));
     await page.getByRole('checkbox', { name: 'Color dust by strongest attraction' }).check();
     await ranking.first().locator('img').waitFor();
     assert.match(await ranking.first().locator('img').getAttribute('src'), /^https:\/\/s4\.anilist\.co\//);

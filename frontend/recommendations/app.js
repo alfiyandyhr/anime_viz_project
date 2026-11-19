@@ -192,10 +192,10 @@ function pickerCatalogue() {
 function resetMagnetPicker() {
   const { magnet, example, records, label } = pickerCatalogue();
   const { direction } = AnivizMain.snapshot();
-  const animeCounts = AnivizDust.supportsAnimeCounts(direction);
   document.querySelector("#title-magnet-label").textContent = humanize(label);
-  document.querySelector("#genre-magnet-label").textContent = animeCounts ? "Movie genre" : "Genre cohort";
-  document.querySelectorAll("[data-anime-count-magnet]").forEach(control => { control.hidden = !animeCounts; });
+  document.querySelector("#genre-magnet-label").textContent = `${humanize(label)} genre`;
+  document.querySelector("#genre-count-magnet-label").textContent = AnivizDust.isMovieDust(direction) ? "Movie genre" : "Anime genre";
+  document.querySelector("#count-magnet-types").hidden = !AnivizDust.groupFor(direction);
   const search = document.querySelector("#movie-search");
   search.value = "";
   search.placeholder = `Search ${label} titles or aliases`;
@@ -223,32 +223,36 @@ function updateMagnetPickerMode() {
 }
 
 function renderCountAndGenrePickers() {
-  const { genreCohorts, animeGenreMagnets, titleCount, metadataStatus } = AnivizMain.snapshot();
+  const { direction, genreCohorts, genreCountMagnets, titleCount, metadataStatus, movieDetailsStatus } = AnivizMain.snapshot();
   const type = document.querySelector('#magnet-type input:checked').value;
-  const animeGenre = type === "anime-genre";
-  const showGenre = type === "genre" || animeGenre;
+  const genreCount = type === "genre-count";
+  const showGenre = type === "genre" || genreCount;
   document.querySelector("#genre-magnet-picker").hidden = !showGenre;
   document.querySelector("#title-count-magnet-picker").hidden = type !== "title-count";
 
-  const creditStatus = metadataStatus === "loading" ? "Loading AniList credits…"
-    : metadataStatus === "unavailable" ? "AniList credits are unavailable." : "";
+  const movie = AnivizDust.isMovieDust(direction);
+  const provider = movie ? "TMDB" : "AniList";
+  const titles = `${provider} ${AnivizDust.titleNoun(direction)}`;
+  const status = movie ? movieDetailsStatus : metadataStatus;
+  const creditStatus = ["idle", "loading"].includes(status) ? `Loading ${provider} credits…`
+    : status === "unavailable" ? `${provider} credits are unavailable.` : "";
   if (showGenre) {
-    const options = animeGenre ? animeGenreMagnets : genreCohorts;
+    const options = genreCount ? genreCountMagnets : genreCohorts;
     const choice = document.querySelector("#genre-magnet-choice");
     const selected = choice.value;
     choice.innerHTML = '<option value="">Select a genre…</option>' + options.map(magnet =>
-      `<option value="${escapeAttribute(magnet.key)}">${escapeHTML(magnet.title)}${animeGenre ? "" : ` (${magnet.memberIds.length})`}</option>`).join("");
+      `<option value="${escapeAttribute(magnet.key)}">${escapeHTML(magnet.title)}${genreCount ? "" : ` (${magnet.memberIds.length})`}</option>`).join("");
     choice.value = options.some(magnet => magnet.key === selected) ? selected : "";
     choice.disabled = !options.length;
     document.querySelector("#add-genre-magnet").disabled = !choice.value;
-    document.querySelector("#genre-magnet-source").textContent = animeGenre
-      ? creditStatus || (options.length ? "Counts distinct AniList anime in the selected genre." : "No genres are available for these credits.")
+    document.querySelector("#genre-magnet-source").textContent = genreCount
+      ? creditStatus || (options.length ? `Counts distinct ${titles} in the selected genre.` : "No genres are available for these credits.")
       : options.length ? `Source: ${options[0].source}. Counts are sampled titles.` : "No genre cohorts are available in this sample.";
   }
   if (type === "title-count") {
     document.querySelector("#add-title-count-magnet").disabled = !titleCount?.eligible;
     document.querySelector("#title-count-magnet-source").textContent = creditStatus || (titleCount?.eligible
-      ? "Counts all distinct AniList anime in each filmography." : "No credited titles are available.");
+      ? `Counts all distinct ${titles} in each filmography.` : "No credited titles are available.");
   }
 }
 
@@ -285,7 +289,7 @@ function renderMetricPickers() {
 function focusMagnetPicker() {
   const type = document.querySelector('#magnet-type input:checked').value;
   const input = document.querySelector({ title: "#movie-search", genre: "#genre-magnet-choice",
-    "anime-genre": "#genre-magnet-choice" }[type] || `#add-${type}-magnet`);
+    "genre-count": "#genre-magnet-choice" }[type] || `#add-${type}-magnet`);
   (input.disabled ? document.querySelector('#magnet-type input:checked') : input).focus({ preventScroll: true });
 }
 
@@ -371,17 +375,17 @@ function renderMovieSearchResults(query) {
 
 function addMagnet(key, type, { status = document.querySelector("#recommendation-status"), restoreFocus = true } = {}) {
   const snapshot = AnivizMain.snapshot();
-  const { magnetKeys, genreCohorts, animeGenreMagnets, titleCount } = snapshot;
+  const { magnetKeys, genreCohorts, genreCountMagnets, titleCount } = snapshot;
   const genre = type === "genre";
   if (genre && !genreCohorts.some(cohort => cohort.key === key)) {
     status.textContent = "That genre cohort is unavailable in this sample.";
     return;
   }
-  const animeGenre = animeGenreMagnets.find(magnet => magnet.key === key);
-  if (type === "anime-genre" && !animeGenre) return;
+  const genreCount = genreCountMagnets.find(magnet => magnet.key === key);
+  if (type === "genre-count" && !genreCount) return;
   if (AnivizDust.METRIC_MAGNET_TYPES.includes(type) && !snapshot[type].eligible) return;
   if (magnetKeys.includes(key)) {
-    const label = animeGenre?.title || (type === "title-count" ? titleCount?.title : snapshot[type]?.title);
+    const label = genreCount?.title || (type === "title-count" ? titleCount?.title : snapshot[type]?.title);
     status.textContent = label ? `${label} is already a magnet.` : `That ${genre ? "genre cohort" : "title"} is already a magnet.`;
     return;
   }

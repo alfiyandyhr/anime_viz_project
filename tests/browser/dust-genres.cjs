@@ -11,7 +11,7 @@ const remove = (page, key) => page.locator(`[data-remove-magnet="${key}"]`).clic
 const choice = page => page.locator('#genre-magnet-choice');
 const add = page => page.getByRole('button', { name: 'Add genre magnet' });
 const selectGenre = async (page, key) => {
-  await page.getByRole('radio', { name: 'Genre cohort' }).check();
+  await page.getByRole('radio', { name: key.startsWith('tmdb:') ? 'Movie genre' : 'Anime genre' }).check();
   const select = choice(page);
   const border = await select.evaluate(el => getComputedStyle(el).borderColor);
   await select.focus();
@@ -27,11 +27,58 @@ const snapshot = page => page.evaluate(() => {
   return { magnetKeys, rankingSortKey, displayedKeys, ranking: ranking.map(row => [row.key, row.scores, row.score]) };
 });
 
+async function verifyCreatorPickers(page) {
+  const titleCount = 'tmdb:title-count';
+  const movieGenre = 'tmdb:movie-genre:Science Fiction';
+  const picker = page.locator('#magnet-type');
+  await page.goto(base);
+  await dots(page).first().waitFor();
+  for (const [dustType, title, genre, countGenre] of [
+    [animeTitles, 'Movie', 'Movie genre'],
+    ['anime-studios', 'Movie', 'Movie genre', 'Anime genre'],
+    ['anime-voice-actors', 'Movie', 'Movie genre', 'Anime genre'],
+    [movieTitles, 'Anime', 'Anime genre'],
+    ['movie-actors', 'Anime', 'Anime genre', 'Movie genre'],
+    ['movie-writers', 'Anime', 'Anime genre', 'Movie genre']
+  ]) {
+    await page.selectOption('#dust-type', dustType);
+    assert.deepEqual(await picker.locator('label:visible').allInnerTexts(),
+      [title, genre, 'Popularity', 'Score', ...(countGenre ? [countGenre, 'Title count'] : [])]);
+    if (!countGenre) continue;
+    const position = name => picker.getByRole('radio', { name, exact: true }).evaluate(node => node.getBoundingClientRect().top);
+    const metricsBottom = Math.max(await position('Popularity'), await position('Score'));
+    assert.ok(await position(countGenre) > metricsBottom && await position('Title count') > metricsBottom);
+    if (countGenre !== 'Movie genre') continue;
+
+    await page.waitForFunction(() => AnivizMain.snapshot().movieDetailsStatus === 'ready');
+    await selectGenre(page, movieGenre);
+    await picker.getByRole('radio', { name: 'Title count' }).check();
+    await page.getByRole('button', { name: 'Add title count magnet' }).click();
+    await page.locator('[data-dust-ranking-sort]').selectOption(movieGenre);
+    assert.match(await page.locator('[data-dust-ranking-head]').textContent(), /Science Fiction movies/);
+    const counts = await page.evaluate(() => {
+      const { ranking, titleLookup, activeMagnetKeys } = AnivizMain.snapshot();
+      const leader = ranking[0];
+      const creditedMovies = leader.record.memberIds.map(id => titleLookup.get(`tmdb:${id}`).record);
+      return { activeMagnetKeys, raw: leader.rawScores.slice(1),
+        expected: [creditedMovies.filter(movie => movie.genres.includes('Science Fiction')).length, creditedMovies.length] };
+    });
+    assert.deepEqual(counts.activeMagnetKeys, ['anilist:16498', movieGenre, titleCount]);
+    assert.deepEqual(counts.raw, counts.expected);
+    await remove(page, movieGenre);
+    await remove(page, titleCount);
+  }
+}
+
 (async () => {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
   try {
     const errors = [];
+    const pickerPage = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    pickerPage.on('pageerror', error => errors.push(error.message));
+    await verifyCreatorPickers(pickerPage);
+    await pickerPage.close();
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(base);
@@ -162,6 +209,6 @@ const snapshot = page => page.evaluate(() => {
     await remove(mobile, anime);
     assert.deepEqual((await snapshot(mobile)).magnetKeys, ['anilist:16498']);
     assert.deepEqual(errors, []);
-    console.log('Verified mixed and three-cohort fields, the shared slot limit, rankings and filters, drag, keyboard use, and desktop/mobile session restoration.');
+    console.log('Verified magnet labels and row order, movie creator count magnets, genre cohorts, rankings, filters, and session restoration.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

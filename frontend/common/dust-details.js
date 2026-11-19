@@ -38,7 +38,7 @@
     const count = match.record.memberIds.length;
     const titles = `${count} catalogue ${root.AnivizDust.titleNoun(direction, count)}`;
     if (index === undefined || magnet?.kind === 'title-count') return titles;
-    return `${match.contributingCounts[index]} of ${titles} ${magnet?.kind === 'anime-genre' ? 'in this genre' : 'scored'}`;
+    return `${match.contributingCounts[index]} of ${titles} ${magnet?.kind === 'genre-count' ? 'in this genre' : 'scored'}`;
   }
 
   function renderGroup({ snapshot, match, color, helpers, heading = 'h3' }) {
