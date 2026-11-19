@@ -159,6 +159,20 @@ const StoryData = (() => {
     });
   }
 
-  return { validate, summarizePeriod, topAnime, locatePeriod, yearScrollProgress, yearPairs, movieYearPairs };
+  function nearestYearIndex(rows, year) {
+    return rows.reduce((best, row, i) =>
+      Math.abs(row.year - year) < Math.abs(rows[best].year - year) ? i : best, 0);
+  }
+
+  function matchYearSpan(matches) {
+    const years = matches.slice(0, 5).map(({ work }) => work.year);
+    if (years.length < 5 || !years.every(Number.isInteger)) return null;
+    years.sort((a, b) => b - a);
+    const gaps = years.slice(1).map((year, index) => years[index] - year);
+    return { years, gaps, span: gaps.reduce((sum, gap) => sum + gap, 0) };
+  }
+
+  return { validate, summarizePeriod, topAnime, locatePeriod, yearScrollProgress, yearPairs, movieYearPairs,
+    nearestYearIndex, matchYearSpan };
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = StoryData;

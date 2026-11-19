@@ -4,7 +4,6 @@
   const project = new URL("../../", document.currentScript.src);
   const $ = selector => document.querySelector(selector);
   const journey = $("#history-journey");
-  const panel = $(".history-panel");
   const pairPanel = $("#history-pair");
   const animeAxis = $("#anime-axis");
   const movieAxis = $("#movie-axis");
@@ -61,7 +60,7 @@
     }
   }
 
-  function openSynopsis(work, label, sourceName) {
+  function openSynopsis(work, label, sourceName, card) {
     $("#synopsis-kind").textContent = `${label} · ${work.year}`;
     $("#synopsis-title").textContent = work.title;
     $("#synopsis-text").textContent = work.description || "No synopsis available.";
@@ -70,7 +69,7 @@
     source.hidden = !href;
     source.href = href;
     source.textContent = `View on ${sourceName} ↗`;
-    synopsisScroll = panel.scrollTop;
+    synopsisScroll = { card, top: card.scrollTop };
     dialog.showModal();
   }
 
@@ -99,7 +98,7 @@
       } else cover.removeAttribute("src");
     }
 
-    button.addEventListener("click", () => openSynopsis(entry, kind.textContent, sourceName));
+    button.addEventListener("click", () => openSynopsis(entry, kind.textContent, sourceName, card));
     cover.addEventListener("error", () => { cover.hidden = true; });
 
     const update = (work, label, emptyMessage, additional, motion, focus) => {
@@ -130,6 +129,7 @@
           { transform: "translateY(0)", opacity: 1 }
         ], { duration: 200, easing: "ease-out" });
       }
+      const titleChanged = work?.id !== entry?.id;
       entry = work;
       kind.textContent = label;
       year.textContent = work?.year ?? "";
@@ -157,6 +157,7 @@
         item.append(details, value);
         return item;
       }));
+      if (titleChanged) card.scrollTop = 0;
       if (focus) title.focus({ preventScroll: true });
     };
     update.refreshArtwork = refreshArtwork;
@@ -295,9 +296,10 @@
   }
 
   function render(index, reason) {
-    if (!reason && activeIndex === index) return;
+    const yearChanged = index !== activeIndex;
+    if (!reason && !yearChanged) return;
     const motion = reason || (activeIndex < 0 ? null : index < activeIndex ? "backward" : "forward");
-    if (index !== activeIndex) {
+    if (yearChanged) {
       selectedMatch = 0;
       hoveredRank = focusedRank = undefined;
     }
@@ -349,17 +351,13 @@
       caption.textContent = `No match for ${year}`;
       $("#timeline-title").textContent = `Anime and movie release timelines for ${year}`;
     }
-  }
-
-  function stickyTop() {
-    return parseFloat(getComputedStyle(panel).top);
+    if (yearChanged) matchSpan.update(activePerspective, pairs, index);
   }
 
   function syncScroll(reason) {
     frame = 0;
     if (!pairs.length || synopsisScroll != null) return;
-    const offset = stickyTop() - journey.getBoundingClientRect().top;
-    const index = Math.min(pairs.length - 1, Math.max(0, Math.round(offset / yearTravel)));
+    const index = Math.min(pairs.length - 1, Math.max(0, Math.round(journey.scrollTop / yearTravel)));
     render(index, reason);
   }
 
@@ -369,18 +367,12 @@
 
   function goTo(index, reason) {
     if (!pairs[index]) return;
-    const start = window.scrollY + journey.getBoundingClientRect().top - stickyTop();
-    window.scrollTo({ top: Math.max(0, start + index * yearTravel), behavior: "instant" });
+    journey.scrollTo({ top: index * yearTravel, behavior: "instant" });
     syncScroll(reason);
   }
 
   function goToYear(year, reason) {
-    goTo(nearestYearIndex(pairs, year), reason);
-  }
-
-  function nearestYearIndex(rows, year) {
-    return rows.reduce((best, row, i) =>
-      Math.abs(row.year - year) < Math.abs(rows[best].year - year) ? i : best, 0);
+    goTo(StoryData.nearestYearIndex(pairs, year), reason);
   }
 
   function showZoomStatus(text = "", retryAction = null) {
@@ -464,7 +456,7 @@
     showZoomStatus();
     const rows = timelines.get(track).pairs;
     const sections = rows.map(row => makeZoomYear(row, track === "movie"));
-    const selected = sections[nearestYearIndex(rows, year)];
+    const selected = sections[StoryData.nearestYearIndex(rows, year)];
     zoomYears.replaceChildren(...sections);
     zoomYears.scrollTo({ top: selected.offsetTop, behavior: "instant" });
     selected.querySelector("h3").focus({ preventScroll: true });
@@ -556,14 +548,14 @@
     $("#history-range").textContent = `${first}–${last}`;
     $("#year-label").textContent = moviePerspective ? "Movie release year" : "Anime release year";
     $("#history-intro").textContent = moviePerspective
-      ? "Scroll to explore each year’s most popular live-action movie and its closest anime matches."
-      : "Scroll to explore each year’s most popular anime and its closest live-action movie matches.";
+      ? "Scroll inside the timeline to explore each year’s most popular live-action movie and its closest anime matches."
+      : "Scroll inside the timeline to explore each year’s most popular anime and its closest live-action movie matches.";
     const count = number.format(timeline.matchCount);
     $("#history-method").textContent = moviePerspective
       ? `Top movies use TMDB popularity. Anime matches use cosine similarity across ${count} AniList titles.`
       : `Popularity uses AniList list counts. Movie matches use cosine similarity across ${count} live-action TMDB titles.`;
     $("#history-travel").style.height = `${(pairs.length - 1) * yearTravel}px`;
-    for (const id of ["history-controls", "history-pair", "history-note"]) $(`#${id}`).hidden = false;
+    for (const id of ["history-controls", "history-journey", "history-pair", "history-method", "history-match-span"]) $(`#${id}`).hidden = false;
     showStatus();
 
     if (selectedYear == null) {
@@ -586,28 +578,34 @@
     }
   }
 
-  async function changePerspective() {
+  function setPerspectiveControls(mode) {
+    perspective.querySelector(`[value="${mode}"]`).checked = true;
+    matchSpan.setDirection(mode);
+  }
+
+  async function changePerspective(input, notify = showStatus) {
     const request = ++perspectiveRequest;
-    const selected = perspective.querySelector(":checked");
-    const mode = selected.value;
+    const mode = input.value;
+    setPerspectiveControls(mode);
+    showStatus();
+    matchSpan.showStatus();
     if (!timelines.has(mode)) {
-      showStatus("Loading Movie Timeline…");
+      notify("Loading Movie Timeline…");
       try {
         await loadMovieTimeline();
       } catch (error) {
         if (request !== perspectiveRequest) return;
-        perspective.querySelector(`[value="${activePerspective}"]`).checked = true;
-        showStatus("Movie Timeline could not be loaded. Try again.", () => {
-          selected.checked = true;
-          selected.focus({ preventScroll: true });
-          changePerspective();
+        setPerspectiveControls(activePerspective);
+        notify("Movie Timeline could not be loaded. Try again.", () => {
+          input.focus({ preventScroll: true });
+          changePerspective(input, notify);
         });
         console.warn("Movie Timeline data unavailable", error);
         return;
       }
     }
     if (request !== perspectiveRequest) return;
-    showStatus();
+    notify();
     if (mode !== activePerspective) activateTimeline(mode, pairs[activeIndex].year);
   }
 
@@ -643,7 +641,14 @@
     }
   }
 
-  window.addEventListener("scroll", queueSync, { passive: true });
+  journey.addEventListener("scroll", queueSync, { passive: true });
+  journey.addEventListener("keydown", event => {
+    if (event.target !== journey || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    const target = { ArrowUp: activeIndex - 1, ArrowDown: activeIndex + 1, Home: 0, End: pairs.length - 1 }[event.key];
+    if (!Number.isInteger(target)) return;
+    event.preventDefault();
+    goTo(target);
+  });
   window.addEventListener("resize", queueSync);
   window.addEventListener("pageshow", queueSync);
   window.addEventListener("hashchange", followLegacyHash);
@@ -668,7 +673,7 @@
   });
   dialog.addEventListener("close", () => {
     if (synopsisScroll == null) return;
-    panel.scrollTop = synopsisScroll;
+    synopsisScroll.card.scrollTop = synopsisScroll.top;
     synopsisScroll = null;
     goTo(activeIndex);
   });
@@ -690,14 +695,18 @@
     closeZoom();
   });
   $("#close-history-zoom").addEventListener("click", closeZoom);
-  perspective.addEventListener("change", changePerspective);
+  perspective.addEventListener("change", event => changePerspective(event.target));
   yearPicker.addEventListener("change", () => goTo(yearPicker.selectedIndex));
   matchCount.addEventListener("change", () => {
     if (activeIndex >= 0) render(activeIndex, "count");
   });
   previous.addEventListener("click", () => goTo(activeIndex - 1));
   next.addEventListener("click", () => goTo(activeIndex + 1));
-  perspective.querySelector('[value="anime"]').checked = true;
+  const matchSpan = HistoryMatchSpan.mount($("#history-match-span"), {
+    onYearChange: goToYear,
+    onDirectionChange: input => changePerspective(input, matchSpan.showStatus)
+  });
+  setPerspectiveControls("anime");
   loadMovieArtwork();
   load();
 })();
