@@ -248,7 +248,8 @@ The refresh stores model weights in the Hugging Face cache.
 ## History
 
 Choose **History** from the view dropdown or visit `/history` or `/story` with Flask.
-Scroll to advance one anime release year at a time, or use the year selector.
+Scroll inside the timeline frame to advance one release year at a time, or use
+the year selector. Scroll the page outside the frame to reach Match year span.
 The left timeline follows the most popular title from that year’s AniList sample.
 The right timeline marks the release years of the highest-scoring live-action
 movie matches. Use **Connections** to show one to five matches, ordered by cosine
