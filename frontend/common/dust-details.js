@@ -48,11 +48,14 @@
     const movie = root.AnivizDust.isMovieDust(direction);
     const studio = direction === root.AnivizDust.STUDIOS;
     const writer = direction === root.AnivizDust.MOVIE_WRITERS;
+    const originalCreator = direction === root.AnivizDust.ORIGINAL_CREATORS;
     const provider = root.AnivizDust.DIRECTIONS[direction].dust;
     const noun = root.AnivizDust.titleNoun(direction);
     const credit = writer ? 'TMDB Writing department credits'
-      : movie ? 'Sampled TMDB cast credits' : studio ? 'AniList main-studio credits' : 'AniList Japanese main-role credits';
-    const workAttribute = studio ? 'data-studio-work' : writer ? 'data-writer-work' : 'data-actor-work';
+      : movie ? 'Sampled TMDB cast credits' : studio ? 'AniList main-studio credits'
+        : originalCreator ? 'AniList original creator credits' : 'AniList Japanese main-role credits';
+    const workAttribute = studio ? 'data-studio-work' : writer ? 'data-writer-work'
+      : originalCreator ? 'data-creator-work' : 'data-actor-work';
     const image = movie ? root.AnivizArtwork.moviePortrait(record) : record.image;
     const portrait = root.AnivizArtwork.detailHero('', image, `Portrait of ${record.title}`, attr);
     const link = movie ? `https://www.themoviedb.org/person/${attr(record.id)}`

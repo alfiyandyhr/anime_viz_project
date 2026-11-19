@@ -184,7 +184,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     await page.goto(url(''));
     await ready();
     assert.deepEqual(await dustTypePicker.locator('option').allTextContents(),
-      ['Anime titles', 'Anime studios', 'Anime voice actors', 'Movie titles', 'Movie actors', 'Movie writers']);
+      ['Anime titles', 'Anime studios', 'Anime voice actors', 'Anime original creators', 'Movie titles', 'Movie actors', 'Movie writers']);
     assert.equal(await dustTypePicker.inputValue(), animeTitles);
     assert.equal(await page.getByRole('radio', { name: 'Movie', exact: true }).isChecked(), true);
     const radioTextStyle = locator => locator.evaluate(node => {

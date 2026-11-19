@@ -3,18 +3,21 @@ const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 
-(async () => {
-  const browser = await chromium.launch({ headless: true,
-    ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
+async function verifyCredits(browser, dustType, creditLabel) {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
   try {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
+    const creators = dustType === 'anime-original-creators';
+    if (creators) {
+      await page.route('**/data/anime_credits.json', route => route.fulfill({ status: 503 }), { times: 1 });
+    }
     await page.goto(new URL('frontend/dust-magnet/index.html', base).href);
     const field = page.locator('#recommendation-chart');
     const chart = kind => page.locator(`[data-dust-chart="${kind}"]`);
     await field.locator('.dust-node').first().waitFor();
-    await page.locator('#dust-type').selectOption('anime-voice-actors');
+    await page.locator('#dust-type').selectOption(dustType);
+    if (creators) await field.getByRole('button', { name: 'Retry original creator credits' }).click();
     await field.locator('[data-match-id^="anilist:staff:"]').first().waitFor();
 
     const { first, second, filmography, selected, portrait } = await page.evaluate(() => {
@@ -23,7 +26,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       const sharesTitle = (first, second) => first !== second && first.memberIds.some(id => second.memberIds.includes(id));
       const first = groups.find(group => group.image && group.memberIds.length > 1
         && groups.some(other => sharesTitle(group, other)));
-      if (!first) throw new Error('Expected two displayed voice actors with a shared title');
+      if (!first) throw new Error('Expected two displayed people with a shared title');
       const second = groups.find(group => sharesTitle(first, group));
       const receptionIds = groups => [...new Set(groups.flatMap(group => group.memberIds))].filter(id => {
         const anime = titleLookup.get(`anilist:${id}`).record;
@@ -48,7 +51,14 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     assert.deepEqual(await ids(dots), filmography);
 
     await actor.press('Enter');
-    assert.match(await page.locator('#dust-focus').innerText(), /Japanese main-role credits/);
+    const focus = page.locator('#dust-focus');
+    assert.match(await focus.innerText(), creditLabel);
+    assert.equal(await focus.locator('img').getAttribute('src'), portrait);
+    if (creators) {
+      await focus.locator('[data-creator-work]').first().click();
+      assert.equal(await page.locator('#detail-drawer').getAttribute('aria-label'), 'Anime details');
+      await page.keyboard.press('Escape');
+    }
     await chart('connections').locator(`[data-dust-connection-id$=":${second}"]`).press('Enter');
     assert.deepEqual(await page.evaluate(() => AnivizMain.snapshot().selectedKeys), [first, second]);
 
@@ -81,7 +91,18 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     await dots.first().waitFor();
     assert.deepEqual(await ids(dots), filmography);
     assert.deepEqual(errors, []);
-    console.log('Verified voice actor portraits, connections, purple scatterplot filtering and highlights in the other charts.');
+    console.log(`Verified ${dustType} portraits, connections, scatterplot filtering and highlights in the other charts.`);
+  } finally {
+    await page.close();
+  }
+}
+
+(async () => {
+  const browser = await chromium.launch({ headless: true,
+    ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
+  try {
+    await verifyCredits(browser, 'anime-voice-actors', /Japanese main-role credits/);
+    await verifyCredits(browser, 'anime-original-creators', /AniList original creator credits/);
   } finally {
     await browser.close();
   }

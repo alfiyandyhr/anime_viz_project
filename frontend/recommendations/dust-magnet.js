@@ -398,17 +398,21 @@ function renderDustRecommendations() {
     button.setAttribute("aria-pressed", magnets.some(magnet => magnet.key === button.dataset.magnetKey));
   });
   document.querySelector("#reset-magnets").disabled = !magnets.length;
-  const creditStatus = movie ? snapshot.movieDetailsStatus : snapshot.metadataStatus;
+  const { creditStatus } = snapshot;
   if (group && creditStatus !== "ready") {
     const unavailable = creditStatus === "unavailable";
     const writers = direction === AnivizDust.MOVIE_WRITERS;
-    const credits = writers ? "writing credits" : studios ? "studio credits" : movie ? "movie cast credits" : "voice actor credits";
+    const creators = direction === AnivizDust.ORIGINAL_CREATORS;
+    const credits = creators ? "original creator credits"
+      : writers ? "writing credits" : studios ? "studio credits" : movie ? "movie cast credits" : "voice actor credits";
     const message = unavailable ? `${group.label} credits could not be loaded.` : `Loading ${movie ? "TMDB" : "AniList"} ${credits}…`;
-    const retryId = writers ? "writer-credits-retry" : studios ? "studio-credits-retry" : "actor-credits-retry";
+    const retryId = creators ? "creator-credits-retry"
+      : writers ? "writer-credits-retry" : studios ? "studio-credits-retry" : "actor-credits-retry";
+    const retry = creators ? AnivizMain.loadAnimeCredits : movie ? AnivizMain.loadMovieDetails : AnivizMain.loadMetricData;
     container.innerHTML = `<div class="dust-empty" role="status"><p>${message}</p>${unavailable
       ? `<button type="button" class="small-button ghost" id="${retryId}">Retry ${credits}</button>` : ""}</div>`;
     renderEmpty(mirror, message);
-    document.querySelector(`#${retryId}`)?.addEventListener("click", movie ? AnivizMain.loadMovieDetails : AnivizMain.loadMetricData);
+    document.querySelector(`#${retryId}`)?.addEventListener("click", retry);
     return;
   }
   if (!magnets.length) {

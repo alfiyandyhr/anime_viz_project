@@ -9,6 +9,7 @@
     [AnivizDust.FORWARD]: 'anime-titles',
     [AnivizDust.STUDIOS]: 'anime-studios',
     [AnivizDust.ACTORS]: 'anime-voice-actors',
+    [AnivizDust.ORIGINAL_CREATORS]: 'anime-original-creators',
     [AnivizDust.REVERSE]: 'movie-titles',
     [AnivizDust.MOVIE_ACTORS]: 'movie-actors',
     [AnivizDust.MOVIE_WRITERS]: 'movie-writers'
@@ -16,6 +17,7 @@
   const magnetColors = new Map();
   const isReverse = () => AnivizDust.isMovieDust(latest.direction);
   const isStudio = () => latest.direction === AnivizDust.STUDIOS;
+  const isOriginalCreatorDust = () => latest.direction === AnivizDust.ORIGINAL_CREATORS;
   const dustGroup = () => AnivizDust.groupFor(latest.direction);
   const isMoviePersonDust = () => isReverse() && Boolean(dustGroup());
   const dustNoun = () => dustGroup()?.noun || (isReverse() ? "movies" : "anime");
@@ -333,7 +335,11 @@
     restoreScroll();
   }
   async function loadMetricData() {
-    if (!isReverse()) { void loadMetadata(); return; }
+    if (!isReverse()) {
+      if (isOriginalCreatorDust()) void loadAnimeCredits();
+      if (!isOriginalCreatorDust() || latest.metadataStatus !== 'ready') void loadMetadata();
+      return;
+    }
     const { status } = latest.popularity;
     if (!['idle', 'unavailable'].includes(status)) return;
     context.setMoviePopularity(null, 'loading');
@@ -342,6 +348,15 @@
       .catch(() => null);
     context.setMoviePopularity(payload, payload ? 'ready' : 'unavailable');
     if (isReverse()) renderRecommendations();
+    restoreScroll();
+  }
+  async function loadAnimeCredits() {
+    if (!['idle', 'unavailable'].includes(latest.creditStatus)) return;
+    context.setAnimeCredits(null, 'loading');
+    renderRecommendations();
+    const credits = await AnivizData.animeCredits().catch(() => null);
+    context.setAnimeCredits(credits, credits ? 'ready' : 'unavailable');
+    if (isOriginalCreatorDust()) renderRecommendations();
     restoreScroll();
   }
   function loadMovieDetails() {
@@ -406,8 +421,8 @@
     });
     for (const panel of [$('#dust-focus'), elements.drawerContent]) {
       panel.addEventListener('click', event => {
-        const button = event.target.closest('[data-studio-work], [data-actor-work], [data-writer-work]');
-        if (button) inspectTitle(button.dataset.studioWork || button.dataset.actorWork || button.dataset.writerWork);
+        const button = event.target.closest('[data-studio-work], [data-actor-work], [data-writer-work], [data-creator-work]');
+        if (button) inspectTitle(button.dataset.studioWork || button.dataset.actorWork || button.dataset.writerWork || button.dataset.creatorWork);
       });
     }
     $('#recommendation-detail').addEventListener('click', event => {
@@ -462,6 +477,7 @@
     const searchExamples = {
       [AnivizDust.STUDIOS]: 'MADHOUSE',
       [AnivizDust.ACTORS]: 'Kana Hanazawa',
+      [AnivizDust.ORIGINAL_CREATORS]: 'Hajime Isayama',
       [AnivizDust.MOVIE_ACTORS]: 'Keanu Reeves',
       [AnivizDust.MOVIE_WRITERS]: 'Christopher Nolan'
     };
@@ -491,7 +507,7 @@
     if (scrollRestored || !recommendationState.data
       || (latest.magnets.some(magnet => !AnivizDust.isMetricMagnet(magnet)) && !recommendationState.scores)
       || (!isReverse() && latest.metadataStatus === 'loading')
-      || (isMoviePersonDust() && ['idle', 'loading'].includes(latest.movieDetailsStatus))
+      || (dustGroup() && ['idle', 'loading'].includes(latest.creditStatus))
       || AnivizDust.METRIC_MAGNET_TYPES.some(type => latest.magnetKeys.includes(latest[type].key)
         && ['idle', 'loading'].includes(latest[type].status))) return;
     scrollRestored = true;
@@ -519,7 +535,7 @@
       if (isReverse()) {
         void loadMetricData();
         loadMovieDetails();
-      }
+      } else if (isOriginalCreatorDust()) void loadAnimeCredits();
       restoreScroll();
     },
     setScores(scores) { context.setSources(recommendationState.data, scores); restoreScroll(); },
@@ -534,14 +550,14 @@
       if (isReverse()) {
         void loadMetricData();
         loadMovieDetails();
-      }
+      } else if (isOriginalCreatorDust()) void loadAnimeCredits();
       renderRecommendations();
       scrollRestored = true;
       window.scrollTo(0, context.getLayout().scrollY || 0);
     },
     setMagnets(keys) { context.setMagnets(keys); renderRecommendations(); },
     setDustLimit(value) { context.setDustLimit(value); renderRecommendations(); },
-    select, focusMagnet, color, dustColor, saveLayout, loadMetricData, loadMovieDetails,
+    select, focusMagnet, color, dustColor, saveLayout, loadMetricData, loadAnimeCredits, loadMovieDetails,
     deselectLast() {
       if (latest.selectedKeys.length) {
         focusedMagnetKey = null;

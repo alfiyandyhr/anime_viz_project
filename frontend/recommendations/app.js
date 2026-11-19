@@ -223,7 +223,7 @@ function updateMagnetPickerMode() {
 }
 
 function renderCountAndGenrePickers() {
-  const { direction, genreCohorts, genreCountMagnets, titleCount, metadataStatus, movieDetailsStatus } = AnivizMain.snapshot();
+  const { direction, genreCohorts, genreCountMagnets, titleCount, creditStatus: status } = AnivizMain.snapshot();
   const type = document.querySelector('#magnet-type input:checked').value;
   const genreCount = type === "genre-count";
   const showGenre = type === "genre" || genreCount;
@@ -233,7 +233,6 @@ function renderCountAndGenrePickers() {
   const movie = AnivizDust.isMovieDust(direction);
   const provider = movie ? "TMDB" : "AniList";
   const titles = `${provider} ${AnivizDust.titleNoun(direction)}`;
-  const status = movie ? movieDetailsStatus : metadataStatus;
   const creditStatus = ["idle", "loading"].includes(status) ? `Loading ${provider} credits…`
     : status === "unavailable" ? `${provider} credits are unavailable.` : "";
   if (showGenre) {

@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { ACTORS, FORWARD, MOVIE_ACTORS, MOVIE_WRITERS, REVERSE, createContext } = require('../frontend/common/dust-context.js');
+const { ACTORS, FORWARD, ORIGINAL_CREATORS, MOVIE_ACTORS, MOVIE_WRITERS, REVERSE, createContext } = require('../frontend/common/dust-context.js');
 
 test('voice actors aggregate by AniList staff ID and retain a distinct anime selection across reload', () => {
   const lead = { id: 42, name: 'Lead' };
@@ -51,6 +51,55 @@ test('voice actors aggregate by AniList staff ID and retain a distinct anime sel
   assert.ok(restored.restore());
   restored.setSources(data, matrix);
   assert.deepEqual(restored.setMetadata(metadata).selectedKeys, [firstKey, secondKey]);
+});
+
+test('anime original creators join by anime ID and score distinct credits across all magnet types', () => {
+  const creator = { id: '42', name: 'Creator', roles: ['Original Story'] };
+  const portrait = 'https://example.com/portrait.jpg';
+  const credits = {
+    1: { original_creators: [creator, { ...creator, image: portrait, roles: ['Original Creator'] }] },
+    2: { original_creators: [creator, { id: '43', name: 'Co-creator' }] },
+    3: { original_creators: [] }
+  };
+  const anime = [
+    { id: 1, title: 'First', genres: ['Action'], average_score: 60, popularity: 200 },
+    { id: 2, title: 'Second', genres: ['Drama'], average_score: 90, popularity: 500 },
+    { id: 3, title: 'Uncredited', genres: ['Drama'], voice_actors: [creator], average_score: 99, popularity: 1000 }
+  ];
+  const data = {
+    anime: anime.map(({ id, title }) => ({ id, title })),
+    movies: [{ id: 101, title: 'Inception', genres: ['Action'] }, { id: 102, title: 'Another', genres: ['Action'] }]
+  };
+  const memory = new Map();
+  const storage = { getItem: key => memory.get(key), setItem: (key, value) => memory.set(key, value) };
+  const scores = [-0.5, 0.75, 1, 0.25, 0.5, 1];
+  const context = createContext({ storage });
+  context.setMetadata(anime);
+  context.setSources(data, scores, { seedExample: true });
+  assert.equal(context.setDirection(ORIGINAL_CREATORS).creditStatus, 'idle');
+  let snapshot = context.setAnimeCredits(credits);
+  const firstKey = 'anilist:staff:42', secondKey = 'anilist:staff:43';
+  const first = () => snapshot.ranking.find(match => match.key === firstKey);
+  assert.deepEqual(first().record.memberIds, ['1', '2']);
+  assert.equal(first().record.image, portrait);
+  assert.equal(first().score, 0.125);
+  snapshot = context.setMagnets(['tmdb:genre:Action', 'anilist:popularity', 'anilist:score']);
+  assert.deepEqual(first().rawScores, [0.25, 700, 75]);
+  assert.deepEqual(first().scores, [0, 1, 0]);
+  snapshot = context.setMagnets(['anilist:anime-genre:Action', 'anilist:title-count']);
+  assert.deepEqual(first().rawScores, [1, 2]);
+  assert.deepEqual(context.setFilters({ genre: 'Action' }).displayedKeys, [firstKey]);
+  context.resetFilters();
+  assert.deepEqual(context.setSelection([firstKey, secondKey]).supportingIds, ['1', '2']);
+  assert.deepEqual(context.setDirection(ACTORS).selectedKeys, []);
+  assert.deepEqual(context.snapshot().lookup.get(firstKey).record.memberIds, ['3']);
+  context.setDirection(ORIGINAL_CREATORS);
+
+  const restored = createContext({ storage });
+  assert.ok(restored.restore());
+  restored.setSources(data, scores);
+  restored.setMetadata(anime);
+  assert.deepEqual(restored.setAnimeCredits(credits).selectedKeys, [firstKey, secondKey]);
 });
 
 test('movie actors use the anime matrix column and deduplicate credits for scores, metrics and selection', () => {

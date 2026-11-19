@@ -10,6 +10,7 @@
   const LEGACY_KEY = "aniviz-dust-session-v1";
   const FORWARD = "movie-to-anime", REVERSE = "anime-to-movies", STUDIOS = "movie-to-studios";
   const ACTORS = "movie-to-actors", MOVIE_ACTORS = "anime-to-actors", MOVIE_WRITERS = "anime-to-writers";
+  const ORIGINAL_CREATORS = "movie-to-original-creators";
   const DIRECTIONS = {
     [FORWARD]: { magnet: "tmdb", dust: "anilist", example: "Inception" },
     [REVERSE]: { magnet: "anilist", dust: "tmdb", example: "Attack on Titan" },
@@ -17,6 +18,8 @@
       group: { prefix: "anilist:studio", label: "Studio", noun: "studios" } },
     [ACTORS]: { magnet: "tmdb", dust: "anilist", example: "Inception",
       group: { prefix: "anilist:staff", label: "Voice actor", noun: "voice actors" } },
+    [ORIGINAL_CREATORS]: { magnet: "tmdb", dust: "anilist", example: "Inception",
+      group: { prefix: "anilist:staff", label: "Original creator", noun: "original creators" } },
     [MOVIE_ACTORS]: { magnet: "anilist", dust: "tmdb", example: "Attack on Titan",
       group: { prefix: "tmdb:person", label: "Movie actor", noun: "movie actors" } },
     [MOVIE_WRITERS]: { magnet: "anilist", dust: "tmdb", example: "Attack on Titan",
@@ -306,6 +309,7 @@
 
   function createContext({ storage, onNotice = () => {} } = {}) {
     let direction = FORWARD, data, matrix, pairScore, metadata = [], metadataStatus = "loading";
+    let animeCredits = {}, animeCreditsStatus = "idle";
     let movieDetails = {}, movieDetailsStatus = "idle", movieReception = {};
     let session = { state: blankState(direction), layout: blankLayout() };
     const sessions = new Map();
@@ -321,6 +325,8 @@
     let metricMagnets = {};
     let persistent = true, warned = false, revision = 0, colorByMagnet = false;
     const listeners = new Set();
+    const creditStatus = () => direction === ORIGINAL_CREATORS ? animeCreditsStatus
+      : isMovieDust(direction) ? movieDetailsStatus : metadataStatus;
     function storageFailure() {
       persistent = false;
       if (!warned) { warned = true; onNotice("Session storage is unavailable. Changes work here, but may not survive navigation or reload."); }
@@ -344,7 +350,8 @@
       const visible = new Set(state.displayedKeys);
       return { ...state, version: VERSION, direction, revision, colorByMagnet, magnets, magnetSlots, genreCohorts: cohorts,
         genreCountMagnets: [...genreCountMagnets.values()], titleCount, candidateDust: candidates, displayedDust: displayed,
-        ranking, lookup, titleLookup, metadataStatus, movieDetailsStatus, persistent, ...metricMagnets, mixed: magnets.some(isMetricMagnet),
+        ranking, lookup, titleLookup, metadataStatus, movieDetailsStatus, creditStatus: creditStatus(),
+        persistent, ...metricMagnets, mixed: magnets.some(isMetricMagnet),
         activeMagnetKeys: magnets.map(magnet => magnet.key),
         missingMetadataIds: direction === FORWARD ? state.candidateKeys.filter(key => !lookup.get(key)?.metadata) : [],
         filteredOutIds: state.candidateKeys.filter(key => !visible.has(key)) };
@@ -383,9 +390,16 @@
             const key = keyFor("anilist", row.id);
             if (!titleLookup.has(key)) titleLookup.set(key, { record: joinAnimeRecord(row, row), metadata: row });
           }
-          summaries = direction === ACTORS ? ChartData.voiceActors(metadata)
-            : ChartData.studios(metadata).filter(studio => studio.studioId !== null)
-              .map(({ studio, studioId, ...summary }) => ({ ...summary, id: studioId, title: studio }));
+          if (direction === ORIGINAL_CREATORS) {
+            const creditedAnime = [...titleLookup.values()].map(({ record }) => ({
+              ...record, original_creators: animeCredits[record.id]?.original_creators
+            }));
+            summaries = ChartData.originalCreators(creditedAnime);
+          } else {
+            summaries = direction === ACTORS ? ChartData.voiceActors(metadata)
+              : ChartData.studios(metadata).filter(studio => studio.studioId !== null)
+                .map(({ studio, studioId, ...summary }) => ({ ...summary, id: studioId, title: studio }));
+          }
         }
       }
       // Prefer groups with more catalogue titles when scores tie.
@@ -429,13 +443,14 @@
         state.magnetKeys = validMagnets(state.magnetKeys);
         const records = catalogueFor(data, provider);
         const source = metricSource;
+        const status = direction === ORIGINAL_CREATORS && source.status === "ready" ? creditStatus() : source.status;
         const definitions = {
           popularity: { title: "Popularity", metric: group ? "Total popularity" : movie ? "TMDB popularity" : "AniList list users" },
           score: { title: "Score", metric: group ? "Average score" : movie ? "TMDB score" : "AniList score", scale: movie ? 10 : 100 }
         };
         metricMagnets = Object.fromEntries(METRIC_MAGNET_TYPES.map(kind => [kind, {
           ...definitions[kind], key: metricMagnetKey(direction, kind), kind,
-          snapshotDate: source.snapshotDate, status: source.status, total: group ? groups.length : records.length,
+          snapshotDate: source.snapshotDate, status, total: group ? groups.length : records.length,
           eligible: group
             ? groups.filter(row => Number.isFinite(row[GROUP_METRICS[kind].value])).length
             : records.filter(record => Number.isFinite(source.values[kind]?.get(id(record.id)))).length
@@ -463,8 +478,7 @@
       const visible = new Set(state.displayedKeys);
       const waitingForMetrics = state.magnetKeys.some(key => isMetricKey(direction, key))
         && ["idle", "loading"].includes(metricSource.status);
-      const selectionReady = movie ? !group || movieDetailsStatus === "ready"
-        : group ? metadataStatus === "ready" : metadataStatus !== "loading";
+      const selectionReady = (!group || creditStatus() === "ready") && (movie || metadataStatus !== "loading");
       if ((pairScore || vectors.length) && !waitingForMetrics && selectionReady) {
         const retained = state.selectedKeys.filter(key => visible.has(key));
         if (retained.length < state.selectedKeys.length) onNotice(`Selection updated. ${group?.label ? group.label + "s" : "Titles"} no longer displayed were removed.`);
@@ -546,6 +560,13 @@
           values: { popularity: new Map(metadata.map(row => [id(row.id), row.popularity])),
             score: new Map(metadata.map(row => [id(row.id), row.average_score])) } };
         if (!data || isMovieDust(direction)) return snapshot();
+        refreshLookup();
+        return derive({ rescore: true });
+      },
+      setAnimeCredits(credits, status = "ready") {
+        animeCredits = credits || {};
+        animeCreditsStatus = status;
+        if (!data || direction !== ORIGINAL_CREATORS) return snapshot();
         refreshLookup();
         return derive({ rescore: true });
       },
@@ -637,7 +658,7 @@
     };
     return api;
   }
-  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, STUDIOS, ACTORS, MOVIE_ACTORS, MOVIE_WRITERS, DIRECTIONS, groupFor, isMovieDust, titleNoun,
+  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, STUDIOS, ACTORS, ORIGINAL_CREATORS, MOVIE_ACTORS, MOVIE_WRITERS, DIRECTIONS, groupFor, isMovieDust, titleNoun,
     METRIC_MAGNET_TYPES, isMetricMagnet,
     keyFor, catalogueFor, magnetScoreLabel, cohortDescription,
     averageLabel, formatPercentile, formatRawScore, mixedEvidence, defaults, joinRecords,

@@ -68,6 +68,7 @@
     }));
   }
   const voiceActors = anime => personGroups(anime, "voice_actors", "anilist:staff");
+  const originalCreators = anime => personGroups(anime, "original_creators", "anilist:staff");
   const movieActors = movies => personGroups(movies, "cast", "tmdb:person");
   const movieWriters = movies => personGroups(movies, "writers", "tmdb:person");
   function timeline(anime, selectedIds = []) {
@@ -100,5 +101,5 @@
   }
   const hasMovieReception = movie => Number.isInteger(movie.popularity_rank) && movie.popularity_rank >= 1
     && Number.isFinite(movie.vote_average) && movie.vote_average >= 0 && movie.vote_average <= 10;
-  return { genres, studios, creditedPeople, voiceActors, movieActors, movieWriters, timeline, correlation, comparisonValues, hasMovieReception };
+  return { genres, studios, creditedPeople, voiceActors, originalCreators, movieActors, movieWriters, timeline, correlation, comparisonValues, hasMovieReception };
 });

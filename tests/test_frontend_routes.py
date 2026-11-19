@@ -47,6 +47,7 @@ class FrontendRoutesTests(unittest.TestCase):
                 ("/data/movie_anime_scores.bin", "data/movie_anime_scores.bin"),
                 ("/data/movie_popularity.json", "data/movie_popularity.json"),
                 ("/data/movie_details.json", "data/movie_details.json"),
+                ("/data/anime_credits.json", "data/anime_credits.json"),
                 ("/data/story_movie_recommendations.json", "data/story_movie_recommendations.json"),
                 ("/assets/tmdb-logo.svg", "assets/tmdb-logo.svg"),
                 ("/assets/anilist-logo.png", "assets/anilist-logo.png"),

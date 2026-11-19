@@ -37,6 +37,7 @@ async function verifyCreatorPickers(page) {
     [animeTitles, 'Movie', 'Movie genre'],
     ['anime-studios', 'Movie', 'Movie genre', 'Anime genre'],
     ['anime-voice-actors', 'Movie', 'Movie genre', 'Anime genre'],
+    ['anime-original-creators', 'Movie', 'Movie genre', 'Anime genre'],
     [movieTitles, 'Anime', 'Anime genre'],
     ['movie-actors', 'Anime', 'Anime genre', 'Movie genre'],
     ['movie-writers', 'Anime', 'Anime genre', 'Movie genre']

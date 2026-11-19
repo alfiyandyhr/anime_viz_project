@@ -23,6 +23,18 @@
       return payload;
     }),
     recommendations: () => once("recommendations", () => json("data/movie_recommendations.json")),
+    animeCredits: () => once("anime-credits", async () => {
+      const payload = await json("data/anime_credits.json");
+      const anime = payload?.anime;
+      if (payload?.schema_version !== 1 || payload.source !== "AniList"
+        || !anime || typeof anime !== "object" || Array.isArray(anime)
+        || payload.record_count !== Object.keys(anime).length
+        || Object.values(anime).some(record => !Array.isArray(record?.original_creators)
+          || record.original_creators.some(credit => credit?.id == null || !credit.name))) {
+        throw new Error("Invalid AniList original creator credits");
+      }
+      return anime;
+    }),
     movieDetails: data => {
       const movieIds = data.movies.map(movie => String(movie.id)).sort();
       return once(`movie-details:${movieIds.join(",")}`, async () => {
