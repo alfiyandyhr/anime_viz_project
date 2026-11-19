@@ -155,7 +155,6 @@
   function publish(snapshot) {
     const switched = latest.direction !== snapshot.direction;
     const recolor = latest.colorByMagnet !== snapshot.colorByMagnet;
-    const colorMetricChanged = latest.mixed !== snapshot.mixed;
     const magnetsChanged = switched || latest.activeMagnetKeys.join('|') !== snapshot.activeMagnetKeys.join('|');
     const strengthOnly = latest.magnetStrengths !== snapshot.magnetStrengths && latest.magnets === snapshot.magnets;
     latest = snapshot;
@@ -178,10 +177,6 @@
     if (magnetsChanged) renderMotionControls();
     if (switched) updateDustTypeControls();
     $('#dust-color-by-magnet').checked = snapshot.colorByMagnet;
-    if (colorMetricChanged) {
-      $('#dust-color-label').textContent = snapshot.mixed
-        ? 'Color dust by strongest magnet' : 'Color dust by strongest attraction';
-    }
     if (recolor) refreshDustColors();
     const keysInScope = snapshot.selectedKeys.length ? snapshot.selectedKeys : snapshot.displayedKeys;
     const studioGroups = studios ? keysInScope.map(key => snapshot.lookup.get(key)?.record).filter(Boolean) : null;

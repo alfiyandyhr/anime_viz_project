@@ -63,9 +63,8 @@ const state = page => page.evaluate(() => {
     });
     await page.goto(base);
     await ready(page);
-    const colorBySimilarity = page.getByRole('checkbox', { name: 'Color dust by strongest attraction' });
-    const colorByPercentile = page.getByRole('checkbox', { name: 'Color dust by strongest magnet' });
-    assert.ok(await colorBySimilarity.isVisible());
+    const colorByMagnet = page.getByRole('checkbox', { name: 'Color dust by strongest magnet' });
+    assert.ok(await colorByMagnet.isVisible());
     await page.getByRole('radio', { name: 'Movie genre' }).check();
     await page.selectOption('#genre-magnet-choice', 'tmdb:genre:Science Fiction');
     await page.locator('#add-genre-magnet').click();
@@ -73,7 +72,7 @@ const state = page => page.evaluate(() => {
     await choosePopularity(page);
     await add(page).press('Enter');
     await mixed(page);
-    await colorByPercentile.check();
+    await colorByMagnet.check();
     assert.doesNotMatch(await page.locator('#movie-magnets').innerText(), /AniList users|eligible/);
     assert.ok(await page.locator('#popularity-magnet-source').isHidden());
     assert.equal(await page.getByRole('slider', { name: 'Popularity strength' }).inputValue(), '1');
@@ -144,7 +143,7 @@ const state = page => page.evaluate(() => {
     await page.locator('#recommendation-chart .dust-magnet').last().press('ArrowRight');
     assert.deepEqual((await state(page)).ranking, combined.ranking);
     await page.locator(`[data-remove-magnet="${anime}"]`).click();
-    assert.ok(await colorBySimilarity.isChecked());
+    assert.ok(await colorByMagnet.isChecked());
     assert.deepEqual((await state(page)).ranking, cosine.ranking);
     await add(page).click();
     await mixed(page);
@@ -177,7 +176,7 @@ const state = page => page.evaluate(() => {
     await add(page).click();
     await mixed(page);
     assert.ok(movieURL.searchParams.has('retry'));
-    assert.ok(await colorByPercentile.isChecked());
+    assert.ok(await colorByMagnet.isChecked());
     assert.equal(await page.getByRole('slider', { name: 'Popularity strength' }).inputValue(), '1');
     assert.doesNotMatch(await page.locator('#movie-magnets').innerText(), /TMDB popularity|eligible/);
     assert.ok(await page.locator('#popularity-magnet-source').isHidden());
