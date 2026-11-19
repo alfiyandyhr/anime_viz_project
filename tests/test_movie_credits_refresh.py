@@ -15,7 +15,7 @@ class MovieCreditsRefreshTests(unittest.TestCase):
              "order": person - 1, "character": f"Character {person}"}
             for person in range(6, 0, -1)
         ]
-        cast.append({"id": 1, "order": 12, "character": "Other Role"})
+        cast.append({"id": 1, "order": 12, "character": "Other Role", "profile_path": "/portrait.jpg"})
         writer = {"id": 525, "name": "Christopher Nolan", "department": "Writing"}
         screenplay = {**writer, "job": "Screenplay"}
         crew = [
@@ -54,7 +54,8 @@ class MovieCreditsRefreshTests(unittest.TestCase):
             collected = details["cast"]
             self.assertEqual([person["id"] for person in collected], ["1", "2", "3", "4", "5"])
             self.assertEqual(collected[0], {"id": "1", "name": "Same Name", "order": 0,
-                                            "characters": ["Character 1", "Other Role"]})
+                                            "characters": ["Character 1", "Other Role"],
+                                            "profile_path": "/portrait.jpg"})
             self.assertEqual(collected[1]["name"], "Same Name")
             self.assertEqual(details["writers"], [
                 {"id": "525", "name": "Christopher Nolan", "jobs": ["Screenplay", "Story"]},

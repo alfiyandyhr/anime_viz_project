@@ -43,6 +43,7 @@
   <script src="../common/chart-composition.js" defer></script>
   <script src="../common/dust-context.js" defer></script>
   <script src="../common/title-artwork.js" defer></script>
+  <script src="../common/movie-credits.js" defer></script>
   <script src="../common/dust-details.js" defer></script>
   <script src="../common/dust-connections.js" defer></script>
   <script src="../common/app.js" defer></script>
@@ -90,6 +91,7 @@
               <option value="anime-studios">Anime studios</option>
               <option value="anime-voice-actors">Anime voice actors</option>
               <option value="movie-titles">Movie titles</option>
+              <option value="movie-actors">Movie actors</option>
             </select>
           </label>
           <fieldset class="magnet-type-picker" id="magnet-type" disabled>
@@ -309,6 +311,7 @@
             <article><h3>Genre cohorts</h3><p>Genre magnets use mean cosine similarity. For each dust title, the score is the arithmetic mean of its signed cosine similarities to every sampled title with that genre in the magnet catalogue. A title can belong to multiple cohorts and contribute to each of their scores. Each magnet contributes one score to the combined average. Filters narrow the dust while the cohorts stay fixed.</p></article>
             <article><h3>Anime studios</h3><p>Studios group anime by AniList main-studio credit. As in Full Catalogue, Popularity sums list-user counts and Score averages available ratings. A movie magnet averages the studio’s signed cosine similarities to that movie. A genre magnet averages over every scored pair of a studio anime and a movie in the cohort. Each magnet uses all works with data for that magnet. Filters affect which studios appear in the field. The analysis charts cover the catalogue filmographies of the selected studios, or all studios in the field when the selection is empty.</p></article>
             <article><h3>Anime voice actors</h3><p>Voice actors group anime by AniList Japanese main-role credits. A movie magnet averages the similarities of an actor’s credited anime to that movie. A genre magnet averages across the cohort’s movies. Popularity sums list-user counts, and Score averages available ratings. Score vs. popularity shows anime credited to the selected actors, or all actors in the field when the selection is empty. Shared titles count once.</p></article>
+            <article><h3>Movie actors</h3><p>Movie actors group movies by their top five sampled TMDB cast credits. Anime and genre magnets average similarities across each actor’s credited movies. Popularity sums archived TMDB popularity, and Score averages available TMDB ratings. Score vs. popularity rank shows movies credited to the selected actors, or to all actors in the field when the selection is empty. Shared movies count once.</p></article>
             <article><h3>Popularity and score</h3><p>Popularity uses AniList list users for anime and TMDB popularity for movies. Score uses AniList ratings out of 100 and TMDB ratings out of 10. With either metric active, each magnet’s raw values become attraction percentiles from 0 to 1. The reference sample includes dust with values for every active magnet. Ties share the average percentile and a sample of one gets 0.5. Dot count and filters leave the reference sample fixed. The full ranking keeps entries with missing values and supports sorting by each magnet’s raw values.</p></article>
 
             <article><h3>Reading the magnets</h3><p>The field samples each magnet’s strongest matches, then fills remaining slots by average cosine or average attraction percentile. Similar scores draw a dot into the space between magnets. Nearby dots can shift it to make room. Hover, focus, or select a dot to see its links. Thicker links show which magnets pull more strongly on that dot. Coloring uses each title’s highest similarity score, or its highest attraction percentile when Popularity or Score is active. Hover or focus a dot, or use the full ranking table, to compare scores. Select up to three dots with a click, tap, Enter, or Space. Select again to remove a title, or click empty space to remove the latest selection.</p></article>

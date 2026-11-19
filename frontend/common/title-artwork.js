@@ -20,9 +20,14 @@
     return tmdbImage(record.poster_path, 'w92');
   }
 
+  function moviePortrait(record, size = 'w185') {
+    return tmdbImage(record.profile_path, size);
+  }
+
   function dustThumbnail(record, key) {
     if (key.startsWith('anilist:staff:')) return record.image;
     if (key.startsWith('anilist:studio:')) return '';
+    if (key.startsWith('tmdb:person:')) return moviePortrait(record);
     return key.startsWith('tmdb:') ? movieThumbnail(record) : animeThumbnail(record);
   }
 
@@ -39,5 +44,5 @@
       `Poster for ${record.title}`, attr);
   }
 
-  root.AnivizArtwork = Object.freeze({ animeThumbnail, movieThumbnail, dustThumbnail, detailHero, movieHero });
+  root.AnivizArtwork = Object.freeze({ animeThumbnail, movieThumbnail, moviePortrait, dustThumbnail, detailHero, movieHero });
 })(globalThis);

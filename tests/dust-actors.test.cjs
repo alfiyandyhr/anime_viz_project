@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { ACTORS, FORWARD, createContext } = require('../frontend/common/dust-context.js');
+const { ACTORS, FORWARD, MOVIE_ACTORS, REVERSE, createContext } = require('../frontend/common/dust-context.js');
 
 test('voice actors aggregate by AniList staff ID and retain a distinct anime selection across reload', () => {
   const lead = { id: 42, name: 'Lead' };
@@ -51,4 +51,69 @@ test('voice actors aggregate by AniList staff ID and retain a distinct anime sel
   assert.ok(restored.restore());
   restored.setSources(data, matrix);
   assert.deepEqual(restored.setMetadata(metadata).selectedKeys, [firstKey, secondKey]);
+});
+
+test('movie actors use the anime matrix column and deduplicate credits for scores, metrics and selection', () => {
+  const lead = { id: '7', name: 'Actor' };
+  const other = { id: '8', name: 'Actor' };
+  const details = {
+    101: { cast: [lead, { ...lead, profile_path: '/portrait.jpg' }, other] },
+    102: { cast: [lead] },
+    103: { cast: [other] }
+  };
+  const data = {
+    anime: [
+      { id: 1, title: 'Attack on Titan', genres: ['Action'] },
+      { id: 2, title: 'Another anime', genres: ['Action'] }
+    ],
+    movies: [
+      { id: 101, title: 'First', genres: ['Thriller'], year: 2000 },
+      { id: 102, title: 'Second', genres: ['Comedy'], year: 2005 },
+      { id: 103, title: 'Third', genres: ['Drama'], year: 2010 }
+    ]
+  };
+  const matrix = [-0.5, 0.25, 0.75, 0.5, 0.25, 1];
+  const memory = new Map();
+  const storage = { getItem: key => memory.get(key), setItem: (key, value) => memory.set(key, value) };
+  const context = createContext({ storage });
+  context.setSources(data, matrix, { seedExample: true });
+  context.setDirection(MOVIE_ACTORS);
+  let snapshot = context.setMovieDetails(details);
+  const firstKey = 'tmdb:person:7', secondKey = 'tmdb:person:8';
+  const first = () => snapshot.ranking.find(match => match.key === firstKey);
+  assert.deepEqual(snapshot.magnetKeys, ['anilist:1']);
+  assert.equal(snapshot.lookup.size, 2);
+  assert.equal(first().record.profile_path, '/portrait.jpg');
+  assert.deepEqual(first().record.memberIds, ['101', '102']);
+  assert.equal(first().score, 0.125);
+  snapshot = context.setMagnets(['anilist:genre:Action']);
+  assert.equal(first().score, 0.25);
+  snapshot = context.setFilters({ genre: 'Comedy', yearFrom: 2005 });
+  assert.deepEqual(snapshot.displayedKeys, [firstKey]);
+  assert.equal(first().score, 0.25);
+  context.resetFilters();
+
+  const moviePopularity = {
+    popularity: { 101: 4, 102: 12, 103: 20 },
+    vote_average: { 101: 6, 102: null, 103: 10 },
+    movies: {
+      101: { popularity: 4, vote_average: 6 },
+      102: { popularity: 12, vote_average: null },
+      103: { popularity: 20, vote_average: 10 }
+    }
+  };
+  context.setMoviePopularity(moviePopularity, 'ready');
+  snapshot = context.setMagnets(['anilist:1', 'tmdb:score', 'tmdb:popularity']);
+  assert.deepEqual(first().rawScores, [0.125, 6, 16]);
+  assert.deepEqual(first().contributingCounts, [2, 1, 2]);
+  assert.equal(snapshot.score.scale, 10);
+  assert.deepEqual(context.setSelection([firstKey, secondKey]).supportingIds, ['101', '102', '103']);
+  assert.deepEqual(context.setDirection(REVERSE).selectedKeys, []);
+  context.setDirection(MOVIE_ACTORS);
+
+  const restored = createContext({ storage });
+  assert.ok(restored.restore());
+  restored.setSources(data, matrix);
+  restored.setMoviePopularity(moviePopularity, 'ready');
+  assert.deepEqual(restored.setMovieDetails(details).selectedKeys, [firstKey, secondKey]);
 });

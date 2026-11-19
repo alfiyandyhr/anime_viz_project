@@ -45,24 +45,30 @@
       ...studio, ...summarize([...works.values()], selected)
     }));
   }
-  function voiceActors(anime) {
-    const actors = new Map();
-    for (const work of anime) {
-      for (const actor of work.voice_actors || []) {
-        if (actor.id == null || !actor.name) continue;
-        const key = `anilist:staff:${actor.id}`;
-        if (!actors.has(key)) {
-          actors.set(key, { key, id: String(actor.id), title: actor.name, image: actor.image, works: new Map() });
+  function creditedPeople(titles, field) {
+    const people = new Map();
+    for (const work of titles) {
+      for (const credit of work[field] || []) {
+        if (credit.id == null || !credit.name) continue;
+        const id = String(credit.id);
+        if (!people.has(id)) {
+          people.set(id, { id, name: credit.name, image: credit.image, profile_path: credit.profile_path, works: new Map() });
         }
-        const group = actors.get(key);
-        group.image ||= actor.image;
-        group.works.set(String(work.id), work);
+        const person = people.get(id);
+        person.image ||= credit.image;
+        person.profile_path ||= credit.profile_path;
+        person.works.set(String(work.id), work);
       }
     }
-    return [...actors.values()].map(({ works, ...actor }) => ({
-      ...actor, ...summarize([...works.values()], new Set())
+    return people;
+  }
+  function actorGroups(titles, field, prefix) {
+    return [...creditedPeople(titles, field).values()].map(({ id, name, image, profile_path, works }) => ({
+      key: `${prefix}:${id}`, id, title: name, image, profile_path, ...summarize([...works.values()], new Set())
     }));
   }
+  const voiceActors = anime => actorGroups(anime, "voice_actors", "anilist:staff");
+  const movieActors = movies => actorGroups(movies, "cast", "tmdb:person");
   function timeline(anime, selectedIds = []) {
     const selected = new Set(selectedIds.map(String)), groups = new Map();
     anime.filter(row => Number.isFinite(row.year)).forEach(row => {
@@ -93,5 +99,5 @@
   }
   const hasMovieReception = movie => Number.isInteger(movie.popularity_rank) && movie.popularity_rank >= 1
     && Number.isFinite(movie.vote_average) && movie.vote_average >= 0 && movie.vote_average <= 10;
-  return { genres, studios, voiceActors, timeline, correlation, comparisonValues, hasMovieReception };
+  return { genres, studios, creditedPeople, voiceActors, movieActors, timeline, correlation, comparisonValues, hasMovieReception };
 });

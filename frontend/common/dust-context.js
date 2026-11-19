@@ -9,16 +9,20 @@
   const STORAGE_KEY = "aniviz-dust-session-v2";
   const LEGACY_KEY = "aniviz-dust-session-v1";
   const FORWARD = "movie-to-anime", REVERSE = "anime-to-movies", STUDIOS = "movie-to-studios";
-  const ACTORS = "movie-to-actors";
+  const ACTORS = "movie-to-actors", MOVIE_ACTORS = "anime-to-actors";
   const DIRECTIONS = {
     [FORWARD]: { magnet: "tmdb", dust: "anilist", example: "Inception" },
     [REVERSE]: { magnet: "anilist", dust: "tmdb", example: "Attack on Titan" },
     [STUDIOS]: { magnet: "tmdb", dust: "anilist", example: "Inception",
       group: { prefix: "anilist:studio", label: "Studio", noun: "studios" } },
     [ACTORS]: { magnet: "tmdb", dust: "anilist", example: "Inception",
-      group: { prefix: "anilist:staff", label: "Voice actor", noun: "voice actors" } }
+      group: { prefix: "anilist:staff", label: "Voice actor", noun: "voice actors" } },
+    [MOVIE_ACTORS]: { magnet: "anilist", dust: "tmdb", example: "Attack on Titan",
+      group: { prefix: "tmdb:person", label: "Movie actor", noun: "movie actors" } }
   };
   const groupFor = direction => DIRECTIONS[direction].group;
+  const isMovieDust = direction => DIRECTIONS[direction].dust === "tmdb";
+  const titleNoun = (direction, count) => isMovieDust(direction) ? (count === 1 ? "movie" : "movies") : "anime";
   const normalizeStrength = value => Number.isFinite(value) ? Math.round(Math.max(0, Math.min(2, value)) * 10) / 10 : 1;
   const keyFor = (catalogue, id) => `${catalogue}:${id}`;
   const catalogueFor = (data, catalogue) => (catalogue === "tmdb" ? data?.movies : data?.anime) || [];
@@ -46,7 +50,7 @@
   }
   const defaults = direction => ({ search: "", genre: "All", yearFrom: null, yearTo: null,
     ...(direction === FORWARD ? { studio: "All" } : {}),
-    ...(direction === REVERSE ? {} : { format: "All", minimumScore: 0 }) });
+    ...(isMovieDust(direction) ? {} : { format: "All", minimumScore: 0 }) });
   const id = (value) => String(value);
   const ids = (values) => [...new Set((values || []).filter(v => typeof v === "string" || typeof v === "number").map(id))];
   const finite = (v) => Number.isFinite(v) ? v : null;
@@ -80,7 +84,7 @@
       && (filters.genre === "All" || genres.includes(filters.genre))
       && (filters.yearFrom === null || Number.isFinite(record.year) && record.year >= filters.yearFrom)
       && (filters.yearTo === null || Number.isFinite(record.year) && record.year <= filters.yearTo)
-      && (direction === REVERSE || ((filters.studio === "All" || studio_names.includes(filters.studio))
+      && (isMovieDust(direction) || ((filters.studio === "All" || studio_names.includes(filters.studio))
         && (filters.format === "All" || record.format === filters.format)
         && (!filters.minimumScore || Number.isFinite(record.average_score) && record.average_score >= filters.minimumScore)));
   }
@@ -126,7 +130,7 @@
 
   function scoreDust(records, magnets, direction, pairScore, cohortVectors, metricValues, groups) {
     if (!magnets.length || (!pairScore && magnets.some(magnet => !isMetricMagnet(magnet)))) return [];
-    const scorePair = direction === REVERSE
+    const scorePair = isMovieDust(direction)
       ? (magnetId, dustId) => pairScore(dustId, magnetId) : pairScore;
     const rawColumns = magnets.map(magnet => {
       if (isMetricMagnet(magnet)) return groupFor(direction) ? null
@@ -277,7 +281,7 @@
 
   function createContext({ storage, onNotice = () => {} } = {}) {
     let direction = FORWARD, data, matrix, pairScore, metadata = [], metadataStatus = "loading";
-    let movieDetails = {}, movieReception = {};
+    let movieDetails = {}, movieDetailsStatus = "idle", movieReception = {};
     let session = { state: blankState(direction), layout: blankLayout() };
     const sessions = new Map();
     // Catalogue-qualified keys separate directions. A new data or matrix object invalidates the bundle cache.
@@ -314,7 +318,7 @@
       const state = session.state;
       const visible = new Set(state.displayedKeys);
       return { ...state, version: VERSION, direction, revision, colorByMagnet, magnets, genreCohorts: cohorts, candidateDust: candidates, displayedDust: displayed,
-        ranking, lookup, titleLookup, metadataStatus, persistent, ...metricMagnets, mixed: magnets.some(isMetricMagnet),
+        ranking, lookup, titleLookup, metadataStatus, movieDetailsStatus, persistent, ...metricMagnets, mixed: magnets.some(isMetricMagnet),
         activeMagnetKeys: magnets.map(magnet => magnet.key),
         missingMetadataIds: direction === FORWARD ? state.candidateKeys.filter(key => !lookup.get(key)?.metadata) : [],
         filteredOutIds: state.candidateKeys.filter(key => !visible.has(key)) };
@@ -332,32 +336,32 @@
       return value;
     }
     function refreshLookup() {
-      if (direction !== REVERSE) {
-        titleLookup = new Map([...joinRecords(data?.anime || [], metadata)].map(([id, row]) =>
-          [keyFor("anilist", id), { record: row.anime, metadata: row.metadata }]));
-        groups = [];
-        if (groupFor(direction)) {
-          for (const row of metadata) {
-            const key = keyFor("anilist", row.id);
-            if (!titleLookup.has(key)) titleLookup.set(key, { record: joinAnimeRecord(row, row), metadata: row });
-          }
-          const summaries = direction === ACTORS ? ChartData.voiceActors(metadata)
-            : ChartData.studios(metadata).filter(studio => studio.studioId !== null)
-              .map(({ studio, studioId, ...summary }) => ({ ...summary, id: studioId, title: studio }));
-          // Prefer groups with more catalogue titles when scores tie.
-          groups = summaries
-            .sort((a, b) => b.count - a.count)
-            .map(({ ids, ...summary }) => ({ ...summary, memberIds: ids }));
-        }
-        lookup = groupFor(direction) ? new Map(groups.map(record => [record.key, { record }])) : titleLookup;
-      } else {
-        lookup = titleLookup = new Map(catalogueFor(data, "tmdb").map(record => {
+      const group = groupFor(direction);
+      let summaries = [];
+      if (isMovieDust(direction)) {
+        titleLookup = new Map(catalogueFor(data, "tmdb").map(record => {
           const reception = movieReception[record.id];
           return [keyFor("tmdb", record.id), {
             record: { ...record, ...movieDetails[record.id], ...reception, average_score: reception?.vote_average ?? null }
           }];
         }));
+        if (group) summaries = ChartData.movieActors([...titleLookup.values()].map(row => row.record));
+      } else {
+        titleLookup = new Map([...joinRecords(data?.anime || [], metadata)].map(([id, row]) =>
+          [keyFor("anilist", id), { record: row.anime, metadata: row.metadata }]));
+        if (group) {
+          for (const row of metadata) {
+            const key = keyFor("anilist", row.id);
+            if (!titleLookup.has(key)) titleLookup.set(key, { record: joinAnimeRecord(row, row), metadata: row });
+          }
+          summaries = direction === ACTORS ? ChartData.voiceActors(metadata)
+            : ChartData.studios(metadata).filter(studio => studio.studioId !== null)
+              .map(({ studio, studioId, ...summary }) => ({ ...summary, id: studioId, title: studio }));
+        }
       }
+      // Prefer groups with more catalogue titles when scores tie.
+      groups = summaries.sort((a, b) => b.count - a.count).map(({ ids, ...summary }) => ({ ...summary, memberIds: ids }));
+      lookup = group ? new Map(groups.map(record => [record.key, { record }])) : titleLookup;
     }
     function activate() {
       const { magnet } = DIRECTIONS[direction];
@@ -374,14 +378,16 @@
     function derive({ rescore = false, resample = false, rerank = false } = {}) {
       const state = session.state;
       const group = groupFor(direction);
-      const metricSource = metricSources[direction === REVERSE ? REVERSE : FORWARD];
+      const movie = isMovieDust(direction);
+      const provider = DIRECTIONS[direction].dust;
+      const metricSource = metricSources[movie ? REVERSE : FORWARD];
       if (rescore) {
         state.magnetKeys = validMagnets(state.magnetKeys);
-        const records = catalogueFor(data, DIRECTIONS[direction].dust);
-        const source = metricSource, reverse = direction === REVERSE;
+        const records = catalogueFor(data, provider);
+        const source = metricSource;
         const definitions = {
-          popularity: { title: "Popularity", metric: group ? "Total popularity" : reverse ? "TMDB popularity" : "AniList list users" },
-          score: { title: "Score", metric: group ? "Average score" : reverse ? "TMDB score" : "AniList score", scale: reverse ? 10 : 100 }
+          popularity: { title: "Popularity", metric: group ? "Total popularity" : movie ? "TMDB popularity" : "AniList list users" },
+          score: { title: "Score", metric: group ? "Average score" : movie ? "TMDB score" : "AniList score", scale: movie ? 10 : 100 }
         };
         metricMagnets = Object.fromEntries(METRIC_MAGNET_TYPES.map(kind => [kind, {
           ...definitions[kind], key: metricMagnetKey(direction, kind), kind,
@@ -400,7 +406,7 @@
         const titleFilters = { ...memberFilters, search: "", studio: "All" };
         const normalizedSearch = search.toLowerCase();
         const pool = group ? vectors.filter(match => match.record.title.toLowerCase().includes(normalizedSearch)
-          && match.record.memberIds.some(member => passesFilters(titleLookup.get(keyFor("anilist", member)).record, titleFilters)))
+          && match.record.memberIds.some(member => passesFilters(titleLookup.get(keyFor(provider, member)).record, titleFilters, direction)))
           : vectors;
         candidates = sampleDust(pool, magnets.length, state.dustLimit);
         state.candidateKeys = candidates.map(match => match.key);
@@ -411,7 +417,8 @@
       const visible = new Set(state.displayedKeys);
       const waitingForMetrics = state.magnetKeys.some(key => isMetricKey(direction, key))
         && ["idle", "loading"].includes(metricSource.status);
-      const selectionReady = group ? metadataStatus === "ready" : direction === REVERSE || metadataStatus !== "loading";
+      const selectionReady = movie ? !group || movieDetailsStatus === "ready"
+        : group ? metadataStatus === "ready" : metadataStatus !== "loading";
       if ((pairScore || vectors.length) && !waitingForMetrics && selectionReady) {
         const retained = state.selectedKeys.filter(key => visible.has(key));
         if (retained.length < state.selectedKeys.length) onNotice(`Selection updated. ${group?.label ? group.label + "s" : "Titles"} no longer displayed were removed.`);
@@ -472,8 +479,9 @@
       setDirection(next) {
         if (!data || next === direction || !Object.hasOwn(DIRECTIONS, next)) return snapshot();
         const previous = sessions.get(next);
-        const carry = next === REVERSE ? null : direction !== REVERSE ? session.state
-          : !previous ? sessions.get(FORWARD)?.state : null;
+        const sameCatalogue = isMovieDust(next) === isMovieDust(direction);
+        const base = isMovieDust(next) ? REVERSE : FORWARD;
+        const carry = sameCatalogue ? session.state : !previous ? sessions.get(base)?.state : null;
         direction = next;
         session = previous || { state: blankState(direction), layout: blankLayout() };
         activate();
@@ -491,20 +499,22 @@
         metricSources[FORWARD] = { status, snapshotDate: typeof snapshotDate === "string" ? snapshotDate : null,
           values: { popularity: new Map(metadata.map(row => [id(row.id), row.popularity])),
             score: new Map(metadata.map(row => [id(row.id), row.average_score])) } };
-        if (!data || direction === REVERSE) return snapshot();
+        if (!data || isMovieDust(direction)) return snapshot();
         refreshLookup();
         return derive({ rescore: true });
       },
       getMagnetRecord(key) {
         const magnet = magnets.find(magnet => magnet.key === key && magnet.kind === undefined);
         if (!magnet) return null;
-        return direction !== REVERSE ? { ...magnet, ...movieDetails[magnet.id] }
+        return !isMovieDust(direction) ? { ...magnet, ...movieDetails[magnet.id] }
           : joinAnimeRecord(magnet, metadata.find(row => id(row.id) === magnet.id));
       },
-      setMovieDetails(details) {
-        movieDetails = details;
-        if (direction !== REVERSE) return snapshot();
+      setMovieDetails(details, status = "ready") {
+        movieDetails = details || {};
+        movieDetailsStatus = status;
+        if (!isMovieDust(direction)) return snapshot();
         refreshLookup();
+        if (direction === MOVIE_ACTORS) return derive({ rescore: true });
         return publish();
       },
       setMoviePopularity(payload, status) {
@@ -512,7 +522,7 @@
         metricSources[REVERSE] = { status, snapshotDate: payload?.snapshot_date,
           values: { popularity: new Map(Object.entries(payload?.popularity || {})),
             score: new Map(Object.entries(payload?.vote_average || {})) } };
-        if (direction !== REVERSE) return snapshot();
+        if (!isMovieDust(direction)) return snapshot();
         refreshLookup();
         return derive({ rescore: true });
       },
@@ -569,7 +579,7 @@
         if (selectedKeys.includes(key)) return api.setSelection(selectedKeys.filter(item => item !== key));
         if (selectedKeys.length >= 3) {
           const group = groupFor(direction);
-          const noun = group?.noun || (direction === REVERSE ? "movies" : "anime");
+          const noun = group?.noun || titleNoun(direction);
           onNotice(`Compare up to 3 ${noun}. Remove a selected ${group?.label.toLowerCase() || "title"} before adding another.`);
           return snapshot();
         }
@@ -581,7 +591,8 @@
     };
     return api;
   }
-  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, STUDIOS, ACTORS, DIRECTIONS, groupFor, METRIC_MAGNET_TYPES, isMetricMagnet,
+  return { VERSION, STORAGE_KEY, FORWARD, REVERSE, STUDIOS, ACTORS, MOVIE_ACTORS, DIRECTIONS, groupFor, isMovieDust, titleNoun,
+    METRIC_MAGNET_TYPES, isMetricMagnet,
     keyFor, catalogueFor, magnetScoreLabel, cohortDescription,
     averageLabel, formatPercentile, formatRawScore, mixedEvidence, defaults, joinRecords,
     passesFilters, createScoreAccessor, forwardVectors, rankCorpus, sampleDust, createContext };

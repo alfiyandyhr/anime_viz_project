@@ -18,6 +18,10 @@ TMDB_URL = "https://api.themoviedb.org/3"
 CAST_LIMIT = 5
 
 
+def image_path(path):
+    return path if isinstance(path, str) and re.fullmatch(r"/[\w-]+\.jpg", path, re.ASCII) else None
+
+
 def credit_text(value):
     return value.strip() if isinstance(value, str) else ""
 
@@ -48,7 +52,11 @@ def movie_cast(cast):
                 "characters": [],
             }
         character = credit_text(credit.get("character"))
-        characters = people[person_id]["characters"]
+        person = people[person_id]
+        profile = image_path(credit.get("profile_path"))
+        if profile:
+            person.setdefault("profile_path", profile)
+        characters = person["characters"]
         if character and character not in characters:
             characters.append(character)
     return list(people.values())
@@ -81,10 +89,6 @@ def movie_details(movie, movie_id):
     if movie.get("id") != movie_id:
         raise CollectionError(f"TMDB detail ID does not match movie {movie_id}.")
 
-    def image(field):
-        path = movie.get(field)
-        return path if isinstance(path, str) and re.fullmatch(r"/[\w-]+\.jpg", path, re.ASCII) else None
-
     popularity = movie.get("popularity")
     if type(popularity) not in (int, float) or not math.isfinite(popularity) or popularity < 0:
         raise CollectionError(f"Invalid TMDB popularity for movie {movie_id}.")
@@ -92,8 +96,8 @@ def movie_details(movie, movie_id):
     score = movie.get("vote_average")
     votes = movie.get("vote_count")
     return {
-        "poster_path": image("poster_path"),
-        "backdrop_path": image("backdrop_path"),
+        "poster_path": image_path(movie.get("poster_path")),
+        "backdrop_path": image_path(movie.get("backdrop_path")),
         "runtime": runtime if type(runtime) is int and runtime > 0 else None,
         "vote_average": score if type(votes) is int and votes > 0
         and type(score) in (int, float) and 0 <= score <= 10 else None,

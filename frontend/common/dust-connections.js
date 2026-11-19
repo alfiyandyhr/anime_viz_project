@@ -22,7 +22,7 @@
       const { snapshot, dustMatchColor } = value;
       const { magnets, activeMagnetKeys: magnetKeys, displayedDust, selectedKeys, mixed } = snapshot;
       const group = AnivizDust.groupFor(snapshot.direction);
-      const noun = group?.noun || (snapshot.direction === AnivizDust.REVERSE ? 'movies' : 'anime');
+      const noun = group?.noun || AnivizDust.titleNoun(snapshot.direction);
       const focused = document.activeElement;
       const focusKey = ['data-dust-connection-movie', 'data-dust-connection-id', 'data-dust-connection-panel',
         'data-dust-member-movie', 'data-dust-member-id', 'data-dust-member-scroll']
@@ -106,13 +106,13 @@
           .attr('aria-pressed', isSelected)
           .attr('aria-haspopup', match => group || isSelected(match) ? null : 'dialog')
           .attr('aria-controls', group ? 'recommendation-detail' : 'recommendation-detail detail-drawer')
-          .attr('aria-label', match => `Dust rank ${match.rank} of ${ranking.length}: ${match.record.title}. ${mixed ? evidence(match) : `${AnivizDust.magnetScoreLabel(magnet)}: ${match.similarity}`}.${group ? ` ${AnivizDustDetails.groupCoverage(match, magnetIndex)}.` : ''}`)
+          .attr('aria-label', match => `Dust rank ${match.rank} of ${ranking.length}: ${match.record.title}. ${mixed ? evidence(match) : `${AnivizDust.magnetScoreLabel(magnet)}: ${match.similarity}`}.${group ? ` ${AnivizDustDetails.groupCoverage(match, snapshot.direction, magnetIndex)}.` : ''}`)
           .attr('title', match => match.record.title)
           .on('click', (event, match) => onSelect(match.key));
         rows.append('span').attr('class', 'dust-connection-dot').attr('aria-hidden', 'true');
         rows.append('span').attr('class', 'dust-connection-rank').text(match => match.rank);
         rows.append('span').attr('class', 'dust-connection-title').text(match => match.record.title)
-          .attr('title', match => group ? AnivizDustDetails.groupCoverage(match, magnetIndex) : null);
+          .attr('title', match => group ? AnivizDustDetails.groupCoverage(match, snapshot.direction, magnetIndex) : null);
         showScores(rows.append('span').attr('class', 'dust-connection-score'));
         const panel = list.node(), end = panel.scrollHeight - panel.clientHeight;
         panel.scrollTop = index === 0 ? offsets[index] : end - offsets[index];
@@ -137,7 +137,7 @@
           .style('--dust-color', matchColor(members[0]));
         const memberScoreLabel = !mixed || magnet.kind === 'genre' ? 'Similarity' : scoreLabel;
         const headings = ['Rank', group?.label || (noun === 'movies' ? 'Movie' : 'Anime'), memberScoreLabel];
-        if (group) headings.push('Anime counts');
+        if (group) headings.push(AnivizDust.isMovieDust(snapshot.direction) ? 'Movie counts' : 'Anime counts');
         const headerCells = table.append('thead').append('tr').selectAll('th').data(headings).join('th')
           .attr('scope', 'col')
           .classed('dust-member-similarity', label => label === 'Similarity')

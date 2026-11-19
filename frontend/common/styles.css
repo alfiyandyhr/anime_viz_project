@@ -785,6 +785,13 @@ input[type="range"] {
 .title-artwork .detail-cover { display: block; position: relative; width: 80px; height: 112px; margin: -42px 0 12px 10px; border-width: 3px; border-radius: 8px; }
 .title-artwork .detail-cover:first-child { margin: 0 0 12px; }
 
+.movie-credits { margin-block: 16px; }
+.movie-credits section { border-top: 1px solid var(--border); padding-block: 10px; }
+.movie-credits h3, .movie-credits h4 { margin: 0 0 6px; font-size: .9rem; }
+.movie-credits ul, .movie-credits p { margin: 0; color: var(--text-soft); font-size: .85rem; }
+.movie-credits ul { padding-inline-start: 18px; }
+.movie-credits li + li { margin-top: 3px; }
+
 .detail-main h2 {
   margin: 15px 0 8px;
   font-family: "Space Grotesk", sans-serif;

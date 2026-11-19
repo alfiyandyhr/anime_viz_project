@@ -13,14 +13,14 @@ Set **Dust type** to **Movie titles** for movie dots and Attack on Titan as the 
 
 | View | Data and interactions |
 | --- | --- |
-| Dust & Magnet | Choose Anime titles, Anime studios, Anime voice actors, or Movie titles, with a field of up to 30, 60, or 90 dots. Each type includes similarity connections, a field mirror, reception, genres, release years, and a full ranking. Select a dust dot or a title magnet to see it in the In Focus panel. Anime dust types also show studio charts. |
+| Dust & Magnet | Choose Anime titles, Anime studios, Anime voice actors, Movie titles, or Movie actors, with a field of up to 30, 60, or 90 dots. Each type includes similarity connections, a field mirror, reception, genres, release years, and a full ranking. Select a dust dot or a title magnet to see it in the In Focus panel. Anime dust types also show studio charts. |
 | History | Scroll a pair of release timelines to see each year’s most popular anime and its closest movie match. Both titles have synopses and the connection shows cosine similarity. |
 | Full Catalogue | The loaded 1,000-title metadata sample, with its own search, filters, sorting, pagination, details and automatic shortlist comparison. Saved movies never narrow its scope. |
 
 The dust type, magnet picker, removable magnets, dot count, and **Reset positions** sit in the left panel.
 The right panel follows the latest selected title. Anime details include AniList
-images, synopsis, tags, and sampled Japanese cast. Movie details show TMDB
-posters, the archived synopsis, genres, keywords, and a TMDB link. The movie
+images, synopsis, tags, and sampled Japanese cast. Movie details include TMDB
+artwork, the archived synopsis, sampled cast, and writing credits. The movie
 comparison includes release years, genres, runtimes, and archived TMDB scores
 out of 10. Movie reception plots the archived user scores against popularity
 ranks across the movie sample. Posters and runtimes come from a separate TMDB
@@ -59,6 +59,16 @@ averages available anime scores. Zoom in on an actor for their AniList portrait.
 The linked charts show distinct anime credited to actors in the field. Select up
 to three actors to filter Score vs. popularity to their anime and highlight their
 contributions in the genre, release year, and studio charts.
+
+**Movie actors** groups movies by TMDB person ID using up to five sampled cast
+members per movie. Anime titles and anime genre cohorts act as story magnets.
+Popularity sums archived TMDB popularity scores across credited movies, and
+Score averages the available ratings out of 10. Zoom in on the field or its
+mirror for available TMDB portraits. Select up to three actors to filter Score
+vs. popularity rank to their distinct credited movies and highlight the same
+movies in the genre and release-year charts. The Movie catalogue counts distinct
+actors and writers across the current filters. Writing credits come from TMDB’s
+Writing department.
 
 ## Routes and session state
 

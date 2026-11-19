@@ -178,19 +178,19 @@ function bindRecommendationControls() {
 function pickerCatalogue() {
   const { direction } = AnivizMain.snapshot();
   const { magnet, example } = AnivizDust.DIRECTIONS[direction];
-  return { direction, magnet, example, records: AnivizDust.catalogueFor(recommendationState.data, magnet),
+  return { magnet, example, records: AnivizDust.catalogueFor(recommendationState.data, magnet),
     label: magnet === "tmdb" ? "movie" : "anime" };
 }
 
 function resetMagnetPicker() {
-  const { direction, magnet, example, records, label } = pickerCatalogue();
+  const { magnet, example, records, label } = pickerCatalogue();
   const { genreCohorts } = AnivizMain.snapshot();
   document.querySelector("#title-magnet-label").textContent = humanize(label);
   const search = document.querySelector("#movie-search");
   search.value = "";
   search.placeholder = `Search ${label} titles or aliases`;
   document.querySelector("#movie-search-label").textContent = `Add ${label === "anime" ? "an" : "a"} ${label} magnet · up to 3`;
-  const titles = direction === AnivizDust.REVERSE
+  const titles = magnet === "anilist"
     ? [example, "ONE PIECE", "Naruto", "Your Name.", "Death Note"]
     : [example, "Interstellar", "The Matrix", "The Dark Knight", "Titanic"];
   document.querySelector("#movie-suggestions").innerHTML = `<span>Try a favorite</span>` + titles

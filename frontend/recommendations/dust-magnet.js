@@ -377,9 +377,9 @@ function renderDustRecommendations() {
   const snapshot = AnivizMain.snapshot();
   const { magnets, magnetKeys, mixed, displayedDust, direction, example } = snapshot;
   const savedMetrics = AnivizDust.METRIC_MAGNET_TYPES.map(type => snapshot[type]);
-  const reverse = direction === AnivizDust.REVERSE, studios = direction === AnivizDust.STUDIOS;
+  const movie = AnivizDust.isMovieDust(direction), studios = direction === AnivizDust.STUDIOS;
   const group = AnivizDust.groupFor(direction);
-  const noun = group?.noun || (reverse ? "movies" : "anime");
+  const noun = group?.noun || AnivizDust.titleNoun(direction);
   const container = document.querySelector("#recommendation-chart");
   const mirror = document.querySelector("#dust-mirror");
   renderDustLegend(snapshot);
@@ -399,15 +399,16 @@ function renderDustRecommendations() {
     button.setAttribute("aria-pressed", magnets.some(magnet => magnet.key === button.dataset.magnetKey));
   });
   document.querySelector("#reset-magnets").disabled = !magnets.length;
-  if (group && snapshot.metadataStatus !== "ready") {
-    const unavailable = snapshot.metadataStatus === "unavailable";
-    const credits = studios ? "studio credits" : "voice actor credits";
-    const message = unavailable ? `${group.label} credits could not be loaded.` : `Loading AniList ${credits}…`;
+  const creditStatus = movie ? snapshot.movieDetailsStatus : snapshot.metadataStatus;
+  if (group && creditStatus !== "ready") {
+    const unavailable = creditStatus === "unavailable";
+    const credits = studios ? "studio credits" : movie ? "movie cast credits" : "voice actor credits";
+    const message = unavailable ? `${group.label} credits could not be loaded.` : `Loading ${movie ? "TMDB" : "AniList"} ${credits}…`;
     const retryId = studios ? "studio-credits-retry" : "actor-credits-retry";
     container.innerHTML = `<div class="dust-empty" role="status"><p>${message}</p>${unavailable
       ? `<button type="button" class="small-button ghost" id="${retryId}">Retry ${credits}</button>` : ""}</div>`;
     renderEmpty(mirror, message);
-    document.querySelector(`#${retryId}`)?.addEventListener("click", AnivizMain.loadMetricData);
+    document.querySelector(`#${retryId}`)?.addEventListener("click", movie ? AnivizMain.loadMovieDetails : AnivizMain.loadMetricData);
     return;
   }
   if (!magnets.length) {
@@ -437,7 +438,8 @@ function renderDustRecommendations() {
   highlightRecommendation();
 }
 
-function createDustView(container, matches, anchors, width, height, onMove, { label, mixed, group, zoomContent }) {
+function createDustView(container, matches, anchors, width, height, onMove, { label, mixed, direction, zoomContent }) {
+  const group = AnivizDust.groupFor(direction);
   const svg = d3.select(container).append("svg").attr("viewBox", `0 0 ${width} ${height}`)
     .attr("width", width).attr("height", height).attr("class", "dust-map")
     .attr("aria-label", `${label} ${mixed ? "attraction to" : "similarity to"} ${anchors.map(({ magnet }) => magnet.title).join(", ")}`);
@@ -474,7 +476,7 @@ function createDustView(container, matches, anchors, width, height, onMove, { la
   const dots = scene.append("g").selectAll("g").data(matches, (match) => match.key).join("g")
     .attr("class", "dust-node").attr("data-match-id", (match) => match.key)
     .attr("role", "button").attr("tabindex", 0).attr("aria-controls", "dust-focus recommendation-detail")
-    .attr("aria-label", (match) => `${match.record.title}. ${group ? `${AnivizDustDetails.groupCoverage(match)}. ` : ""}${anchors.map(({ magnet }, index) => mixed ? AnivizDust.mixedEvidence(match, magnet, index)
+    .attr("aria-label", (match) => `${match.record.title}. ${group ? `${AnivizDustDetails.groupCoverage(match, direction)}. ` : ""}${anchors.map(({ magnet }, index) => mixed ? AnivizDust.mixedEvidence(match, magnet, index)
       : `${AnivizDust.magnetScoreLabel(magnet)}: ${match.scores[index].toFixed(3)}`).join(". ")}. Toggle selection for details or comparison.`)
     .on("mouseenter focus", (event, match) => {
       if (event.type === "focus") focused = match.key;
@@ -482,7 +484,7 @@ function createDustView(container, matches, anchors, width, height, onMove, { la
       drawPreview();
       const rect = event.currentTarget.getBoundingClientRect();
       const pointer = event.type === "focus" ? { clientX: rect.x + rect.width / 2, clientY: rect.y + rect.height / 2 } : event;
-      const subtitle = group ? AnivizDustDetails.groupCoverage(match)
+      const subtitle = group ? AnivizDustDetails.groupCoverage(match, direction)
         : `${match.key.startsWith("anilist:") ? escapeHTML(humanize(match.record.format)) + " · " : ""}${match.record.year || "Year unknown"}`;
       showTooltip(pointer, `<strong>${escapeHTML(match.record.title)}</strong><span>${subtitle}</span>`
         + anchors.map(({ magnet, color }, index) => `<span class="dust-tooltip-score"><i style="background:${color}"></i>${mixed
@@ -630,14 +632,14 @@ function renderDustChart(container, mirror, magnets, matches, mixed) {
   for (const anchor of anchors) {
     Object.assign(anchor, constrainMagnetPosition(anchor, anchor.x, anchor.y, anchors, width, height));
   }
-  const group = AnivizDust.groupFor(snapshot.direction);
-  const noun = group?.noun || (snapshot.direction === AnivizDust.REVERSE ? "movies" : "anime");
-  const zoomContent = snapshot.direction === AnivizDust.STUDIOS ? "studio names"
-    : snapshot.direction === AnivizDust.ACTORS ? "portraits" : "posters";
+  const { direction } = snapshot;
+  const group = AnivizDust.groupFor(direction);
+  const noun = group?.noun || AnivizDust.titleNoun(direction);
+  const zoomContent = direction === AnivizDust.STUDIOS ? "studio names" : group ? "portraits" : "posters";
   const views = [createDustView(container, matches, anchors, width, height, moveAnchor, {
-    label: `Displayed ${noun}`, mixed, group, zoomContent
+    label: `Displayed ${noun}`, mixed, direction, zoomContent
   }), createDustView(mirror, matches, anchors, width, height, moveAnchor, {
-    label: `Mirror of ${noun}`, mixed, group, zoomContent
+    label: `Mirror of ${noun}`, mixed, direction, zoomContent
   })];
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const nodes = createDustNodes(matches, anchors, width, height, dustChart, mixed);

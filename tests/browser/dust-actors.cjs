@@ -56,7 +56,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     await dots.first().waitFor();
     assert.deepEqual(await ids(dots), selected);
     assert.ok(await dots.evaluateAll(nodes => nodes.every(node => node.__data__.favourites > 0
-      ? getComputedStyle(node).fill === 'rgb(157, 123, 255)'
+      ? getComputedStyle(node).fill === d3.color(getComputedStyle(node).getPropertyValue('--purple').trim()).formatRgb()
       : node.getAttribute('fill') === 'transparent')));
     assert.deepEqual(await ids(reception.locator('.reception-dot[stroke-width="1"]')), selected);
     assert.equal(await reception.locator('.reception-selection-ring').count(), 0);
@@ -70,8 +70,9 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       await plot.scrollIntoViewIfNeeded();
       const marks = plot.locator('[role="img"][tabindex="0"]');
       await marks.first().waitFor();
-      assert.ok(await marks.evaluateAll(nodes => nodes.some(node =>
-        node.__data__.selectedCount > 0 && node.getAttribute('stroke') === 'white')), kind);
+      assert.ok(await marks.evaluateAll((nodes, kind) => nodes.some(node =>
+        node.__data__.selectedCount > 0 && node.getAttribute('stroke') === 'var(--text)'
+        && node.getAttribute('stroke-width') === (kind === 'studios' ? '3' : '2')), kind), kind);
     }
     await actor.press('Enter');
     assert.deepEqual(await page.evaluate(() => AnivizMain.snapshot().selectedKeys), [second]);

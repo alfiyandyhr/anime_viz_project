@@ -35,8 +35,9 @@
         }
         // Reception uses the popularity and ratings sidecar.
         return Object.fromEntries(movieIds.map(id => {
-          const { poster_path, backdrop_path, runtime } = movies[id];
-          return [id, { poster_path, backdrop_path, runtime: Number.isInteger(runtime) && runtime > 0 ? runtime : null }];
+          const { poster_path, backdrop_path, runtime, cast, writers } = movies[id];
+          return [id, { poster_path, backdrop_path, runtime: Number.isInteger(runtime) && runtime > 0 ? runtime : null,
+            cast: Array.isArray(cast) ? cast : undefined, writers: Array.isArray(writers) ? writers : undefined }];
         }));
       });
     },

@@ -184,7 +184,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     await page.goto(url(''));
     await ready();
     assert.deepEqual(await dustTypePicker.locator('option').allTextContents(),
-      ['Anime titles', 'Anime studios', 'Anime voice actors', 'Movie titles']);
+      ['Anime titles', 'Anime studios', 'Anime voice actors', 'Movie titles', 'Movie actors']);
     assert.equal(await dustTypePicker.inputValue(), animeTitles);
     assert.equal(await page.getByRole('radio', { name: 'Movie', exact: true }).isChecked(), true);
     const radioTextStyle = locator => locator.evaluate(node => {
@@ -399,7 +399,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
       }, anchor);
     }
     assert.match(await page.locator('#reception').innerText(), /Rank #1 is most popular in the movie sample/);
-    assert.match(await page.locator('#creators').innerText(), /no production company or cast credits/);
+    assert.match(await page.locator('#creators').innerText(), /Movie cast credits appear in the movie details/);
     await page.goto(url('frontend/story/index.html'));
     await page.waitForSelector('#history-pair');
     await page.goBack();

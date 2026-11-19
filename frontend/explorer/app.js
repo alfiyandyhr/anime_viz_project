@@ -30,21 +30,18 @@ function renderCatalogueSummary(titles, movie) {
   const withPopularity = titles.filter(title => Number.isFinite(title.popularity));
   const genres = AnivizChartData.genres(titles);
   const studios = movie ? [] : AnivizChartData.studios(titles);
-  const actors = new Map();
-  if (!movie) {
-    for (const title of titles) {
-      for (const actor of title.voice_actors || []) {
-        if (!actors.has(actor.id)) actors.set(actor.id, { name: actor.name, titles: new Set() });
-        actors.get(actor.id).titles.add(title.id);
-      }
-    }
-  }
+  const actors = AnivizChartData.creditedPeople(titles, movie ? "cast" : "voice_actors");
+  const writers = movie ? AnivizChartData.creditedPeople(titles, "writers") : null;
   const kpis = [
     [movie ? "Visible movies" : "Visible anime", formatNumber(titles.length), "after current filters"],
     ["Average score", d3.mean(scored, title => title.average_score)?.toFixed(1) ?? "N/A", `out of ${scoreMax}`],
     ["Total popularity", withPopularity.length ? compactFormatter.format(d3.sum(withPopularity, title => title.popularity)) : "N/A",
       movie ? "combined TMDB popularity scores" : "combined list users"],
-    ...(movie ? [["Genres represented", formatNumber(genres.length), "TMDB genres"]] : [
+    ["Genres represented", formatNumber(genres.length), movie ? "TMDB genres" : "AniList genres"],
+    ...(movie ? [
+      ["Actors represented", movieCatalogue.hasCast ? formatNumber(actors.size) : "N/A", "sampled TMDB cast"],
+      ["Writers represented", movieCatalogue.hasWriters ? formatNumber(writers.size) : "N/A", "TMDB Writing department"]
+    ] : [
       ["Studios represented", formatNumber(studios.length), "primary studios"],
       ["Voice actors represented", formatNumber(actors.size), "Japanese main-role cast"]
     ])
@@ -63,7 +60,14 @@ function renderCatalogueSummary(titles, movie) {
   const highestRated = d3.greatest(scored, title => title.average_score);
   const topGenre = d3.greatest(genres.filter(genre => genre.count >= 3 && genre.scoreCount), genre => genre.averageScore);
   const topStudio = d3.greatest(studios.filter(studio => Number.isFinite(studio.totalPopularity)), studio => studio.totalPopularity);
-  const topActor = d3.greatest(actors.values(), actor => actor.titles.size);
+  const represented = (label, people, missing) => {
+    if (!people.size) return [label, "N/A", missing];
+    const max = d3.max(people.values(), person => person.works.size);
+    const names = [...people.values()].filter(person => person.works.size === max).map(person => person.name);
+    const name = names.length > 2 ? `${names[0]} and ${formatNumber(names.length - 1)} others` : names.join(" and ");
+    const unit = movie ? (max === 1 ? "movie" : "movies") : "anime";
+    return [label, name, `${formatNumber(max)} matching ${unit}${names.length > 1 ? " each" : ""}`];
+  };
   const correlation = AnivizChartData.correlation(scored.filter(title => title.popularity > 0)
     .map(title => [Math.log10(title.popularity), title.average_score]));
   const facts = [
@@ -72,10 +76,13 @@ function renderCatalogueSummary(titles, movie) {
     ["Highest rated", highestRated?.title ?? "N/A", highestRated ? `${highestRated.average_score}/${scoreMax}` : "No scored titles"],
     ["Top recurring genre", topGenre?.genre ?? "N/A", topGenre
       ? `${topGenre.averageScore.toFixed(1)}/${scoreMax} across ${topGenre.scoreCount} scored titles` : "Requires a genre with at least three titles and score data"],
-    ...(movie ? [] : [
+    ...(movie ? [
+      represented("Most represented actor", actors, "No cast data"),
+      represented("Most represented writer", writers, "No writing credits")
+    ] : [
       ["Largest studio reach", topStudio?.studio ?? "N/A", topStudio
         ? `${compactFormatter.format(topStudio.totalPopularity)} combined popularity` : "No studio popularity data"],
-      ["Most represented actor", topActor?.name ?? "N/A", topActor ? `${topActor.titles.size} matching anime` : "No cast data"]
+      represented("Most represented actor", actors, "No cast data")
     ]),
     ["Score–popularity correlation", correlation === null ? "N/A" : `r = ${correlation.toFixed(2)}`,
       movie ? "Pearson correlation using log TMDB popularity scores" : "Pearson correlation using log popularity"]
@@ -183,6 +190,7 @@ function openCatalogueMovie(movie) {
         <div class="detail-stat"><span>TMDB popularity</span><strong>${movie.popularity ?? "N/A"}</strong></div>
       </div>
       <p>${escapeHTML(movie.synopsis || "No synopsis is available for this movie.")}</p>
+      ${AnivizMovieCredits.render(movie, escapeHTML)}
       <section class="detail-section">
         <a class="button button-primary" href="https://www.themoviedb.org/movie/${escapeAttribute(movie.id)}" target="_blank" rel="noopener noreferrer">View on TMDB</a>
       </section>
@@ -233,16 +241,17 @@ async function loadMovieCatalogue() {
   try {
     const data = await AnivizData.recommendations();
     if (!Array.isArray(data?.movies) || !data.movies.length) throw new Error("Movie sample unavailable");
-    const [snapshot, artwork] = await Promise.all([
+    const [snapshot, details] = await Promise.all([
       AnivizData.moviePopularity(data).catch(() => null),
       AnivizData.movieDetails(data).catch(() => null)
     ]);
     const titles = data.movies.map(movie => {
       const detail = snapshot?.movies[movie.id];
-      return { ...movie, ...artwork?.[movie.id], ...detail, average_score: detail?.vote_average, studio_names: [] };
+      return { ...movie, ...details?.[movie.id], ...detail, average_score: detail?.vote_average, studio_names: [] };
     });
     const years = titles.map(movie => movie.year).filter(Number.isFinite);
-    movieCatalogue = { titles, meta: {
+    movieCatalogue = { titles, hasCast: titles.some(movie => Array.isArray(movie.cast)),
+      hasWriters: titles.some(movie => Array.isArray(movie.writers)), meta: {
       genres: [...new Set(titles.flatMap(movie => movie.genres))].sort(), studios: [], formats: [],
       year_min: years.length ? Math.min(...years) : 1900,
       year_max: years.length ? Math.max(...years) : new Date().getFullYear()
