@@ -2,10 +2,9 @@
 
 (function (root) {
   const posterZoom = 6;
-  const maxZoom = 12;
 
   function attach({ container, svg, d3, extent, label, onStart, onZoom, zoomInPoint, zoomContent = "posters",
-    canDragFrom = () => true }) {
+    maxZoom = 12, canDragFrom = () => true }) {
     svg.attr("role", "group").attr("tabindex", 0)
       .attr("aria-description", `Zoom in for ${zoomContent}. When zoomed in, drag or use arrow keys to pan.`);
     const controls = d3.select(container).append("div").attr("class", "dust-zoom-controls")

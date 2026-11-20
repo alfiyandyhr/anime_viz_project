@@ -189,6 +189,8 @@
     const receptionTitles = people && snapshot.selectedKeys.length ? snapshot.supportingIds.map(titleFor) : records;
     const dustColors = new Map(snapshot.displayedDust.map(match => [match.key, dustColor(match)]));
     const metric = $('[data-dust-genre-metric]').value;
+    const creditMode = $('[data-dust-credit-mode]').value;
+    const heatmapMode = $('[data-dust-heatmap-mode]').value;
     const selectedIds = people ? (snapshot.selectedKeys.length ? snapshot.supportingIds : [])
       : studios ? [] : snapshot.selectedKeys.flatMap(key => {
         const record = snapshot.lookup.get(key)?.record;
@@ -196,7 +198,9 @@
       });
     composition.update({ anime: records, selectedIds, hasSelection: !group,
       filmography: group ? receptionTitles : null,
-      studioGroups,
+      studioGroups, creditMode, heatmapMode,
+      animeCredits: snapshot.animeCredits, animeCreditsStatus: snapshot.animeCreditsStatus,
+      metadataStatus: snapshot.metadataStatus,
       metric, movieRankLimit: reverse ? Math.max(2, snapshot.titleLookup.size) : null,
       onSelect: id => {
         const key = AnivizDust.keyFor(provider, id);
@@ -235,25 +239,13 @@
           ? `TMDB snapshot ${snapshot.popularity.snapshotDate} UTC · Rank #1 is most popular in the movie sample.${colorNote}`
           : snapshot.popularity.status === 'unavailable' ? 'Archived TMDB reception data unavailable.'
             : 'Loading archived TMDB reception data…'];
-      $('[data-coverage="studios"]').textContent = 'Studio charts use AniList production credits. Movie cast credits appear in the movie details.';
-      $('[data-coverage="heatmap"]').textContent = '';
     } else {
-      Object.assign(notes, {
-        studios: ['Titles with studio, score and popularity', row => row.studio_names.length && row.popularity > 0 && Number.isFinite(row.average_score), 'Circle area represents matching titles. Studio credits can overlap.'],
-        heatmap: ['Studio × genre', row => row.studio_names.length && row.genres.length,
-          'Up to 15 studios and 10 genres, ranked by displayed title count. Titles can appear in multiple cells.'],
-        reception: ['Ratings', row => row.popularity > 0 && Number.isFinite(row.average_score), `Circle area: favourites.${group ? '' : colorNote}`]
-      });
-      if (studios) {
-        notes.studios = ['Studio coverage', () => true, 'Each circle shows a studio’s average score and total popularity. Circle area represents its catalogue anime count.'];
-        notes.heatmap = ['Studio × genre', row => row.genres.length,
-          'Each row counts that studio’s catalogue anime. Co-productions count for each credited studio. Up to 15 studios and 10 genres are shown.'];
-      }
+      notes.reception = ['Ratings', row => row.popularity > 0 && Number.isFinite(row.average_score), `Circle area: favourites.${group ? '' : colorNote}`];
     }
     Object.entries(notes).forEach(([kind, [label, predicate, suffix]]) => {
       const chartRecords = kind === 'reception' ? receptionTitles : records;
       const available = chartRecords.filter(predicate).length;
-      $(`[data-coverage="${kind}"]`).textContent = !reverse && snapshot.metadataStatus === 'unavailable' && ['studios', 'heatmap', 'reception'].includes(kind)
+      $(`[data-coverage="${kind}"]`).textContent = !reverse && snapshot.metadataStatus === 'unavailable' && kind === 'reception'
         ? `${label} unavailable: metadata failed to load.` : (available < chartRecords.length ? `${label}: ${available} of ${chartRecords.length} · ` : '') + suffix;
     });
     $('[data-dust-chips]').replaceChildren();
@@ -353,9 +345,9 @@
     restoreScroll();
   }
   async function loadAnimeCredits() {
-    if (!['idle', 'unavailable'].includes(latest.creditStatus)) return;
+    if (!['idle', 'unavailable'].includes(latest.animeCreditsStatus)) return;
     context.setAnimeCredits(null, 'loading');
-    renderRecommendations();
+    if (isOriginalCreatorDust()) renderRecommendations();
     const credits = await AnivizData.animeCredits().catch(() => null);
     context.setAnimeCredits(credits, credits ? 'ready' : 'unavailable');
     if (isOriginalCreatorDust()) renderRecommendations();
@@ -408,6 +400,12 @@
     context.subscribe(publish);
     $('#dust-color-by-magnet').addEventListener('change', event => context.setColorByMagnet(event.target.checked));
     $('[data-dust-genre-metric]').addEventListener('change', () => publish(context.snapshot()));
+    for (const selector of ['[data-dust-credit-mode]', '[data-dust-heatmap-mode]']) {
+      $(selector).addEventListener('change', event => {
+        if (event.target.value.split(':')[0] === 'originalCreators') void loadAnimeCredits();
+        publish(context.snapshot());
+      });
+    }
     $('[data-dust-ranking-sort]').addEventListener('change', event => context.setRankingSort(event.target.value));
     $('[data-dust-ranking-order]').addEventListener('change', event => context.setRankingOrder(event.target.value));
     $('[data-dust-ranking-pages]').addEventListener('click', event => {
@@ -505,8 +503,6 @@
         : 'Outlined titles are selected for comparison in the playground and here. Click an outlined title to remove it. Click any other title to open its details and add it to the comparison if there’s room for it. Compare up to three titles.';
     $('#dust-mirror-guide').textContent = `Zoom in for ${studios ? 'studio names' : group ? 'portraits' : 'posters'}. Select a title magnet to show it in the In Focus panel. Drag magnets or use arrow keys to move them. Select ${group?.noun || 'titles'} to compare them, or click empty space to remove the latest selection.`;
     $('[data-dust-genre-metric] option[value="popularity"]').textContent = reverse ? 'Popularity score' : 'Popularity';
-    $('#creators h3').textContent = studios ? 'Score vs. popularity by studio' : reverse ? 'Creators' : 'Studios';
-    $('#dust-heatmap-title').textContent = studios ? 'Genres by studio' : 'Studio × genre';
     $('[data-dust-chart="heatmap"]').classList.toggle('studio-heatmap', studios);
     $('[data-title-studio-filter]').hidden = Boolean(group) || reverse;
     document.querySelectorAll('[data-anime-only], [data-anime-chart]').forEach(node => { node.hidden = reverse; });
@@ -525,7 +521,8 @@
     requestAnimationFrame(() => {
       if (latest.direction !== direction) return;
       const returning = ['back_forward', 'reload'].includes(performance.getEntriesByType('navigation')[0]?.type);
-      const target = !returning && ['#content', '#creators', '#reception'].includes(location.hash) ? $(location.hash) : null;
+      const anchor = location.hash === '#creators' && isReverse() ? '#content' : location.hash;
+      const target = !returning && ['#content', '#creators', '#reception'].includes(anchor) ? $(anchor) : null;
       if (target) target.scrollIntoView();
       else window.scrollTo(0, context.getLayout().scrollY || 0);
     });
@@ -545,7 +542,8 @@
       if (isReverse()) {
         void loadMetricData();
         loadMovieDetails();
-      } else if (isOriginalCreatorDust()) void loadAnimeCredits();
+      } else if (isOriginalCreatorDust() || $('[data-dust-credit-mode]').value === 'originalCreators'
+        || $('[data-dust-heatmap-mode]').value.startsWith('originalCreators:')) void loadAnimeCredits();
       restoreScroll();
     },
     setScores(scores) { context.setSources(recommendationState.data, scores); restoreScroll(); },

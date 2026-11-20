@@ -51,7 +51,7 @@ const url = route => new URL(route, base).href;
           return [...document.querySelectorAll(`[data-dust-chart="${kind}"] [role="${role}"]`)].flatMap(el=>{
             const d=el.__data__;
             const matching=rows.filter(a=>kind==='genres'?a.genres.includes(d.genre):kind==='years'?a.year===d.year:
-              kind==='studios'?a.studio_names.includes(d.studio):kind==='heatmap'?a.studio_names.includes(d.studio)&&a.genres.includes(d.genre):a.id===String(d.id));
+              kind==='studios'?a.studio_names.includes(d.studio):kind==='heatmap'?a.studio_names.includes(d.row.studio)&&a.genres.includes(d.column.genre):a.id===String(d.id));
             const ok=kind==='reception'?matching.length===1&&Boolean(el.getAttribute('aria-label')):
               d.count===matching.length&&d.selectedCount===matching.filter(a=>s.selectedKeys.includes(`anilist:${a.id}`)).length;
             return ok?[]:[{kind,genre:d.genre,studio:d.studio,year:d.year,count:d.count,expected:matching.length}];

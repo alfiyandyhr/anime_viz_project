@@ -2,11 +2,12 @@
 // Instances own their container and latest snapshot. No page-global controls or selectors.
 (function (root) {
   let nextClipId = 0;
+  const creditLabels = { studios: "Studios", voiceActors: "Voice actors", originalCreators: "Original creators" };
   function create(kind, { container, d3, helpers, transforms = root.AnivizChartData }) {
     if (!container) throw new Error("A chart container is required");
     const { clearChart, renderEmpty, showTooltip, moveTooltip, hideTooltip, escapeHTML,
       formatNumber, truncate, compactFormatter } = helpers;
-    let context, dataIdentity, selectionKey, receptionCamera;
+    let context, dataIdentity, selectionKey, popularityCamera;
     const cached = new Map();
     function metricData(key, compute) {
       if (!cached.has(key)) cached.set(key, compute());
@@ -15,7 +16,6 @@
     // Geometry can redraw on resize without recalculating analytical aggregates.
     const ChartData = {
       genres: (anime, selected) => metricData("genres", () => transforms.genres(anime, selected)).slice(),
-      studios: (anime, selected) => metricData("studios", () => transforms.studios(anime, selected)).slice(),
       timeline: (anime, selected) => metricData("years", () => transforms.timeline(anime, selected))
     };
     const scoreMax = () => context.movieRankLimit ? 10 : 100;
@@ -302,150 +302,153 @@
         .text(context.movieRankLimit ? "TMDB score / 10" : "Average score");
     }
 
-    function renderStudioChart() {
-      clearChart(container);
+    function creditGroups(mode, scopedStudios = true) {
+      if (mode === "studios" && scopedStudios && context.studioGroups) {
+        return context.studioGroups.map(group => ({
+          ...group, studio: group.title, ids: group.memberIds
+        }));
+      }
+      return metricData(`credits:${mode}`, () => {
+        const anime = mode === "originalCreators"
+          ? transforms.withOriginalCreators(context.anime, context.animeCredits || {}) : context.anime;
+        return transforms[mode](anime, context.selectedIds).map(item => ({
+          ...item, key: item.key ?? item.genre, title: item.title ?? item.studio ?? item.genre
+        }));
+      });
+    }
 
-      const groupMode = Boolean(context.studioGroups);
-      const summaries = groupMode ? context.studioGroups.map(({ title, ...group }) => ({
-        ...group, studio: title
-      })) : ChartData.studios(context.anime, context.selectedIds);
-      const studios = summaries.map(item => ({
+    function waitingForCredits(mode) {
+      if (mode !== "originalCreators" || context.animeCreditsStatus === "ready") return false;
+      renderEmpty(container, context.animeCreditsStatus === "unavailable"
+        ? "Original creator credits could not be loaded." : "Loading original creator credits…");
+      return true;
+    }
+
+    function renderCreditScatterplot() {
+      clearChart(container);
+      const mode = context.creditMode || "studios";
+      if (waitingForCredits(mode)) {
+        popularityCamera = null;
+        return;
+      }
+      const isStudio = mode === "studios";
+      const label = `Score vs. popularity · ${creditLabels[mode]}`;
+      const data = creditGroups(mode).map(item => ({
         ...item, popularity: item.totalPopularity, score: item.averageScore
       })).filter(item => item.popularity > 0 && Number.isFinite(item.score));
 
-      if (!studios.length) {
-        renderEmpty(container, "No studios with score and popularity data match the filters.");
+      if (!data.length) {
+        popularityCamera = null;
+        renderEmpty(container, context.metadataStatus === "unavailable" ? "Anime metadata could not be loaded."
+          : `No ${creditLabels[mode].toLowerCase()} with score and popularity data match the filters.`);
         return;
       }
 
       // Draw smaller bubbles last so they remain reachable where circles overlap.
-      studios.sort((a, b) => d3.descending(a.count, b.count));
-
-      const { svg, x, y, draw } = drawPopularityAxes(studios, {
-        popularity: (item) => item.popularity,
-        score: (item) => item.score,
-        label: "Studio score versus popularity bubble chart",
-        popularityLabel: "Total popularity (log scale)",
-        scoreLabel: "Average score / 100"
+      data.sort((a, b) => d3.descending(a.count, b.count));
+      const popularity = item => item.popularity;
+      const score = item => item.score;
+      const chart = drawPopularityAxes(data, {
+        popularity, score, label, mode, popularityLabel: "Total popularity (log scale)"
       });
-      draw();
-
-      const radius = d3.scaleSqrt()
-        .domain([0, d3.max(studios, (item) => item.count)])
-        .range([0, 20]);
-
-      svg.append("g")
-        .selectAll("circle")
-        .data(studios, (item) => item.key)
-        .join("circle")
-        .attr("class", "studio-dot")
-        .attr("cx", (item) => x(item.popularity))
-        .attr("cy", (item) => y(item.score))
-        .attr("r", (item) => radius(item.count))
+      const radius = d3.scaleSqrt().domain([0, d3.max(data, item => item.count)]).range([0, 20]);
+      const marks = chart.svg.append("g");
+      const dots = marks.append("g").selectAll("circle").data(data, item => item.key).join("circle")
+        .attr("class", "credit-dot")
+        .classed("studio-dot", isStudio)
+        .classed("has-portrait", item => !isStudio && Boolean(item.image))
+        .attr("r", item => radius(item.count))
         .attr("fill", "var(--purple)")
         .attr("fill-opacity", 0.8)
         .attr("stroke", "var(--text)")
-        .attr("stroke-width", item => item.selectedCount ? 3 : 1)
-        .on("mouseenter", (event, item) => {
+        .attr("stroke-width", item => item.selectedCount ? 3 : 1);
+
+      const countLabel = context.studioGroups ? "Catalogue anime" : "Matching titles";
+      function bindMarks(selection) {
+        selection.on("mouseenter", (event, item) => {
           showTooltip(event, `
-            <strong>${escapeHTML(item.studio)}</strong>
+            <strong>${escapeHTML(item.title)}</strong>
             <span>
               Total popularity: ${formatNumber(item.popularity)}<br>
               Average score: ${item.score.toFixed(1)}/100<br>
-              ${groupMode ? "Catalogue anime" : "Matching titles"}: ${formatNumber(item.count)}
+              ${countLabel}: ${formatNumber(item.count)}
             </span>
           `);
-        })
-        .on("mousemove", moveTooltip)
-        .on("mouseleave", hideTooltip);
+        }).on("mousemove", moveTooltip).on("mouseleave", hideTooltip);
+        keyboardMarks(selection, item => `${item.title}. Total popularity ${formatNumber(item.popularity)}. Average score ${item.score.toFixed(1)} / 100. ${countLabel} ${item.count}.`);
+      }
+      bindMarks(dots);
+      const portraits = isStudio ? [] : data.filter(item => item.image);
+      const portraitLayer = marks.append("g");
+      attachPopularityZoom(chart, data, { popularity, score, label, mode,
+        maxZoom: 128,
+        zoomContent: isStudio ? "individual studios" : "portraits",
+        drawMarks({ zoomed, pointX, pointY, visible, showPosters }) {
+          marks.attr("clip-path", zoomed ? chart.clip : null);
+          const dotVisible = item => (!zoomed || visible(item)) && !(showPosters && !isStudio && item.image);
+          dots.attr("cx", pointX).attr("cy", pointY)
+            .attr("tabindex", item => dotVisible(item) ? 0 : -1)
+            .attr("aria-hidden", item => dotVisible(item) ? null : "true");
+          portraitLayer.selectAll("foreignObject")
+            .data(showPosters ? portraits.filter(visible) : [], item => item.key)
+            .join(enter => {
+              const cards = enter.append("foreignObject").attr("class", "credit-portrait")
+                .classed("is-selected", item => Boolean(item.selectedCount));
+              const { images } = root.AnivizPosterZoom.addCards(cards, {
+                title: item => item.title, color: "var(--text)"
+              });
+              root.AnivizPosterZoom.drawArtwork(images, item => item.image);
+              bindMarks(cards);
+              return cards;
+            })
+            .attr("x", item => pointX(item) - 34).attr("y", item => pointY(item) - 62);
+        }
+      });
     }
 
     function renderHeatmap() {
-
       clearChart(container);
 
-      const anime = context.anime;
-
-      if (!anime.some(item => item.studio_names.length && item.genres.length)) {
-        renderEmpty(container, "No studio–genre data match the filters.");
+      const [rowMode, columnMode] = (context.heatmapMode || "studios:genres").split(":");
+      if (waitingForCredits(rowMode)) return;
+      const { rows, columns, cells } = metricData(`heatmap:${rowMode}:${columnMode}`, () =>
+        transforms.creditHeatmap(context.anime, creditGroups(rowMode), creditGroups(columnMode, false), context.selectedIds));
+      if (!cells.length) {
+        renderEmpty(container, context.metadataStatus === "unavailable" ? "Anime metadata could not be loaded."
+          : "No titles with the chosen credits and categories match the filters.");
         return;
       }
 
-      const studios = context.studioGroups ? context.studioGroups.map(group => ({
-        key: group.key, title: group.title, members: new Set(group.memberIds), count: group.memberIds.length
-      })) : ChartData.studios(anime, context.selectedIds).map(item => ({
-        key: item.key, title: item.studio, members: new Set(item.ids), count: item.count
-      }));
-      const topStudios = studios
-        .sort((a, b) => d3.descending(a.count, b.count))
-        .slice(0, 15);
-
-      const topGenres = ChartData.genres(anime, context.selectedIds)
-        .sort((a, b) => d3.descending(a.count, b.count))
-        .slice(0, 10)
-        .map((item) => item.genre);
-
-      const cells = [];
-
-      topStudios.forEach(({ key, title, members }) => {
-        const works = anime.filter(item => members.has(String(item.id)));
-        topGenres.forEach((genre) => {
-          const matchingAnime = works.filter(item => item.genres.includes(genre));
-
-          cells.push({
-            studio: title,
-            studioKey: key,
-            genre,
-            count: matchingAnime.length,
-            titles: matchingAnime.map((item) => item.title),
-            selectedCount: matchingAnime.filter(item => context.selectedIds.includes(String(item.id))).length
-          });
-        });
-      });
-
-      const width = Math.max(container.clientWidth, 560);
-      const height = context.studioGroups ? Math.max(128, 84 + 34 * topStudios.length) : Math.max(container.clientHeight, 480);
-      const margin = { top: 64, right: 25, bottom: 20, left: 130 };
-
-      const svg = d3.select(container)
-        .append("svg")
-        .attr("viewBox", [0, 0, width, height]);
-
-      const x = d3.scaleBand()
-        .domain(topGenres)
-        .range([margin.left, width - margin.right])
-        .padding(0.08);
-
-      const y = d3.scaleBand()
-        .domain(topStudios.map(studio => studio.key))
-        .range([margin.top, height - margin.bottom])
-        .padding(0.08);
-
+      const byKey = groups => new Map(groups.map(group => [group.key, group.title]));
+      const rowLabels = byKey(rows), columnLabels = byKey(columns);
+      const studioColumns = columnMode === "studios";
+      const minWidth = studioColumns ? 650 : 560;
+      const width = Math.max(container.clientWidth, minWidth);
+      const height = context.studioGroups ? Math.max(128, 84 + 34 * rows.length) : Math.max(container.clientHeight, 480);
+      const margin = { top: studioColumns ? 88 : 64, right: 25, bottom: 20, left: 130 };
+      const svg = d3.select(container).append("svg")
+        .attr("viewBox", [0, 0, width, height])
+        .style("min-width", `${minWidth}px`);
+      const x = d3.scaleBand().domain([...columnLabels.keys()]).range([margin.left, width - margin.right]).padding(0.08);
+      const y = d3.scaleBand().domain([...rowLabels.keys()]).range([margin.top, height - margin.bottom]).padding(0.08);
       const intensity = d3.scaleLinear()
-        .domain([0, d3.max(cells, (item) => item.count) || 1])
+        .domain([0, d3.max(cells, item => item.count) || 1])
         .range([15, 100]);
 
-      svg.append("g")
-        .selectAll("rect")
-        .data(cells)
-        .join("rect")
-        .attr("x", (item) => x(item.genre))
-        .attr("y", (item) => y(item.studioKey))
+      svg.append("g").selectAll("rect").data(cells).join("rect")
+        .attr("x", item => x(item.column.key))
+        .attr("y", item => y(item.row.key))
         .attr("width", x.bandwidth())
         .attr("height", y.bandwidth())
         .attr("rx", 5)
-        .attr("fill", (item) => (
-          item.count === 0
-            ? "var(--bg-soft)"
-            : `color-mix(in srgb, var(--color-primary-strong) ${intensity(item.count)}%, var(--surface-solid))`
-        ))
+        .attr("fill", item => item.count === 0
+          ? "var(--bg-soft)"
+          : `color-mix(in srgb, var(--color-primary-strong) ${intensity(item.count)}%, var(--surface-solid))`)
         .attr("stroke", item => item.selectedCount ? "var(--text)" : "var(--border)")
         .attr("stroke-width", item => item.selectedCount ? 2 : 1)
         .on("mouseenter", (event, item) => {
           showTooltip(event, `
-            <strong>
-              ${escapeHTML(item.studio)} × ${escapeHTML(item.genre)}
-            </strong>
+            <strong>${escapeHTML(item.row.title)} × ${escapeHTML(item.column.title)}</strong>
             <span>
               ${item.count} matching title${item.count === 1 ? "" : "s"}<br>
               ${escapeHTML(item.titles.slice(0, 4).join(", ") || "No titles")}
@@ -458,8 +461,8 @@
       svg.append("g")
         .attr("class", "axis")
         .attr("transform", `translate(0,${margin.top})`)
-        .call(d3.axisTop(x).tickSize(0))
-        .call((group) => group.select(".domain").remove())
+        .call(d3.axisTop(x).tickSize(0).tickFormat(key => truncate(columnLabels.get(key), studioColumns ? 17 : 22)))
+        .call(group => group.select(".domain").remove())
         .selectAll("text")
         .attr("transform", "rotate(-38)")
         .attr("text-anchor", "start")
@@ -469,26 +472,21 @@
       svg.append("g")
         .attr("class", "axis")
         .attr("transform", `translate(${margin.left},0)`)
-        .call(
-          d3.axisLeft(y)
-            .tickFormat((key) => truncate(topStudios.find(studio => studio.key === key).title, 22))
-            .tickSize(0)
-        )
-        .call((group) => group.select(".domain").remove());
+        .call(d3.axisLeft(y).tickFormat(key => truncate(rowLabels.get(key), 22)).tickSize(0))
+        .call(group => group.select(".domain").remove());
     }
 
-    function drawPopularityAxes(data, { popularity, score, label, popularityLabel, rankLimit,
+    function drawPopularityAxes(data, { popularity, score, label, popularityLabel, rankLimit, mode,
       scoreLabel = rankLimit ? "TMDB score / 10" : "Average score / 100" }) {
-      const zoomable = kind === "reception";
       const width = Math.max(container.clientWidth, 320);
       const height = Math.max(container.clientHeight, 473);
-      const margin = { top: zoomable ? 52 : 28, right: 28, bottom: 58, left: 62 };
+      const margin = { top: 52, right: 28, bottom: 58, left: 62 };
       const extent = [[margin.left, margin.top], [width - margin.right, height - margin.bottom]];
       const plotCenter = (margin.left + width - margin.right) / 2;
 
       const svg = d3.select(container)
         .append("svg")
-        .classed("reception-plot", zoomable)
+        .attr("class", "reception-plot")
         .attr("viewBox", [0, 0, width, height])
         .attr("aria-label", label);
 
@@ -560,7 +558,7 @@
         .attr("height", height - margin.top - margin.bottom);
       const clip = `url(#${clipId})`;
 
-      const { correlation, regression } = rankLimit ? { correlation: null } : metricData("popularityTrend", () => {
+      const { correlation, regression } = rankLimit ? { correlation: null } : metricData(`popularityTrend:${mode}`, () => {
         const points = data.map(item => [Math.log10(popularity(item)), score(item)]);
         return { correlation: transforms.correlation(points), regression: linearRegression(points) };
       });
@@ -569,9 +567,8 @@
       if (correlation !== null && regression) {
         svg.append("text")
           .attr("class", "chart-correlation")
-          .attr("x", zoomable ? margin.left : plotCenter)
-          .attr("y", zoomable ? 28 : 16)
-          .attr("text-anchor", zoomable ? null : "middle")
+          .attr("x", margin.left)
+          .attr("y", 28)
           .attr("font-size", 12)
           .attr("fill", "var(--text-soft)")
           .text(`Pearson r = ${correlation.toFixed(3)}`);
@@ -607,7 +604,7 @@
       clearChart(container);
 
       if (!data.length) {
-        receptionCamera = null;
+        popularityCamera = null;
         context.onCorrelation?.(null, 0);
         renderEmpty(container, rankLimit ? "No displayed movies have a TMDB score and popularity rank."
           : "No scored anime match the current filters.");
@@ -619,7 +616,7 @@
         label: rankLimit ? "TMDB score versus popularity rank scatterplot" : "Score versus popularity scatterplot",
         popularityLabel: rankLimit ? "TMDB popularity rank" : "AniList users (log scale)"
       });
-      const { svg, x, y, correlation, clip, extent } = chart;
+      const { svg, correlation, clip } = chart;
       context.onCorrelation?.(correlation, data.length);
 
       const radius = d3.scaleSqrt()
@@ -689,12 +686,40 @@
 
       const posterLayer = marks.append("g");
       const thumbnail = rankLimit ? root.AnivizArtwork.movieThumbnail : root.AnivizArtwork.animeThumbnail;
+      attachPopularityZoom(chart, data, { popularity, score, mode: rankLimit, label: "Score vs. popularity",
+        drawMarks({ zoomed, pointX, pointY, visible, showPosters }) {
+          marks.attr("clip-path", zoomed ? clip : null);
+          if (!showPosters) {
+            dots.attr("tabindex", item => !zoomed || visible(item) ? 0 : -1)
+              .attr("aria-hidden", item => !zoomed || visible(item) ? null : "true");
+            dots.attr("cx", pointX).attr("cy", pointY);
+            rings.attr("cx", pointX).attr("cy", pointY);
+          }
+          posterLayer.selectAll("foreignObject")
+            .data(showPosters ? data.filter(visible) : [], item => item.id)
+            .join(enter => {
+              const posters = enter.append("foreignObject").attr("class", "reception-poster")
+                .classed("is-selected", isSelected);
+              const { images } = root.AnivizPosterZoom.addCards(posters, {
+                title: item => item.title, color
+              });
+              root.AnivizPosterZoom.drawArtwork(images, thumbnail);
+              bindMarks(posters);
+              return posters;
+            })
+            .attr("x", item => pointX(item) - 34).attr("y", item => pointY(item) - 62);
+        }
+      });
+    }
+
+    function attachPopularityZoom(chart, data, { popularity, score, mode, label, maxZoom, zoomContent, drawMarks }) {
+      const { x, y, svg, extent } = chart;
       const [[left, top], [right, bottom]] = extent;
       const centerX = (left + right) / 2, centerY = (top + bottom) / 2;
       const inView = (px, py) =>
         px >= left - 1e-6 && px <= right + 1e-6 && py >= top - 1e-6 && py <= bottom + 1e-6;
       const zoomInPoint = transform => {
-        // Keep a title in view when the plotted scores are clustered away from the center.
+        // Keep a point in view when the plotted scores are clustered away from the center.
         let closest, distance = Infinity;
         for (const item of data) {
           const px = transform.applyX(x(popularity(item))), py = transform.applyY(y(score(item)));
@@ -709,37 +734,18 @@
       function draw(transform, showPosters) {
         chart.draw(transform);
         const zoomed = transform.k > 1;
-        marks.attr("clip-path", zoomed ? clip : null);
         const pointX = item => transform.applyX(x(popularity(item)));
         const pointY = item => transform.applyY(y(score(item)));
         const visible = item => inView(pointX(item), pointY(item));
-        if (!showPosters) {
-          dots.attr("tabindex", item => !zoomed || visible(item) ? 0 : -1)
-            .attr("aria-hidden", item => !zoomed || visible(item) ? null : "true");
-          dots.attr("cx", pointX).attr("cy", pointY);
-          rings.attr("cx", pointX).attr("cy", pointY);
-        }
-        posterLayer.selectAll("foreignObject")
-          .data(showPosters ? data.filter(visible) : [], item => item.id)
-          .join(enter => {
-            const posters = enter.append("foreignObject").attr("class", "reception-poster")
-              .classed("is-selected", isSelected);
-            const { images } = root.AnivizPosterZoom.addCards(posters, {
-              title: item => item.title, color
-            });
-            root.AnivizPosterZoom.drawArtwork(images, thumbnail);
-            bindMarks(posters);
-            return posters;
-          })
-          .attr("x", item => pointX(item) - 34).attr("y", item => pointY(item) - 62);
-        receptionCamera = { rankLimit, extent, transform };
+        drawMarks({ zoomed, pointX, pointY, visible, showPosters });
+        popularityCamera = { mode, extent, transform };
       }
 
-      const previous = receptionCamera;
+      const previous = popularityCamera;
       const camera = root.AnivizPosterZoom.attach({
-        container, svg, d3, extent, label: "Score vs. popularity", onStart: hideTooltip, onZoom: draw, zoomInPoint
+        container, svg, d3, extent, label, maxZoom, zoomContent, onStart: hideTooltip, onZoom: draw, zoomInPoint
       });
-      if (previous && previous.rankLimit === rankLimit && previous.transform.k > 1) {
+      if (previous && previous.mode === mode && previous.transform.k > 1) {
         const { k, x: tx, y: ty } = previous.transform;
         const [[oldLeft, oldTop], [oldRight, oldBottom]] = previous.extent;
         camera.setTransform(d3.zoomIdentity.translate(
@@ -778,19 +784,24 @@
 
       return { slope, intercept };
     }
-    const renderers = { genres: renderGenreChart, years: renderTimeline, studios: renderStudioChart,
+    const renderers = { genres: renderGenreChart, years: renderTimeline, studios: renderCreditScatterplot,
       heatmap: renderHeatmap, reception: renderScatterplot };
     if (!renderers[kind]) throw new Error(`Unknown chart: ${kind}`);
-    function keyboardMarks(marks) {
+    function keyboardMarks(marks, label = item => {
+      if (item.row) return `${item.row.title} × ${item.column.title}: ${item.count} titles`;
+      if (kind === "reception") {
+        const genres = item.genres.join(", ") || "Unknown";
+        return context.movieRankLimit
+          ? `${item.title}: TMDB score ${item.vote_average} / 10; TMDB popularity rank #${formatNumber(item.popularity_rank)}; genres ${genres}`
+          : `${item.title}: score ${item.average_score} / 100; popularity ${formatNumber(item.popularity)}; favourites ${Number.isFinite(item.favourites) ? formatNumber(item.favourites) : "Unknown"}; genres ${genres}`;
+      }
+      return `${item.genre ?? item.year}: ${item.count} titles; average score ${averageScore(item)}; ${popularityLabel()} ${formatNumber(item.totalPopularity)}`;
+    }) {
       const selectable = kind === "reception";
       const tooltipEvent = selectable ? "mousemove" : "mouseenter";
       marks.attr("tabindex", 0).attr("role", selectable ? "button" : "img")
         .attr("aria-pressed", item => selectable && context.hasSelection ? context.selectedIds.includes(String(item.id)) : null)
-        .attr("aria-label", item => item.title && (context.movieRankLimit
-          ? `${item.title}: TMDB score ${item.vote_average} / 10; TMDB popularity rank #${formatNumber(item.popularity_rank)}; genres ${item.genres.join(", ") || "Unknown"}`
-          : `${item.title}: score ${item.average_score} / 100; popularity ${formatNumber(item.popularity)}; favourites ${Number.isFinite(item.favourites) ? formatNumber(item.favourites) : 'Unknown'}; genres ${item.genres.join(", ") || "Unknown"}`) || item.genre && item.studio && `${item.studio} × ${item.genre}: ${item.count}`
-          || item.studio && `${item.studio}. Total popularity ${formatNumber(item.popularity)}. Average score ${item.score.toFixed(1)} / 100. ${item.count} ${context.studioGroups ? "catalogue anime" : "matching titles"}.`
-          || `${item.genre ?? item.year}: ${item.count} titles; average score ${averageScore(item)}; ${popularityLabel()} ${formatNumber(item.totalPopularity)}`)
+        .attr("aria-label", label)
         .on("keydown", selectable ? function (event, item) {
           if (["Enter", " "].includes(event.key)) {
             event.preventDefault(); d3.select(this).on("click").call(this, event, item);
@@ -809,12 +820,13 @@
         const anime = filmography ?? value.anime;
         const selectedIds = filmography ? [] : value.selectedIds || [];
         const nextSelection = JSON.stringify(selectedIds);
-        if (anime !== dataIdentity || nextSelection !== selectionKey) cached.clear();
+        if (anime !== dataIdentity || nextSelection !== selectionKey || value.animeCredits !== context?.animeCredits
+          || value.studioGroups !== context?.studioGroups) cached.clear();
         dataIdentity = anime; selectionKey = nextSelection;
         context = { onSelect() {}, dustColor: () => "var(--color-primary-strong)", hasSelection: Boolean(value.selectedIds),
           ...value, anime, filmography, selectedIds };
         renderers[kind]();
-        if (kind !== "reception") {
+        if (kind !== "reception" && kind !== "studios") {
           keyboardMarks(d3.select(container).selectAll("rect, circle").filter(function () {
             return Boolean(d3.select(this).on("mouseenter"));
           }));
@@ -822,7 +834,7 @@
         if (focused) [...container.querySelectorAll('[aria-label]')].find(node =>
           node.tabIndex === 0 && !node.disabled && node.getAttribute('aria-label') === focused)?.focus({ preventScroll: true });
       },
-      destroy() { container.replaceChildren(); context = receptionCamera = null; }
+      destroy() { container.replaceChildren(); context = popularityCamera = null; }
     };
   }
   root.AnivizCharts = Object.freeze({ create });

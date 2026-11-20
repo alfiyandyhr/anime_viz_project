@@ -494,7 +494,6 @@ body[data-chapter="recommendations"] .filterbar { display: none; }
 [data-dust-ranking-body] td:first-child { text-align: right; }
 
 [data-dust-chart="studios"] { min-height: 480px; }
-[data-dust-chart="heatmap"] svg { min-width: 560px; }
 #dust-analysis .dust-analysis-control { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 8px 0; font-size: .8rem; }
 .dust-analysis-control select { width: auto; max-width: 100%; min-height: 34px; padding: 0 8px; }
 #dust-analysis [data-dust-chart="connections"] {

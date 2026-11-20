@@ -91,7 +91,6 @@
 [data-catalogue-chart="studios"],
 [data-catalogue-chart="heatmap"] { height: 480px; }
 [data-catalogue-chart="years"] svg { min-width: 480px; }
-[data-catalogue-chart="heatmap"] svg { min-width: 560px; }
 
 @media (max-width: 1100px) {
   .catalogue-charts { grid-template-columns: minmax(0, 1fr); }

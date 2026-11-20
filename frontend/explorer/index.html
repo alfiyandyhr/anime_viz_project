@@ -246,14 +246,30 @@
               <div class="catalogue-chart" data-catalogue-chart="years" role="region" tabindex="0" aria-label="Release years chart, scroll horizontally if needed"></div>
             </article>
             <article class="chart-card" data-catalogue-only="anime">
-              <h2>Studios</h2>
-              <p>Circle area represents matching titles. Studio credits can overlap.</p>
+              <h2>Score vs. popularity by credit</h2>
+              <label class="catalogue-chart-control">Group by
+                <select id="catalogue-credit-mode">
+                  <option value="studios">Studios</option>
+                  <option value="voiceActors">Voice actors</option>
+                  <option value="originalCreators">Original creators</option>
+                </select>
+              </label>
+              <p>Circle area represents matching titles. Zoom in for available portraits.</p>
               <div class="catalogue-chart" data-catalogue-chart="studios"></div>
             </article>
             <article class="chart-card" data-catalogue-only="anime">
-              <h2>Studio × genre</h2>
-              <p>Up to 15 studios and 10 genres, ranked by title count. Titles can appear in multiple cells.</p>
-              <div class="catalogue-chart" data-catalogue-chart="heatmap" role="region" tabindex="0" aria-label="Studio genre chart, scroll horizontally if needed"></div>
+              <h2>Anime credit heatmap</h2>
+              <label class="catalogue-chart-control">Compare
+                <select id="catalogue-heatmap-mode">
+                  <option value="studios:genres">Studio × genre</option>
+                  <option value="voiceActors:genres">Voice actors × genre</option>
+                  <option value="originalCreators:genres">Original creators × genre</option>
+                  <option value="voiceActors:studios">Voice actors × studio</option>
+                  <option value="originalCreators:studios">Original creators × studio</option>
+                </select>
+              </label>
+              <p>Up to 15 rows and 10 columns, ranked by title count. Each cell counts distinct anime.</p>
+              <div class="catalogue-chart" data-catalogue-chart="heatmap" role="region" tabindex="0" aria-label="Anime credit heatmap, scroll horizontally if needed"></div>
             </article>
           </section>
         </div>

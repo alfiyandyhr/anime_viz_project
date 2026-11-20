@@ -11,7 +11,9 @@ Object.assign(elements, {
   catalogueAnalysis: document.querySelector("#catalogue-analysis"),
   catalogueKpis: document.querySelector("#catalogue-kpis"),
   insightCards: document.querySelector("#insight-cards"),
-  catalogueGenreMetric: document.querySelector("#catalogue-genre-metric")
+  catalogueGenreMetric: document.querySelector("#catalogue-genre-metric"),
+  catalogueCreditMode: document.querySelector("#catalogue-credit-mode"),
+  catalogueHeatmapMode: document.querySelector("#catalogue-heatmap-mode")
 });
 
 const shortlist = new Set();
@@ -23,6 +25,7 @@ let filteredMovies = [];
 let movieLoading = false;
 let catalogueButtons = [];
 let catalogueCharts;
+let animeCredits, animeCreditsStatus = "idle";
 
 function renderCatalogueSummary(titles, movie) {
   const scoreMax = movie ? 10 : 100;
@@ -95,12 +98,26 @@ function renderCatalogueSummary(titles, movie) {
 
 function renderCatalogueCharts(titles, movie) {
   const byId = new Map(titles.map(title => [String(title.id), title]));
+  const creditMode = elements.catalogueCreditMode.value;
+  const heatmapMode = elements.catalogueHeatmapMode.value;
+  if (!movie && animeCreditsStatus === "idle"
+    && (creditMode === "originalCreators" || heatmapMode.startsWith("originalCreators:"))) {
+    void loadCatalogueAnimeCredits();
+  }
   catalogueCharts.update({
     anime: titles,
+    creditMode, heatmapMode, animeCredits, animeCreditsStatus,
     metric: elements.catalogueGenreMetric.value,
     movieRankLimit: movie ? Math.max(2, movieCatalogue.titles.length) : null,
     onSelect: id => movie ? openCatalogueMovie(byId.get(id)) : openAnimeDetail(byId.get(id))
   });
+}
+
+async function loadCatalogueAnimeCredits() {
+  animeCreditsStatus = "loading";
+  animeCredits = await AnivizData.animeCredits().catch(() => null);
+  animeCreditsStatus = animeCredits ? "ready" : "unavailable";
+  if (catalogueView === "anime") renderCatalogueCharts(state.filteredAnime, false);
 }
 
 function renderCatalogueAnalysis() {
@@ -319,6 +336,12 @@ registerPage({
       });
     });
     elements.catalogueGenreMetric.addEventListener("change", renderCatalogueAnalysis);
+    for (const control of [elements.catalogueCreditMode, elements.catalogueHeatmapMode]) {
+      control.addEventListener("change", () => {
+        if (animeCreditsStatus === "unavailable") animeCreditsStatus = "idle";
+        renderCatalogueCharts(state.filteredAnime, false);
+      });
+    }
     elements.tableBody.addEventListener("change", (event) => {
       const input = event.target.closest("[data-shortlist-id]");
       if (!input) return;

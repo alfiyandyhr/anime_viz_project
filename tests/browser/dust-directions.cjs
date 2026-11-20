@@ -399,13 +399,11 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
       await page.waitForFunction(id => {
         const section = document.getElementById(id);
         const top = section.getBoundingClientRect().top;
-        // The final chart can reach the document's scroll limit before its heading reaches the margin.
-        const maxScroll = document.scrollingElement.scrollHeight - innerHeight;
-        return top >= 48 && (top < 180 || (id === 'creators' && top < innerHeight && scrollY >= maxScroll - 1));
-      }, anchor);
+        return top >= 48 && top < 180;
+      }, anchor === 'creators' ? 'content' : anchor);
     }
     assert.match(await page.locator('#reception').innerText(), /Rank #1 is most popular in the movie sample/);
-    assert.match(await page.locator('#creators').innerText(), /Movie cast credits appear in the movie details/);
+    assert.equal(await page.locator('#creators').isVisible(), false);
     await page.goto(url('frontend/story/index.html'));
     await page.waitForSelector('#history-pair');
     await page.goBack();

@@ -355,6 +355,7 @@
       return { ...state, version: VERSION, direction, revision, colorByMagnet, magnets, magnetSlots, genreCohorts: cohorts,
         genreCountMagnets: [...genreCountMagnets.values()], titleCount, candidateDust: candidates, displayedDust: displayed,
         ranking, lookup, titleLookup, metadataStatus, movieDetailsStatus, creditStatus: creditStatus(),
+        animeCredits, animeCreditsStatus,
         persistent, ...metricMagnets, mixed: magnets.some(isMetricMagnet),
         activeMagnetKeys: magnets.map(magnet => magnet.key),
         missingMetadataIds: direction === FORWARD ? state.candidateKeys.filter(key => !lookup.get(key)?.metadata) : [],
@@ -395,9 +396,8 @@
             if (!titleLookup.has(key)) titleLookup.set(key, { record: joinAnimeRecord(row, row), metadata: row });
           }
           if (direction === ORIGINAL_CREATORS) {
-            const creditedAnime = [...titleLookup.values()].map(({ record }) => ({
-              ...record, original_creators: animeCredits[record.id]?.original_creators
-            }));
+            const anime = [...titleLookup.values()].map(row => row.record);
+            const creditedAnime = ChartData.withOriginalCreators(anime, animeCredits);
             summaries = ChartData.originalCreators(creditedAnime);
           } else {
             summaries = direction === ACTORS ? ChartData.voiceActors(metadata)
@@ -570,7 +570,7 @@
       setAnimeCredits(credits, status = "ready") {
         animeCredits = credits || {};
         animeCreditsStatus = status;
-        if (!data || direction !== ORIGINAL_CREATORS) return snapshot();
+        if (direction !== ORIGINAL_CREATORS || !data) return publish();
         refreshLookup();
         return derive({ rescore: true });
       },

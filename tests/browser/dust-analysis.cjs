@@ -18,6 +18,65 @@ async function verifyStudioAxes(chart) {
   }), 'the popularity axis label fits within the chart');
 }
 
+async function verifyCreditCharts(page, attribute) {
+  const catalogue = attribute === 'catalogue';
+  const heatmap = page.locator(`[data-${attribute}-chart="heatmap"]`);
+  const compare = page.locator(catalogue ? '#catalogue-heatmap-mode' : '[data-dust-heatmap-mode]');
+  const plot = page.locator(`[data-${attribute}-chart="studios"]`);
+  const groupBy = page.locator(catalogue ? '#catalogue-credit-mode' : '[data-dust-credit-mode]');
+
+  for (const mode of ['studios:genres', 'voiceActors:genres', 'originalCreators:genres',
+    'voiceActors:studios', 'originalCreators:studios']) {
+    const [rowMode, columnMode] = mode.split(':');
+    await compare.selectOption(mode);
+    await heatmap.scrollIntoViewIfNeeded();
+    await heatmap.locator('rect[role="img"]').first().waitFor();
+    const grid = await heatmap.locator('rect[role="img"]').evaluateAll((tiles, [rowMode, columnMode]) => {
+      const rows = new Set(), columns = new Set();
+      const correct = tiles.every(tile => {
+        const { row, column, count } = tile.__data__;
+        rows.add(row.key); columns.add(column.key);
+        const rowPrefix = rowMode === 'studios' ? 'anilist:studio:' : 'anilist:staff:';
+        return row.key.startsWith(rowPrefix)
+          && (columnMode === 'genres' ? Boolean(column.genre) : Boolean(column.studio))
+          && count === new Set(row.ids.filter(id => column.ids.includes(id))).size;
+      });
+      return { rows: rows.size, columns: columns.size, cells: tiles.length, correct };
+    }, [rowMode, columnMode]);
+    assert.deepEqual(grid, { rows: 15, columns: 10, cells: 150, correct: true }, mode);
+  }
+
+  for (const mode of ['studios', 'voiceActors', 'originalCreators']) {
+    await groupBy.selectOption(mode);
+    await plot.scrollIntoViewIfNeeded();
+    await plot.locator('.credit-dot').first().waitFor();
+    const zoomIn = plot.getByRole('button', { name: 'Zoom in', exact: true });
+    const reset = plot.getByRole('button', { name: 'Reset zoom', exact: true });
+    assert.equal(await reset.textContent(), '1×', mode);
+    for (let step = 0; step < 3; step++) await zoomIn.press('Enter');
+    assert.equal(await reset.textContent(), '8×', mode);
+    if (mode === 'studios') {
+      assert.ok(await plot.locator('.studio-dot[tabindex="0"]').count());
+      assert.equal(await plot.locator('.credit-portrait').count(), 0);
+    } else {
+      const portrait = plot.locator('.credit-portrait').first();
+      assert.ok(await portrait.isVisible(), mode);
+      assert.equal(await portrait.locator('img').getAttribute('src'), await portrait.evaluate(card => card.__data__.image));
+      assert.equal(await plot.locator('.credit-dot.has-portrait:visible').count(), 0);
+    }
+    const ticksAtEight = await plot.locator('.axis .tick text').allTextContents();
+    await zoomIn.press('Enter');
+    assert.equal(await reset.textContent(), '16×', mode);
+    assert.notDeepEqual(await plot.locator('.axis .tick text').allTextContents(), ticksAtEight);
+    for (let step = 0; step < 3; step++) await zoomIn.press('Enter');
+    assert.equal(await reset.textContent(), '128×', mode);
+    assert.ok(await zoomIn.isDisabled(), mode);
+    await reset.press('Enter');
+    assert.equal(await reset.textContent(), '1×', mode);
+    assert.equal(await plot.locator('.credit-portrait').count(), 0);
+  }
+}
+
 (async () => {
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
@@ -49,7 +108,7 @@ async function verifyStudioAxes(chart) {
       await mark.evaluate(el => el.blur());
       assert.equal(await tooltip.count(), 0);
       if (!selectable) {
-        assert.equal(await chart(kind).getByRole('button').count(), 0);
+        assert.equal(await chart(kind).locator('svg [role="button"]').count(), 0);
         await mark.dispatchEvent('click');
         await mark.press('Enter');
         assert.deepEqual(await filters(), initialFilters, `${kind} marks leave filters unchanged`);
@@ -63,7 +122,6 @@ async function verifyStudioAxes(chart) {
 
     const studioMarks = chart('studios').locator('.studio-dot');
     await verifyStudioAxes(chart('studios'));
-    assert.equal(await page.locator('#creators select').count(), 0);
     const { studios, expected } = await studioMarks.evaluateAll(marks => {
       const snapshot = AnivizMain.snapshot();
       const rows = snapshot.displayedKeys.map(id => snapshot.lookup.get(id).record);
@@ -129,7 +187,7 @@ async function verifyStudioAxes(chart) {
     await chart('heatmap').scrollIntoViewIfNeeded();
     const heatmapCells = chart('heatmap').locator('rect[role="img"]');
     await heatmapCells.first().waitFor();
-    const heatmapStudios = await heatmapCells.evaluateAll(nodes => [...new Set(nodes.map(node => node.__data__.studio))]);
+    const heatmapStudios = await heatmapCells.evaluateAll(nodes => [...new Set(nodes.map(node => node.__data__.row.key))]);
     assert.equal(heatmapStudios.length, 15);
 
     const rankOrder = page.locator('[data-dust-ranking-order]');
@@ -166,6 +224,12 @@ async function verifyStudioAxes(chart) {
     for (const type of types) {
       await dustType.selectOption(type);
       await rankingToggles.first().waitFor();
+      if (type.startsWith('movie-')) {
+        assert.equal(await page.locator('#creators').isVisible(), false, type);
+        assert.equal(await chart('heatmap').isVisible(), false, type);
+      } else {
+        await verifyCreditCharts(page, 'dust');
+      }
       assert.ok(await page.locator('#dust-ranking-title').evaluate(title => {
         const card = title.closest('article');
         return card.previousElementSibling.contains(document.querySelector('#dust-connection-title'))
@@ -210,6 +274,10 @@ async function verifyStudioAxes(chart) {
 
     await page.goto(new URL('frontend/explorer/index.html', base).href);
     await verifyStudioAxes(page.locator('[data-catalogue-chart="studios"]'));
-    console.log('Verified chart tooltips, read-only marks, studio axes in both views, bubble areas, correlations and trendlines, 15 heatmap studios, and ranking order, placement, and selection.');
+    await verifyCreditCharts(page, 'catalogue');
+    await page.locator('[data-catalogue-target="movie"]').click();
+    assert.equal(await page.locator('#catalogue-credit-mode').isVisible(), false);
+    assert.equal(await page.locator('#catalogue-heatmap-mode').isVisible(), false);
+    console.log('Verified credit heatmaps, portrait zoom, anime-only charts, chart evidence, and ranking in both views.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

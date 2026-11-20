@@ -90,10 +90,10 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
       const { lookup, titleLookup } = AnivizMain.snapshot();
       const rows = new Set();
       const correctCounts = nodes.every(node => {
-        const { studioKey, genre, count } = node.__data__;
-        rows.add(studioKey);
-        return lookup.get(studioKey).record.memberIds
-          .filter(id => titleLookup.get(`anilist:${id}`).record.genres.includes(genre)).length === count;
+        const { row, column, count } = node.__data__;
+        rows.add(row.key);
+        return lookup.get(row.key).record.memberIds
+          .filter(id => titleLookup.get(`anilist:${id}`).record.genres.includes(column.genre)).length === count;
       });
       return correctCounts && rows.size === keys.length && keys.every(key => rows.has(key));
     }, pair));

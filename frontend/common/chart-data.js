@@ -62,15 +62,35 @@
     }
     return people;
   }
-  function personGroups(titles, field, prefix) {
+  function personGroups(titles, field, prefix, selectedIds = []) {
+    const selected = new Set(selectedIds.map(String));
     return [...creditedPeople(titles, field).values()].map(({ id, name, image, profile_path, works }) => ({
-      key: `${prefix}:${id}`, id, title: name, image, profile_path, ...summarize([...works.values()], new Set())
+      key: `${prefix}:${id}`, id, title: name, image, profile_path, ...summarize([...works.values()], selected)
     }));
   }
-  const voiceActors = anime => personGroups(anime, "voice_actors", "anilist:staff");
-  const originalCreators = anime => personGroups(anime, "original_creators", "anilist:staff");
+  const voiceActors = (anime, selectedIds) => personGroups(anime, "voice_actors", "anilist:staff", selectedIds);
+  const originalCreators = (anime, selectedIds) => personGroups(anime, "original_creators", "anilist:staff", selectedIds);
   const movieActors = movies => personGroups(movies, "cast", "tmdb:person");
   const movieWriters = movies => personGroups(movies, "writers", "tmdb:person");
+  const withOriginalCreators = (anime, credits) => anime.map(item => ({
+    ...item, original_creators: credits[item.id]?.original_creators
+  }));
+
+  function creditHeatmap(anime, rowGroups, columnGroups, selectedIds = []) {
+    const top = (groups, limit) => groups.slice().sort((a, b) => b.count - a.count).slice(0, limit);
+    const rows = top(rowGroups, 15), columns = top(columnGroups, 10);
+    const titles = new Map(anime.map(item => [String(item.id), item.title]));
+    const selected = new Set(selectedIds.map(String));
+    const cells = columns.flatMap(column => {
+      const columnIds = new Set(column.ids);
+      return rows.map(row => {
+        const ids = row.ids.filter(id => columnIds.has(id));
+        return { row, column, count: ids.length, titles: ids.map(id => titles.get(id)),
+          selectedCount: ids.filter(id => selected.has(id)).length };
+      });
+    });
+    return { rows, columns, cells };
+  }
   function timeline(anime, selectedIds = []) {
     const selected = new Set(selectedIds.map(String)), groups = new Map();
     anime.filter(row => Number.isFinite(row.year)).forEach(row => {
@@ -101,5 +121,6 @@
   }
   const hasMovieReception = movie => Number.isInteger(movie.popularity_rank) && movie.popularity_rank >= 1
     && Number.isFinite(movie.vote_average) && movie.vote_average >= 0 && movie.vote_average <= 10;
-  return { genres, studios, creditedPeople, voiceActors, originalCreators, movieActors, movieWriters, timeline, correlation, comparisonValues, hasMovieReception };
+  return { genres, studios, creditedPeople, voiceActors, originalCreators, withOriginalCreators, creditHeatmap,
+    movieActors, movieWriters, timeline, correlation, comparisonValues, hasMovieReception };
 });
