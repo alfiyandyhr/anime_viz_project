@@ -21,13 +21,17 @@ const formatSpan = span => `${span} ${span === 1 ? 'year' : 'years'}`;
         document.querySelector('#history-match-span').dataset.direction === direction, direction);
       for (const year of ['2000', '2010', '2024']) {
         await page.selectOption('#history-span-year', year);
-        const years = (await page.locator('.history-span-genres tbody td:nth-child(2)').allTextContents())
-          .map(Number).sort((a, b) => b - a);
+        const matches = await page.locator('.history-span-genres tbody tr').evaluateAll(rows => rows.map(row => ({
+          year: Number(row.children[1].textContent), title: row.children[0].textContent
+        })).sort((a, b) => b.year - a.year));
+        const years = matches.map(match => match.year);
         assert.equal(years.length, 5, 'all five original matches remain visible');
         const central = years.slice(1, -1), span = central[0] - central[2];
         assert.equal(await page.locator('#history-span-value').innerText(), formatSpan(span));
-        assert.deepEqual(await page.locator('.history-span-steps > span:not(.history-span-gap)').allTextContents(),
+        assert.deepEqual(await page.locator('.history-span-match-year > strong').allTextContents(),
           central.map(String));
+        assert.deepEqual(await page.locator('.history-span-match-year > span').allTextContents(),
+          matches.slice(1, -1).map(match => match.title), 'each central year identifies its corresponding match, including tied years');
         assert.match(await page.locator('.history-span-equation').innerText(),
           new RegExp(`Q3 − Q1: ${central[0]} − ${central[2]} = ${formatSpan(span)}$`));
         assert.match(await page.locator('#history-span-caption').innerText(), /Interquartile range \(IQR\)/);
@@ -69,6 +73,69 @@ const formatSpan = span => `${span} ${span === 1 ? 'year' : 'years'}`;
     }
     assert.equal(await page.locator('#history-match-span').evaluate(root =>
       getComputedStyle(root, '::details-content').transitionDuration), '0s', 'reduced motion disables expansion transitions');
+    assert.equal(await page.locator('.history-span-bars-previous').count(), 0, 'reduced motion skips the chart roll');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    for (const year of [2001, 2000]) {
+      const roll = await page.evaluate(year => {
+        const picker = document.querySelector('#history-span-year');
+        picker.value = year;
+        picker.dispatchEvent(new Event('change', { bubbles: true }));
+        const outgoing = document.querySelector('.history-span-bars-previous');
+        const incoming = document.querySelector('.history-span-bars');
+        const lists = [outgoing, incoming];
+        for (const list of lists) for (const animation of list.getAnimations({ subtree: true })) {
+          animation.pause();
+          animation.currentTime = 90;
+        }
+        return {
+          labels: lists.map(list => [...list.querySelectorAll('.history-span-bar-title > span')].map(label => label.textContent)),
+          transforms: lists.map(list => {
+            const transform = new DOMMatrix(getComputedStyle(list).transform);
+            return { y: transform.m42, rotation: transform.m23 };
+          }),
+          curvedRows: lists.flatMap(list => [...list.children]).filter(row =>
+            Math.abs(new DOMMatrix(getComputedStyle(row).transform).m23) > 0).length,
+          hidden: outgoing.getAttribute('aria-hidden'),
+          inert: outgoing.inert,
+          controlAnimations: document.querySelector('.history-span-year-control').getAnimations({ subtree: true }).length,
+          resultAnimations: document.querySelector('.history-span-results').getAnimations().length,
+          current: picker.value,
+          frameYear: document.querySelector('#year-picker').value
+        };
+      }, year);
+      assert.deepEqual(roll.labels, year === 2001
+        ? [['1999', '2000', '2001'], ['2000', '2001', '2002']]
+        : [['2000', '2001', '2002'], ['1999', '2000', '2001']]);
+      assert.equal(roll.current, String(year));
+      assert.equal(roll.frameYear, String(year));
+      assert.equal(roll.hidden, 'true', 'outgoing chart stays out of the accessibility tree');
+      assert.ok(roll.inert);
+      assert.equal(roll.controlAnimations, 0, 'year controls keep their original behavior');
+      assert.equal(roll.resultAnimations, 0, 'motion is confined to the comparison chart');
+      const step = year === 2001 ? 1 : -1;
+      assert.ok(roll.transforms[0].y * step < 0 && roll.transforms[1].y * step > 0,
+        'chart rows roll vertically, reversing for previous-year navigation');
+      assert.ok(roll.curvedRows > 0, 'entering and leaving rows curve around the wheel');
+      if (process.env.ANIVIZ_CAPTURE_DIR) await page.locator('.history-span-comparison').screenshot({
+        path: `${process.env.ANIVIZ_CAPTURE_DIR}/history-chart-roll-${year}.png`, animations: 'allow'
+      });
+      await page.locator('.history-span-bars, .history-span-bars-previous').evaluateAll(lists => {
+        for (const list of lists) for (const animation of list.getAnimations({ subtree: true })) animation.finish();
+      });
+      await page.waitForFunction(() => !document.querySelector('.history-span-bars-previous'));
+    }
+    await page.evaluate(() => {
+      const picker = document.querySelector('#history-span-year');
+      for (const year of [2001, 2002, 2001]) {
+        picker.value = year;
+        picker.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+    assert.equal(await page.locator('.history-span-bars-previous').count(), 1, 'rapid changes replace the previous animation');
+    assert.deepEqual(await page.locator('.history-span-bars .history-span-bar-title > span').allTextContents(), ['2000', '2001', '2002']);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.waitForFunction(() => !document.querySelector('.history-span-bars-previous'));
+    assert.equal(await page.locator('#history-span-year').inputValue(), '2001', 'cancelling motion retains the latest selected year');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     for (const opening of [false, true]) {
       const transition = await page.locator('#history-match-span').evaluate(async root => {
@@ -92,8 +159,11 @@ const formatSpan = span => `${span} ${span === 1 ? 'year' : 'years'}`;
     await page.setViewportSize({ width: 390, height: 844 });
     await page.locator('#history-span-calculation').scrollIntoViewIfNeeded();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    if (process.env.ANIVIZ_CAPTURE_DIR) await page.locator('#history-span-calculation').screenshot({
+      path: `${process.env.ANIVIZ_CAPTURE_DIR}/history-match-titles-mobile.png`
+    });
     assert.deepEqual(errors, []);
-    console.log('Passed History IQR evidence, year arrows and boundaries in both directions, expand/collapse animations, reduced motion and mobile layout.');
+    console.log('Passed History IQR evidence, navigation, wheel animation in both directions, rapid changes, expand/collapse, reduced motion and mobile layout.');
   } finally {
     await browser.close();
   }
