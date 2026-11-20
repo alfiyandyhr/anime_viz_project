@@ -4,6 +4,8 @@
   let context, composition, latest, rankingPage = 0, rankingSignature = "";
   let scrollRestored = false, pendingNotice = "", metadataLoading = false;
   let movieDetailsRequest, focusedMagnetKey = null, inspectedMovieKey = null;
+  let brushedKeys = new Set(), brushedTitleIds = new Set();
+  const chartRenderers = [];
   const $ = selector => document.querySelector(selector);
   const dustTypeByDirection = {
     [AnivizDust.FORWARD]: 'anime-titles',
@@ -23,8 +25,10 @@
   const dustNoun = () => dustGroup()?.noun || (isReverse() ? "movies" : "anime");
   const detailHelpers = () => ({ escapeHTML, escapeAttribute, humanize, formatNumber });
   const color = key => magnetColors.get(key);
+  const brushColor = highlighted => highlighted ? DUST_BRUSH_COLOR : DUST_UNIFORM_COLOR;
   const dustColor = match => latest.colorByMagnet
-    ? color(latest.activeMagnetKeys[match.closest]) : DUST_UNIFORM_COLOR;
+    ? color(latest.activeMagnetKeys[match.closest]) : brushColor(brushedKeys.has(match.key));
+  const linkedTitleColor = ids => brushColor(ids.some(id => brushedTitleIds.has(String(id))));
   const notice = message => {
     pendingNotice = message;
     $('[data-dust-notice]').textContent = message;
@@ -152,6 +156,20 @@
     cue.innerHTML = result.html ? `<a href="#recommendation-detail">${result.count > 1
       ? `Comparing ${result.count} ${dustNoun()}` : `Selected ${dustGroup()?.label.toLowerCase() || 'title'}`} · below ↓</a>` : '';
   }
+  function updateBrushedTitles() {
+    const grouped = dustGroup();
+    brushedTitleIds = new Set(latest.displayedDust.filter(match => brushedKeys.has(match.key))
+      .flatMap(({ record }) => grouped ? record.memberIds.map(String) : [String(record.id)]));
+  }
+  function setBrushedKeys(keys) {
+    if (keys.length === brushedKeys.size && keys.every(key => brushedKeys.has(key))) return;
+    brushedKeys = new Set(keys);
+    updateBrushedTitles();
+    if (latest.colorByMagnet) return;
+    dustChart?.views?.forEach(view => view.drawColors());
+    chartRenderers.forEach(renderer => renderer.recolor?.());
+    recolorRanking();
+  }
   function publish(snapshot) {
     const switched = latest.direction !== snapshot.direction;
     const recolor = latest.colorByMagnet !== snapshot.colorByMagnet;
@@ -164,7 +182,11 @@
       return;
     }
     if (switched || !snapshot.activeMagnetKeys.includes(focusedMagnetKey)) focusedMagnetKey = null;
-    if (switched) loadLayout();
+    if (switched) {
+      brushedKeys.clear();
+      loadLayout();
+    }
+    updateBrushedTitles();
     const reverse = isReverse(), studios = isStudio(), group = dustGroup();
     const people = group && !studios;
     const used = new Set();
@@ -177,6 +199,7 @@
     if (magnetsChanged) renderMotionControls();
     if (switched) updateDustTypeControls();
     $('#dust-color-by-magnet').checked = snapshot.colorByMagnet;
+    $('#dust-color-by-brush').checked = !snapshot.colorByMagnet;
     if (recolor) refreshDustColors();
     const keysInScope = snapshot.selectedKeys.length ? snapshot.selectedKeys : snapshot.displayedKeys;
     const studioGroups = studios ? keysInScope.map(key => snapshot.lookup.get(key)?.record).filter(Boolean) : null;
@@ -187,7 +210,7 @@
       : snapshot.supportingIds).map(titleFor)
       : snapshot.displayedKeys.map(key => snapshot.lookup.get(key).record);
     const receptionTitles = people && snapshot.selectedKeys.length ? snapshot.supportingIds.map(titleFor) : records;
-    const dustColors = new Map(snapshot.displayedDust.map(match => [match.key, dustColor(match)]));
+    const dustMatches = new Map(snapshot.displayedDust.map(match => [match.key, match]));
     const metric = $('[data-dust-genre-metric]').value;
     const creditMode = $('[data-dust-credit-mode]').value;
     const heatmapMode = $('[data-dust-heatmap-mode]').value;
@@ -207,8 +230,12 @@
         if (!group) select(key);
         inspectTitle(key);
       },
-      dustColor: id => dustColors.get(AnivizDust.keyFor(provider, id)),
-      dustMatchColor: key => dustColors.get(key), snapshot });
+      brushColor: snapshot.colorByMagnet ? null : linkedTitleColor,
+      dustColor: id => {
+        const match = dustMatches.get(AnivizDust.keyFor(provider, id));
+        return match ? dustColor(match) : undefined;
+      },
+      dustMatchColor: key => dustColor(dustMatches.get(key)), snapshot });
     const count = records.length, candidates = snapshot.candidateKeys.length;
     const filmographyScope = $('#dust-studio-scope');
     filmographyScope.hidden = !group;
@@ -224,7 +251,8 @@
     $('#dust-limit').value = snapshot.dustLimit;
     const unit = group?.noun || 'titles';
     const scoreLabel = snapshot.mixed ? 'attraction percentiles' : group ? 'mean story similarity' : 'similarity scores';
-    $('#recommendation-score-note').textContent = `Zoom in for ${studios ? 'studio names' : people ? 'portraits' : 'posters'}. Hover or focus for ${scoreLabel}. Thicker links show a stronger pull. Select up to 3 ${unit}.`;
+    const brushNote = snapshot.colorByMagnet ? '' : 'Drag or resize the brush to highlight matching data below. ';
+    $('#recommendation-score-note').textContent = `${brushNote}Zoom in for ${studios ? 'studio names' : people ? 'portraits' : 'posters'}. Hover or focus for ${scoreLabel}. Thicker links show a stronger pull. Select up to 3 ${unit}.`;
     const colorNote = snapshot.colorByMagnet ? ` Color identifies each ${group?.label.toLowerCase() || 'title'}’s highest-scoring magnet.` : '';
     $('#dust-connection-method').textContent = `Select a magnet to rank the displayed ${unit} by ${snapshot.mixed ? 'attraction percentile' : group ? 'mean signed cosine similarity' : 'cosine similarity'}. Thicker curves show higher scores within that magnet’s range.${colorNote} Dust members lists the ${unit} that score highest for the selected magnet. Scroll either list to see more ${unit}.`;
     const notes = {
@@ -268,6 +296,14 @@
     renderDetails();
     highlightRecommendation();
   }
+  function recolorRanking() {
+    const body = $('[data-dust-ranking-body]');
+    body.classList.toggle('is-brushing', !latest.colorByMagnet);
+    if (latest.colorByMagnet) return;
+    for (const button of body.querySelectorAll('[data-dust-rank-id]')) {
+      button.closest('tr').style.setProperty('--dust-color', brushColor(brushedKeys.has(button.dataset.dustRankId)));
+    }
+  }
   function renderRanking() {
     const { ranking, magnets, rankingOrder, mixed, selectedKeys } = latest, size = 10;
     const body = $('[data-dust-ranking-body]');
@@ -306,6 +342,7 @@
       const comparison = match.displayed ? `<button type="button" class="small-button ghost" data-dust-rank-select="${key}" aria-label="Compare ${escapeAttribute(record.title)}" aria-pressed="${selected}"><span aria-hidden="true">✓</span> Compare</button>` : '—';
       return `<tr${selected ? ' class="is-selected"' : ''}><td>${match.rank ?? 'Unavailable'}</td><td><button type="button" class="recommendation-title-button anime-cell" data-dust-rank-id="${key}" aria-haspopup="dialog" aria-controls="detail-drawer">${thumbnail}${escapeHTML(record.title)}</button></td>${scores.join('')}<td title="${mixed ? average : 'Average cosine'} ${match.score ?? 'unavailable'}">${AnivizDust.formatPercentile(match.score)}</td><td>${evidence}</td><td>${comparison}</td></tr>`;
     }).join('');
+    recolorRanking();
     if (focusedKey) body.querySelector(`[data-dust-rank-select="${CSS.escape(focusedKey)}"]`)?.focus({ preventScroll: true });
     const pages = [];
     for (let page = 0; page < total; page++) if (page === 0 || page === total - 1 || Math.abs(page - rankingPage) <= 1) pages.push(page);
@@ -389,16 +426,18 @@
     composition = AnivizComposition.create({ onError: error => console.error(error) });
     document.querySelectorAll('[data-dust-chart]').forEach(container => {
       const kind = container.dataset.dustChart;
-      composition.mount(container, kind === 'connections' ? AnivizDustConnections.create({ container, d3, color,
+      const renderer = kind === 'connections' ? AnivizDustConnections.create({ container, d3, color,
           onSelect: key => select(key, { showDrawer: true }),
           onCoverage: text => { $('[data-coverage="connections"]').textContent = text; }, renderEmpty })
-        : AnivizCharts.create(kind, { container, d3, helpers: chartHelpers() }), {
-          preserveHeight: kind === 'connections',
-          enabled: value => !value.movieRankLimit || !container.matches('[data-anime-chart]')
-        });
+        : AnivizCharts.create(kind, { container, d3, helpers: chartHelpers() });
+      chartRenderers.push(renderer);
+      composition.mount(container, renderer, {
+        preserveHeight: kind === 'connections',
+        enabled: value => !value.movieRankLimit || !container.matches('[data-anime-chart]')
+      });
     });
     context.subscribe(publish);
-    $('#dust-color-by-magnet').addEventListener('change', event => context.setColorByMagnet(event.target.checked));
+    $('#dust-color-mode').addEventListener('change', event => context.setColorByMagnet(event.target.value === 'magnet'));
     $('[data-dust-genre-metric]').addEventListener('change', () => publish(context.snapshot()));
     for (const selector of ['[data-dust-credit-mode]', '[data-dust-heatmap-mode]']) {
       $(selector).addEventListener('change', event => {
@@ -565,7 +604,7 @@
     },
     setMagnets(keys) { context.setMagnets(keys); renderRecommendations(); },
     setDustLimit(value) { context.setDustLimit(value); renderRecommendations(); },
-    select, focusMagnet, color, dustColor, saveLayout, loadMetricData, loadAnimeCredits, loadMovieDetails,
+    select, focusMagnet, color, dustColor, setBrushedKeys, saveLayout, loadMetricData, loadAnimeCredits, loadMovieDetails,
     deselectLast() {
       if (latest.selectedKeys.length) {
         focusedMagnetKey = null;

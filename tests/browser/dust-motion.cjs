@@ -50,7 +50,7 @@ async function setup(page, errors) {
     const inception = page.getByRole('slider', { name: 'Inception strength' });
     const interstellar = page.getByRole('slider', { name: 'Interstellar strength' });
     const reset = page.getByRole('button', { name: 'Reset strengths' });
-    const color = page.getByLabel('Color dust by strongest magnet');
+    const color = page.getByRole('radio', { name: 'Strongest magnet' });
     const positions = page.getByRole('button', { name: 'Reset positions' });
     assert.deepEqual(await settings(page), defaults);
     assert.equal(await page.getByRole('group', { name: 'Magnet strength', exact: true }).getByRole('slider').count(), 3);
@@ -63,7 +63,7 @@ async function setup(page, errors) {
     await color.check();
     assert.ok(new Set(await colors(page)).size > 1);
     assert.deepEqual(await transforms(page), uncolored);
-    await color.uncheck();
+    await page.getByRole('radio', { name: 'Brushing and linking' }).check();
     assert.equal(new Set(await colors(page)).size, 1);
     assert.deepEqual(await transforms(page), uncolored);
 
@@ -170,7 +170,7 @@ async function setup(page, errors) {
     }
     assert.equal(await phone.evaluate(() => document.documentElement.scrollWidth === innerWidth), true);
     const narrowPositions = await transforms(phone);
-    await phone.getByLabel('Color dust by strongest magnet').check();
+    await phone.getByRole('radio', { name: 'Strongest magnet' }).check();
     assert.deepEqual(await transforms(phone), narrowPositions);
 
     const animated = await browser.newPage({ viewport: { width: 1440, height: 900 } });

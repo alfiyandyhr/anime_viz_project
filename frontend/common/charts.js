@@ -9,6 +9,13 @@
       formatNumber, truncate, compactFormatter } = helpers;
     let context, dataIdentity, selectionKey, popularityCamera;
     const cached = new Map();
+    const brushUpdates = [];
+    function trackBrush(update) {
+      if (!context.brushColor) return;
+      brushUpdates.push(update);
+      update();
+    }
+    const aggregateColor = item => context.brushColor(item.ids);
     function metricData(key, compute) {
       if (!cached.has(key)) cached.set(key, compute());
       return cached.get(key);
@@ -108,7 +115,7 @@
         .call(d3.axisLeft(y).tickSize(0))
         .call((group) => group.select(".domain").remove());
 
-      svg.append("g")
+      const bars = svg.append("g")
         .selectAll("rect")
         .data(data)
         .join("rect")
@@ -133,6 +140,7 @@
         })
         .on("mousemove", moveTooltip)
         .on("mouseleave", hideTooltip);
+      trackBrush(() => bars.attr("fill", aggregateColor));
 
       svg.append("g")
         .selectAll("text.value")
@@ -197,7 +205,7 @@
             .tickFormat("")
         );
 
-      svg.append("g")
+      const bars = svg.append("g")
         .selectAll("rect")
         .data(data)
         .join("rect")
@@ -223,6 +231,7 @@
         })
         .on("mousemove", moveTooltip)
         .on("mouseleave", hideTooltip);
+      trackBrush(() => bars.attr("fill", aggregateColor).attr("fill-opacity", 0.8));
 
       const tickStep = Math.max(1, Math.ceil(data.length / 12));
       const visibleYears = data
@@ -268,7 +277,7 @@
       svg.append("path")
         .datum(lineData)
         .attr("fill", "none")
-        .attr("stroke", "var(--color-secondary-strong)")
+        .attr("stroke", context.brushColor?.([]) || "var(--color-secondary-strong)")
         .attr("stroke-width", 2.5)
         .attr(
           "d",
@@ -277,7 +286,7 @@
             .y((item) => yScore(item.averageScore))
         );
 
-      svg.append("g")
+      const scoreDots = svg.append("g")
         .selectAll("circle")
         .data(lineData)
         .join("circle")
@@ -287,6 +296,7 @@
         .attr("fill", "var(--color-secondary-strong)")
         .attr("stroke", "var(--surface-solid)")
         .attr("stroke-width", 1.5);
+      trackBrush(() => scoreDots.attr("fill", aggregateColor));
 
       svg.append("g")
         .attr("class", "axis")
@@ -380,6 +390,11 @@
       bindMarks(dots);
       const portraits = isStudio ? [] : data.filter(item => item.image);
       const portraitLayer = marks.append("g");
+      const color = item => context.brushColor?.(item.ids) || "var(--text)";
+      trackBrush(() => {
+        dots.attr("fill", aggregateColor);
+        portraitLayer.selectAll(".dust-poster-title").style("color", color);
+      });
       attachPopularityZoom(chart, data, { popularity, score, label, mode,
         maxZoom: 128,
         zoomContent: isStudio ? "individual studios" : "portraits",
@@ -395,7 +410,7 @@
               const cards = enter.append("foreignObject").attr("class", "credit-portrait")
                 .classed("is-selected", item => Boolean(item.selectedCount));
               const { images } = root.AnivizPosterZoom.addCards(cards, {
-                title: item => item.title, color: "var(--text)"
+                title: item => item.title, color
               });
               root.AnivizPosterZoom.drawArtwork(images, item => item.image);
               bindMarks(cards);
@@ -628,7 +643,9 @@
       const { filmography } = context;
       const selectedIds = new Set(context.selectedIds);
       const isSelected = item => selectedIds.has(String(item.id));
-      const color = filmography ? () => "var(--purple)" : item => context.dustColor(String(item.id));
+      const color = item => context.brushColor?.([item.id])
+        || (filmography ? "var(--purple)" : context.dustColor(String(item.id)));
+      const stroke = item => filled(item) ? (filmography ? "var(--text)" : "var(--surface-solid)") : color(item);
 
       const marks = svg.append("g");
       const dots = marks.append("g")
@@ -638,17 +655,10 @@
         .attr("class", "reception-dot")
         .classed("filmography-dot", Boolean(filmography))
         .attr("r", pointRadius)
-        .attr("fill", item => filled(item) ? color(item) : "transparent");
-
-      if (filmography) {
-        dots.attr("fill-opacity", 0.8)
-          .attr("stroke", item => filled(item) ? "var(--text)" : color(item))
-          .attr("stroke-width", 1);
-      } else {
-        dots.attr("fill-opacity", 0.65)
-          .attr("stroke", item => filled(item) ? "var(--surface-solid)" : color(item))
-          .attr("stroke-width", 1.5);
-      }
+        .attr("fill", item => filled(item) ? color(item) : "transparent")
+        .attr("fill-opacity", filmography ? 0.8 : 0.65)
+        .attr("stroke", stroke)
+        .attr("stroke-width", filmography ? 1 : 1.5);
 
       function bindMarks(selection) {
         // Closing the details overlay can fire mouseenter under a stationary pointer.
@@ -685,6 +695,11 @@
         .attr("r", item => pointRadius(item) + 3);
 
       const posterLayer = marks.append("g");
+      trackBrush(() => {
+        dots.attr("fill", item => filled(item) ? color(item) : "transparent")
+          .attr("stroke", stroke);
+        posterLayer.selectAll(".dust-poster-title").style("color", color);
+      });
       const thumbnail = rankLimit ? root.AnivizArtwork.movieThumbnail : root.AnivizArtwork.animeThumbnail;
       attachPopularityZoom(chart, data, { popularity, score, mode: rankLimit, label: "Score vs. popularity",
         drawMarks({ zoomed, pointX, pointY, visible, showPosters }) {
@@ -825,6 +840,7 @@
         dataIdentity = anime; selectionKey = nextSelection;
         context = { onSelect() {}, dustColor: () => "var(--color-primary-strong)", hasSelection: Boolean(value.selectedIds),
           ...value, anime, filmography, selectedIds };
+        brushUpdates.length = 0;
         renderers[kind]();
         if (kind !== "reception" && kind !== "studios") {
           keyboardMarks(d3.select(container).selectAll("rect, circle").filter(function () {
@@ -833,6 +849,9 @@
         }
         if (focused) [...container.querySelectorAll('[aria-label]')].find(node =>
           node.tabIndex === 0 && !node.disabled && node.getAttribute('aria-label') === focused)?.focus({ preventScroll: true });
+      },
+      recolor() {
+        if (container.hasChildNodes()) brushUpdates.forEach(update => update());
       },
       destroy() { container.replaceChildren(); context = popularityCamera = null; }
     };

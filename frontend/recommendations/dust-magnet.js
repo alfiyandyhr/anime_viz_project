@@ -3,8 +3,10 @@
 const DUST_MAGNET_VIOLET = "var(--dust-magnet-violet)";
 const MAGNET_COLORS = ["var(--color-secondary-strong)", DUST_MAGNET_VIOLET, "var(--color-accent-strong)"];
 const DUST_UNIFORM_COLOR = "var(--dust-uniform)";
+const DUST_BRUSH_COLOR = "var(--pink)";
 const DUST_ENGINE = typeof module !== "undefined" && module.exports ? require("../common/dust-context.js") : AnivizDust;
 let dustChart = null;
+let dustBrushBounds = [.10, .11, .31, .28];
 
 // Keep the original forward helper available to existing callers.
 function getDustMatches(data, scores, movieIds, limit = 60) {
@@ -337,7 +339,7 @@ function constrainMagnetPosition(anchor, x, y, anchors, width, height) {
 
 function bindDustControls() {
   const deselectOnBackground = event => {
-    if (event.defaultPrevented || event.target.closest(".dust-node, .dust-magnet, button")) return;
+    if (event.defaultPrevented || event.target.closest(".dust-node, .dust-magnet, .dust-brush, button")) return;
     hideTooltip();
     AnivizMain.deselectLast();
   };
@@ -365,12 +367,14 @@ function renderDustLegend({ magnets, colorByMagnet, mixed }) {
   if (!magnets.length) { legend.replaceChildren(); return; }
   const colors = colorByMagnet ? magnets.map((magnet, index) => `
     <span title="${mixed ? "Highest attraction percentile for" : "Titles most similar to"} ${escapeAttribute(magnet.title)}"><i class="dust-legend-dot" style="--magnet-color:${AnivizMain.color(magnet.key)}" aria-hidden="true"></i>M${index + 1}</span>`).join("")
-    : `<span><i class="dust-legend-dot" style="--magnet-color:${DUST_UNIFORM_COLOR}" aria-hidden="true"></i>Dust</span>`;
+    : `<span><i class="dust-legend-dot" style="--magnet-color:${DUST_UNIFORM_COLOR}" aria-hidden="true"></i>Dust</span>
+      <span><i class="dust-legend-dot" style="--magnet-color:${DUST_BRUSH_COLOR}" aria-hidden="true"></i>Brushed</span>`;
   legend.innerHTML = colors + '<span><i class="dust-legend-dot is-selected" aria-hidden="true"></i>Selected</span>';
 }
 
 function refreshDustColors() {
   renderDustLegend(AnivizMain.snapshot());
+  dustChart?.views?.[0].updateBrush();
   dustChart?.views?.forEach(view => view.drawColors());
 }
 
@@ -401,6 +405,7 @@ function renderDustRecommendations() {
   document.querySelector("#reset-magnets").disabled = !magnets.length;
   const { creditStatus } = snapshot;
   if (group && creditStatus !== "ready") {
+    AnivizMain.setBrushedKeys([]);
     const unavailable = creditStatus === "unavailable";
     const writers = direction === AnivizDust.MOVIE_WRITERS;
     const creators = direction === AnivizDust.ORIGINAL_CREATORS;
@@ -418,6 +423,7 @@ function renderDustRecommendations() {
   }
   if (!magnets.length) {
     dustChart = null;
+    AnivizMain.setBrushedKeys([]);
     const message = magnetKeys.length ? "Check the data status of your saved magnets or add another magnet."
       : `Add a magnet to explore the ${noun} sample.`;
     container.innerHTML = `<div class="dust-empty"><p>${message}</p></div>`;
@@ -425,6 +431,7 @@ function renderDustRecommendations() {
     return;
   }
   if (!recommendationState.scores && magnets.some(magnet => !AnivizDust.isMetricMagnet(magnet))) {
+    AnivizMain.setBrushedKeys([]);
     const error = recommendationState.scoresError;
     const message = error ? `Could not load full similarities: ${error}` : `Gathering ${noun}…`;
     container.innerHTML = `<div class="dust-empty" role="status"><p>${escapeHTML(message)}</p>${error ? `<button type="button" class="small-button ghost" id="dust-retry">Retry full scores</button>` : ""}</div>`;
@@ -443,7 +450,88 @@ function renderDustRecommendations() {
   highlightRecommendation();
 }
 
-function createDustView(container, matches, anchors, width, height, onMove, { label, mixed, direction, zoomContent }) {
+function createDustBrush(scene, width, height, onChange) {
+  const margin = 11, minimum = 44;
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+  let scale = 1;
+  let [left, top, right, bottom] = dustBrushBounds.map((value, index) => value * (index % 2 ? height : width));
+  left = clamp(left, margin, width - margin - minimum);
+  top = clamp(top, margin, height - margin - minimum);
+  right = clamp(right, left + minimum, width - margin);
+  bottom = clamp(bottom, top + minimum, height - margin);
+
+  const surface = scene.insert("rect", ":first-child").attr("class", "dust-brush dust-brush-surface");
+  const layer = scene.append("g").attr("class", "dust-brush").attr("tabindex", 0).attr("role", "group")
+    .attr("aria-label", "Brush selection")
+    .attr("aria-description", "Drag the box or use arrow keys to move it. Drag an edge or corner, or hold Shift with the arrow keys, to resize.");
+  const frame = layer.append("rect").attr("class", "dust-brush-frame");
+  const handles = layer.selectAll(".dust-brush-handle").data([
+    [-1, -1, "nwse"], [0, -1, "ns"], [1, -1, "nesw"],
+    [-1, 0, "ew"], [1, 0, "ew"],
+    [-1, 1, "nesw"], [0, 1, "ns"], [1, 1, "nwse"]
+  ]).join("rect").attr("class", "dust-brush-handle")
+    .attr("aria-hidden", "true").style("cursor", ([, , direction]) => `${direction}-resize`);
+
+  function drawHandles() {
+    // Keep the drag targets easy to reach without covering more dust as the scene zooms.
+    const reach = 10 / scale;
+    const start = (side, low, high) => side === 0 ? low + reach : (side < 0 ? low : high) - reach;
+    handles.attr("x", ([x]) => start(x, left, right))
+      .attr("y", ([, y]) => start(y, top, bottom))
+      .attr("width", ([x]) => x === 0 ? right - left - 2 * reach : 2 * reach)
+      .attr("height", ([, y]) => y === 0 ? bottom - top - 2 * reach : 2 * reach);
+  }
+  function draw() {
+    for (const rect of [surface, frame]) {
+      rect.attr("x", left).attr("y", top).attr("width", right - left).attr("height", bottom - top);
+    }
+    drawHandles();
+  }
+  function change(dx, dy, edge) {
+    if (edge) {
+      const [x, y] = edge;
+      if (x < 0) left = clamp(left + dx, margin, right - minimum);
+      if (x > 0) right = clamp(right + dx, left + minimum, width - margin);
+      if (y < 0) top = clamp(top + dy, margin, bottom - minimum);
+      if (y > 0) bottom = clamp(bottom + dy, top + minimum, height - margin);
+    } else {
+      dx = clamp(dx, margin - left, width - margin - right);
+      dy = clamp(dy, margin - top, height - margin - bottom);
+      left += dx; right += dx; top += dy; bottom += dy;
+    }
+    dustBrushBounds = [left / width, top / height, right / width, bottom / height];
+    draw();
+    onChange();
+  }
+  const drag = d3.drag().container(scene.node()).clickDistance(4)
+    .on("start", () => { hideTooltip(); layer.node().focus({ preventScroll: true }); })
+    .on("drag", (event, edge) => change(event.dx, event.dy, edge));
+  surface.call(drag);
+  handles.call(drag);
+  layer.on("keydown", event => {
+    const delta = { ArrowLeft: [-8, 0], ArrowRight: [8, 0], ArrowUp: [0, -8], ArrowDown: [0, 8] }[event.key];
+    if (!delta) return;
+    event.preventDefault();
+    change(...delta, event.shiftKey ? [1, 1] : null);
+  });
+  draw();
+  let shown;
+  return {
+    show(visible) {
+      if (visible === shown) return;
+      shown = visible;
+      for (const part of [surface, layer]) part.style("display", visible ? null : "none");
+    },
+    setScale(nextScale) {
+      if (scale === nextScale) return;
+      scale = nextScale;
+      drawHandles();
+    },
+    contains(x, y) { return x >= left && x <= right && y >= top && y <= bottom; }
+  };
+}
+
+function createDustView(container, matches, anchors, width, height, onMove, { label, mixed, direction, zoomContent, primary }) {
   const group = AnivizDust.groupFor(direction);
   const svg = d3.select(container).append("svg").attr("viewBox", `0 0 ${width} ${height}`)
     .attr("width", width).attr("height", height).attr("class", "dust-map")
@@ -574,10 +662,22 @@ function createDustView(container, matches, anchors, width, height, onMove, { la
     return `${magnet.title} (${description})`;
   });
 
+  const brush = primary ? createDustBrush(scene, width, height, updateBrush) : null;
+  function updateBrush() {
+    if (!brush || !svg.node().isConnected) return;
+    const visible = !AnivizMain.snapshot().colorByMagnet;
+    brush.show(visible);
+    if (!visible || !positions) return;
+    AnivizMain.setBrushedKeys(matches.filter(match => {
+      const { x, y } = positions.get(match.key);
+      return brush.contains(x, y);
+    }).map(match => match.key));
+  }
+
   const camera = AnivizPosterZoom.attach({
     container, svg, d3, label, extent: [[0, 0], [width, height]],
     zoomContent,
-    canDragFrom: target => !target.closest(".dust-magnet"),
+    canDragFrom: target => !target.closest(".dust-magnet, .dust-brush"),
     onStart() {
       hovered = focused = null;
       drawPreview();
@@ -590,11 +690,13 @@ function createDustView(container, matches, anchors, width, height, onMove, { la
         if (!posterImages) addPosters();
         scene.style("--dust-poster-scale", 1 / transform.k);
       }
+      brush?.setScale(transform.k);
     }
   });
 
   return {
     drawArtwork,
+    updateBrush,
     drawColors() {
       grains.attr("fill", AnivizMain.dustColor);
       posterTitles?.style("color", AnivizMain.dustColor);
@@ -642,7 +744,7 @@ function renderDustChart(container, mirror, magnets, matches, mixed) {
   const noun = group?.noun || AnivizDust.titleNoun(direction);
   const zoomContent = direction === AnivizDust.STUDIOS ? "studio names" : group ? "portraits" : "posters";
   const views = [createDustView(container, matches, anchors, width, height, moveAnchor, {
-    label: `Displayed ${noun}`, mixed, direction, zoomContent
+    label: `Displayed ${noun}`, mixed, direction, zoomContent, primary: true
   }), createDustView(mirror, matches, anchors, width, height, moveAnchor, {
     label: `Mirror of ${noun}`, mixed, direction, zoomContent
   })];
@@ -677,6 +779,7 @@ function renderDustChart(container, mirror, magnets, matches, mixed) {
   }
   function draw() {
     views.forEach(view => view.draw(positions));
+    views[0].updateBrush();
     highlightDustConnections();
   }
   function animate(time) {

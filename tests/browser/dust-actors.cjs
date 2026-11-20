@@ -59,15 +59,23 @@ async function verifyCredits(browser, dustType, creditLabel) {
       assert.equal(await page.locator('#detail-drawer').getAttribute('aria-label'), 'Anime details');
       await page.keyboard.press('Escape');
     }
-    await chart('connections').locator(`[data-dust-connection-id$=":${second}"]`).press('Enter');
+    const connections = chart('connections');
+    await connections.scrollIntoViewIfNeeded();
+    await connections.locator(`[data-dust-connection-id$=":${second}"]`).press('Enter');
     assert.deepEqual(await page.evaluate(() => AnivizMain.snapshot().selectedKeys), [first, second]);
 
     await reception.scrollIntoViewIfNeeded();
     await dots.first().waitFor();
     assert.deepEqual(await ids(dots), selected);
-    assert.ok(await dots.evaluateAll(nodes => nodes.every(node => node.__data__.favourites > 0
-      ? getComputedStyle(node).fill === d3.color(getComputedStyle(node).getPropertyValue('--purple').trim()).formatRgb()
-      : node.getAttribute('fill') === 'transparent')));
+    assert.ok(await dots.evaluateAll(nodes => {
+      const brushedIds = new Set([...document.querySelectorAll('#recommendation-chart .dust-grain[fill="var(--pink)"]')]
+        .flatMap(grain => grain.__data__.record.memberIds));
+      return nodes.every(node => {
+        const expected = brushedIds.has(node.__data__.id) ? 'var(--pink)' : 'var(--dust-uniform)';
+        return node.__data__.favourites > 0 ? node.getAttribute('fill') === expected
+          : node.getAttribute('fill') === 'transparent' && node.getAttribute('stroke') === expected;
+      });
+    }));
     assert.deepEqual(await ids(reception.locator('.reception-dot[stroke-width="1"]')), selected);
     assert.equal(await reception.locator('.reception-selection-ring').count(), 0);
     await dots.first().press('Enter');

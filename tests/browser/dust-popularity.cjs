@@ -63,7 +63,7 @@ const state = page => page.evaluate(() => {
     });
     await page.goto(base);
     await ready(page);
-    const colorByMagnet = page.getByRole('checkbox', { name: 'Color dust by strongest magnet' });
+    const colorByMagnet = page.getByRole('radio', { name: 'Strongest magnet' });
     assert.ok(await colorByMagnet.isVisible());
     await page.getByRole('radio', { name: 'Movie genre' }).check();
     await page.selectOption('#genre-magnet-choice', 'tmdb:genre:Science Fiction');
@@ -245,7 +245,7 @@ const state = page => page.evaluate(() => {
     await choosePopularity(phone);
     await add(phone).tap();
     await mixed(phone);
-    assert.ok(await phone.getByRole('checkbox', { name: 'Color dust by strongest magnet' }).isVisible());
+    assert.ok(await phone.getByRole('radio', { name: 'Strongest magnet' }).isVisible());
     await dot(phone).first().press('Enter');
     assert.match(await phone.locator('#dust-focus').innerText(), /AniList users/);
     await phone.locator('[data-dust-chart="connections"]').scrollIntoViewIfNeeded();

@@ -38,9 +38,9 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
     await reception.scrollIntoViewIfNeeded();
     await marks.first().waitFor();
     assert.ok(await marks.evaluateAll(nodes => nodes.every(node => node.getAttribute('stroke-width') === '1')));
-    const filled = reception.locator('.reception-dot[fill="var(--purple)"]').first();
+    const filled = reception.locator('.reception-dot[fill="var(--dust-uniform)"]').first();
     assert.ok(await filled.evaluate(node =>
-      getComputedStyle(node).fill === d3.color(getComputedStyle(node).getPropertyValue('--purple').trim()).formatRgb()));
+      getComputedStyle(node).fill === d3.color(getComputedStyle(node).getPropertyValue('--dust-uniform').trim()).formatRgb()));
 
     await dot(pair[0]).press('Enter');
     assert.match(await page.locator('#dust-focus').innerText(), /catalogue anime scored/);

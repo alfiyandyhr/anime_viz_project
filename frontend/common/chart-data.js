@@ -97,7 +97,7 @@
       if (!groups.has(row.year)) groups.set(row.year, []);
       groups.get(row.year).push(row);
     });
-    return [...groups].map(([year, rows]) => ({ year, count: rows.length,
+    return [...groups].map(([year, rows]) => ({ year, count: rows.length, ids: rows.map(row => String(row.id)),
       selectedCount: rows.filter(row => selected.has(String(row.id))).length,
       averageScore: mean(rows.map(row => row.average_score).filter(Number.isFinite)),
       totalPopularity: rows.some(row => Number.isFinite(row.popularity))

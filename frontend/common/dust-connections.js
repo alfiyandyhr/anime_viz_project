@@ -14,12 +14,12 @@
   }
 
   function create({ container, d3, color, onSelect, onCoverage, renderEmpty }) {
-    let selectedMagnetKey, offsets = [0, 0], drawLines;
+    let selectedMagnetKey, offsets = [0, 0], drawLines, recolor;
     const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(() => drawLines?.()) : null;
     observer?.observe(container);
 
     function update(value, resetMemberScroll = false) {
-      const { snapshot, dustMatchColor } = value;
+      const { snapshot, dustMatchColor, brushColor } = value;
       const { magnets, activeMagnetKeys: magnetKeys, displayedDust, selectedKeys, mixed } = snapshot;
       const group = AnivizDust.groupFor(snapshot.direction);
       const noun = group?.noun || AnivizDust.titleNoun(snapshot.direction);
@@ -36,7 +36,7 @@
         offsets = [0, 0];
       }
       container.replaceChildren();
-      drawLines = null;
+      drawLines = recolor = null;
       const magnet = magnets[magnetIndex];
       const cohortLabel = magnet?.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : '';
       const scoreLabel = mixed ? `${AnivizDust.magnetScoreLabel(magnet)} · Attraction percentile`
@@ -61,7 +61,8 @@
         : cohortLabel ? `${cohortLabel}: ${match.similarity}` : `Cosine ${match.similarity}`;
       const metricValue = match => AnivizDust.formatRawScore(match.rawScores[magnetIndex], magnet);
       const percentile = match => AnivizDust.formatPercentile(match.similarity);
-      const comparison = d3.select(container).append('div').attr('class', 'dust-connection-comparison');
+      const comparison = d3.select(container).append('div').attr('class', 'dust-connection-comparison')
+        .classed('is-brushing', Boolean(brushColor));
       const card = comparison.append('section').attr('class', 'dust-connection-map')
         .attr('aria-label', `Similarity connections for ${title}`);
       const svg = card.append('svg').attr('class', 'dust-connection-lines')
@@ -120,7 +121,7 @@
           offsets[index] = index === 0 ? panel.scrollTop : panel.scrollHeight - panel.clientHeight - panel.scrollTop;
           drawLines?.();
         });
-        return { panel, dots: rows.select('.dust-connection-dot').nodes() };
+        return { panel, rows, dots: rows.select('.dust-connection-dot').nodes() };
       }).filter(Boolean);
 
       const members = ranking.filter(match => match.closest === magnetIndex);
@@ -129,6 +130,7 @@
       memberPanel.append('h4').attr('id', 'dust-members-heading').text('Dust members');
       magnetButtons(memberPanel, 'dust-member-magnets', 'data-dust-member-movie');
       memberPanel.append('p').attr('class', 'dust-member-count').text(`${members.length} of ${displayedDust.length} displayed ${noun}`);
+      let memberRows;
       if (members.length) {
         const scroll = memberPanel.append('div').attr('class', 'dust-member-scroll').attr('role', 'region')
           .attr('tabindex', 0).attr('aria-label', `Dust member ranking for ${title}`).attr('data-dust-member-scroll', '');
@@ -144,7 +146,7 @@
           .attr('scope', 'col')
           .classed('dust-member-similarity', label => label === 'Similarity')
           .text(label => label);
-        const rows = table.append('tbody').selectAll('tr').data(members).join('tr')
+        const rows = memberRows = table.append('tbody').selectAll('tr').data(members).join('tr')
           .classed('dust-member-selected', isSelected)
           .on('click', (event, match) => {
             event.currentTarget.querySelector('button').focus({ preventScroll: true });
@@ -185,12 +187,21 @@
           .attr('stroke-width', row => max === min ? 5 : 1 + 8 * (row.match.similarity - min) / (max - min));
       };
       drawLines();
+      if (brushColor) {
+        recolor = () => {
+          if (!active.isConnected) return;
+          lists.forEach(({ rows }) => rows.style('--dust-color', matchColor));
+          memberRows?.style('--dust-color', matchColor);
+          svg.selectAll('path').attr('stroke', row => matchColor(row.match));
+        };
+        recolor();
+      }
 
       if (focusKey) container.querySelector(`[${focusKey}="${CSS.escape(focused.getAttribute(focusKey))}"]`)
         ?.focus({ preventScroll: true });
     }
-    return { update, destroy() {
-      observer?.disconnect(); drawLines = null; container.replaceChildren();
+    return { update, recolor: () => recolor?.(), destroy() {
+      observer?.disconnect(); drawLines = recolor = null; container.replaceChildren();
     } };
   }
   return { movieConnections, create };
