@@ -88,15 +88,42 @@ test('validation rejects dashboard data, duplicate years and cross-year records'
   assert.throws(() => model.validate({ ...payload, years: [{ year: 1963, anime: [{ id: 1, title: 'Wrong year', year: 1964 }] }] }));
 });
 
-test('match year span sums descending gaps across the five highest-ranked dated matches', () => {
+test('match year span uses the interquartile range of the five highest-ranked matches', () => {
   const matches = [2025, 2016, 2014, 2013, 2016, 1984].map(year => ({ work: { year } }));
   assert.deepEqual(model.matchYearSpan(matches), {
-    years: [2025, 2016, 2016, 2014, 2013], gaps: [9, 0, 2, 1], span: 12
+    years: [2025, 2016, 2016, 2014, 2013], centralYears: [2016, 2016, 2014], gaps: [0, 2], span: 2
   });
   assert.deepEqual(matches.map(({ work }) => work.year), [2025, 2016, 2014, 2013, 2016, 1984]);
   assert.equal(model.matchYearSpan(matches.slice(0, 4)), null);
   assert.equal(model.matchYearSpan([...matches.slice(0, 4), { work: {} }, matches[5]]), null);
   assert.equal(model.matchYearSpan(Array(5).fill(matches[0])).span, 0);
+});
+
+test('isolated early and late matches cannot dominate the central year span', () => {
+  const summary = years => model.matchYearSpan(years.map(year => ({ work: { year } })));
+  const baseline = summary([2000, 2001, 2002, 2003, 2004]);
+  for (const years of [
+    [1900, 2001, 2002, 2003, 2004],
+    [2000, 2001, 2002, 2003, 2100],
+    [1900, 2001, 2002, 2003, 2100],
+    [2003, 1900, 2001, 2100, 2002]
+  ]) {
+    const result = summary(years);
+    assert.equal(result.span, baseline.span);
+    assert.deepEqual(result.centralYears, baseline.centralYears);
+    assert.equal(result.gaps.reduce((sum, gap) => sum + gap, 0), result.span);
+  }
+  assert.equal(summary([1900, 2000, 2000, 2000, 2100]).span, 0);
+  assert.equal(summary([1960, 1980, 2000, 2020, 2040]).span, 40,
+    'a genuinely broad central distribution still has a large span');
+});
+
+test('match year span requires five valid years without substituting lower-ranked matches', () => {
+  const matches = [2000, 2001, 2002, 2003, 2004, 2005].map(year => ({ work: { year } }));
+  assert.equal(model.matchYearSpan([]), null);
+  for (const year of [undefined, null, '2004', NaN, Infinity, 2004.5]) {
+    assert.equal(model.matchYearSpan([...matches.slice(0, 4), { work: { year } }, matches[5]]), null);
+  }
 });
 
 test('the anime timeline ranks the five highest-scoring live-action movies for every annual winner', () => {

@@ -322,6 +322,17 @@ recommendation and popularity snapshots on first use. Both perspectives use
 the same History movie sample, which requires a release year and genre metadata
 and excludes TMDB Animation titles and records tagged with cartoon characters.
 
+**Match year span** measures the interquartile range (IQR) of the five closest
+dated matches in either direction. Sort their release years and subtract the
+second-oldest year (Q1) from the second-newest (Q3). These are the linearly
+interpolated 25th and 75th percentiles for a sample of five. Using the middle
+three years reduces the influence of an isolated early or late match. The
+calculation and nearby-year comparison bars use this same range; all five
+matches remain available in the genres table. Five valid release years are
+required. A zero span means the middle three share a year, even if the outer
+matches differ. The metric describes the central spread, so it is smaller than
+the full release-year range when the outer years differ from the quartiles.
+
 History reads the published `story.json` and `data/history_movie_matches.json` on
 Flask and GitHub Pages. Regenerate them together so the annual winners and their
 scores stay in sync:

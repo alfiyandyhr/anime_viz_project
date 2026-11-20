@@ -168,8 +168,12 @@ const StoryData = (() => {
     const years = matches.slice(0, 5).map(({ work }) => work.year);
     if (years.length < 5 || !years.every(Number.isInteger)) return null;
     years.sort((a, b) => b - a);
-    const gaps = years.slice(1).map((year, index) => years[index] - year);
-    return { years, gaps, span: gaps.reduce((sum, gap) => sum + gap, 0) };
+    // With five observations, linearly interpolated quartiles fall exactly on
+    // the second and fourth sorted years. Their IQR limits the influence of
+    // an isolated early or late match without changing similarity rankings.
+    const centralYears = years.slice(1, -1);
+    const gaps = centralYears.slice(1).map((year, index) => centralYears[index] - year);
+    return { years, centralYears, gaps, span: centralYears[0] - centralYears.at(-1) };
   }
 
   return { validate, summarizePeriod, topAnime, locatePeriod, yearScrollProgress, yearPairs, movieYearPairs,
