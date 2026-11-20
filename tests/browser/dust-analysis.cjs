@@ -115,6 +115,9 @@ async function verifyCreditCharts(page, attribute) {
       }
     }
 
+    await page.getByRole('radio', { name: 'Strongest magnet' }).check();
+    await chart('genres').scrollIntoViewIfNeeded();
+    await chart('genres').locator('rect[role="img"]').first().waitFor();
     const barFills = await chart('genres').locator('rect[role="img"]')
       .evaluateAll(bars => bars.map(bar => getComputedStyle(bar).fill));
     assert.ok(barFills.length > 1);
@@ -225,8 +228,8 @@ async function verifyCreditCharts(page, attribute) {
       await dustType.selectOption(type);
       await rankingToggles.first().waitFor();
       if (type.startsWith('movie-')) {
-        assert.equal(await page.locator('#creators').isVisible(), false, type);
-        assert.equal(await chart('heatmap').isVisible(), false, type);
+        assert.ok(await page.locator('[data-dust-movie-credit-mode]').isVisible(), type);
+        assert.ok(await page.locator('[data-dust-movie-heatmap-mode]').isVisible(), type);
       } else {
         await verifyCreditCharts(page, 'dust');
       }
@@ -278,6 +281,6 @@ async function verifyCreditCharts(page, attribute) {
     await page.locator('[data-catalogue-target="movie"]').click();
     assert.equal(await page.locator('#catalogue-credit-mode').isVisible(), false);
     assert.equal(await page.locator('#catalogue-heatmap-mode').isVisible(), false);
-    console.log('Verified credit heatmaps, portrait zoom, anime-only charts, chart evidence, and ranking in both views.');
+    console.log('Verified anime credit heatmaps, portrait zoom, catalogue controls, chart evidence, and ranking in both views.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

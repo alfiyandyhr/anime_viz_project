@@ -70,16 +70,16 @@
   }
   const voiceActors = (anime, selectedIds) => personGroups(anime, "voice_actors", "anilist:staff", selectedIds);
   const originalCreators = (anime, selectedIds) => personGroups(anime, "original_creators", "anilist:staff", selectedIds);
-  const movieActors = movies => personGroups(movies, "cast", "tmdb:person");
-  const movieWriters = movies => personGroups(movies, "writers", "tmdb:person");
+  const movieActors = (movies, selectedIds) => personGroups(movies, "cast", "tmdb:person", selectedIds);
+  const movieWriters = (movies, selectedIds) => personGroups(movies, "writers", "tmdb:person", selectedIds);
   const withOriginalCreators = (anime, credits) => anime.map(item => ({
     ...item, original_creators: credits[item.id]?.original_creators
   }));
 
-  function creditHeatmap(anime, rowGroups, columnGroups, selectedIds = []) {
+  function creditHeatmap(titlesInScope, rowGroups, columnGroups, selectedIds = []) {
     const top = (groups, limit) => groups.slice().sort((a, b) => b.count - a.count).slice(0, limit);
     const rows = top(rowGroups, 15), columns = top(columnGroups, 10);
-    const titles = new Map(anime.map(item => [String(item.id), item.title]));
+    const titles = new Map(titlesInScope.map(item => [String(item.id), item.title]));
     const selected = new Set(selectedIds.map(String));
     const cells = columns.flatMap(column => {
       const columnIds = new Set(column.ids);

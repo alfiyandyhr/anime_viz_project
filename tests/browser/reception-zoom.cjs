@@ -78,6 +78,41 @@ async function verifyZoom(page, selector, movie, dust) {
   await plot.hover();
   await page.mouse.wheel(0, -1600);
   await plot.and(view.locator('.shows-posters')).waitFor();
+  await button(view, 'Reset zoom').click();
+  for (let step = 0; step < (dust ? 4 : 5); step++) await zoomIn.press('Enter');
+  assert.equal((await camera()).k, dust ? 12 : 25);
+  assert.ok(await zoomIn.isDisabled());
+}
+
+async function verifyMovieCreditPortraits(page) {
+  const view = page.locator('[data-catalogue-chart="studios"]');
+  const plot = view.locator('.reception-plot');
+  const portraits = view.locator('.credit-portrait');
+  const scale = () => plot.evaluate(svg => svg.__zoom.k);
+  for (const mode of ['movieActors', 'movieWriters']) {
+    await page.selectOption('#catalogue-movie-credit-mode', mode);
+    await view.scrollIntoViewIfNeeded();
+    await view.locator('.credit-dot').first().waitFor();
+    const zoomIn = button(view, 'Zoom in');
+    for (let step = 0; step < 3; step++) await zoomIn.press('Enter');
+    assert.equal(await scale(), 8);
+    assert.equal(await portraits.count(), 0, mode);
+    await zoomIn.press('Enter');
+    const dot = await view.locator('.credit-dot.has-portrait[tabindex="0"]').first().boundingBox();
+    const wheelTo = async target => plot.dispatchEvent('wheel', {
+      clientX: dot.x + dot.width / 2,
+      clientY: dot.y + dot.height / 2,
+      deltaY: -500 * Math.log2(target / await scale())
+    });
+    await wheelTo(24.9);
+    assert.ok(Math.abs(await scale() - 24.9) < 0.01);
+    assert.equal(await portraits.count(), 0, mode);
+    await wheelTo(25.1);
+    assert.ok(Math.abs(await scale() - 25.1) < 0.01);
+    await portraits.first().waitFor();
+    await wheelTo(24.9);
+    assert.equal(await portraits.count(), 0, mode);
+  }
 }
 
 (async () => {
@@ -105,7 +140,8 @@ async function verifyZoom(page, selector, movie, dust) {
     await page.locator('[data-catalogue-target="movie"]').click();
     await page.locator('#movie-catalogue-status').getByText(/Loaded/).waitFor();
     await verifyZoom(page, catalogue, true, false);
+    await verifyMovieCreditPortraits(page);
     assert.deepEqual(errors, []);
-    console.log('Verified poster zoom, changing axes, selection, and panning in all four reception views.');
+    console.log('Verified title zoom limits and interactions, plus the 25× movie credit portrait threshold.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

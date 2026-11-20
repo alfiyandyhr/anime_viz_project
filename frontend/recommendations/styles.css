@@ -140,6 +140,8 @@
   border-radius: 14px;
   background: radial-gradient(ellipse at center, var(--secondary-tint), transparent 70%);
   touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .dust-map:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
 .dust-map.is-zoomed { cursor: grab; touch-action: none; }
@@ -147,8 +149,8 @@
 .dust-brush-surface { fill: transparent; cursor: move; touch-action: none; }
 .dust-brush-frame { fill: var(--primary-tint); stroke: var(--pink); stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
 .dust-brush-handle { fill: transparent; pointer-events: all; touch-action: none; }
-.dust-brush:focus-visible { outline: none; }
-.dust-brush:focus-visible .dust-brush-frame { stroke-width: 3; }
+.dust-brush:focus { outline: none; }
+html:not(.pointer-input) .dust-brush:focus-visible .dust-brush-frame { stroke-dasharray: 4 3; }
 .dust-node { cursor: pointer; outline: none; }
 .dust-hit-area { fill: transparent; }
 .dust-grain { stroke: var(--surface-solid); stroke-width: 1.5; pointer-events: none; }

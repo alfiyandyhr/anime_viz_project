@@ -245,21 +245,27 @@
               <p>Bars show title counts. The line shows average scores.</p>
               <div class="catalogue-chart" data-catalogue-chart="years" role="region" tabindex="0" aria-label="Release years chart, scroll horizontally if needed"></div>
             </article>
-            <article class="chart-card" data-catalogue-only="anime">
+            <article class="chart-card">
               <h2>Score vs. popularity by credit</h2>
-              <label class="catalogue-chart-control">Group by
+              <label class="catalogue-chart-control" data-catalogue-only="anime">Group by
                 <select id="catalogue-credit-mode">
                   <option value="studios">Studios</option>
                   <option value="voiceActors">Voice actors</option>
                   <option value="originalCreators">Original creators</option>
                 </select>
               </label>
-              <p>Circle area represents matching titles. Zoom in for available portraits.</p>
+              <label class="catalogue-chart-control" data-catalogue-only="movie">Group by
+                <select id="catalogue-movie-credit-mode">
+                  <option value="movieActors">Actors</option>
+                  <option value="movieWriters">Writers</option>
+                </select>
+              </label>
+              <p>Circle area represents matching titles. <span data-catalogue-only="anime">Zoom in for available portraits.</span><span data-catalogue-only="movie">Available portraits appear at 25× zoom.</span></p>
               <div class="catalogue-chart" data-catalogue-chart="studios"></div>
             </article>
-            <article class="chart-card" data-catalogue-only="anime">
-              <h2>Anime credit heatmap</h2>
-              <label class="catalogue-chart-control">Compare
+            <article class="chart-card">
+              <h2 id="catalogue-credit-heatmap-title"><span data-catalogue-only="anime">Anime</span><span data-catalogue-only="movie">Movie</span> credit heatmap</h2>
+              <label class="catalogue-chart-control" data-catalogue-only="anime">Compare
                 <select id="catalogue-heatmap-mode">
                   <option value="studios:genres">Studio × genre</option>
                   <option value="voiceActors:genres">Voice actors × genre</option>
@@ -268,8 +274,14 @@
                   <option value="originalCreators:studios">Original creators × studio</option>
                 </select>
               </label>
-              <p>Up to 15 rows and 10 columns, ranked by title count. Each cell counts distinct anime.</p>
-              <div class="catalogue-chart" data-catalogue-chart="heatmap" role="region" tabindex="0" aria-label="Anime credit heatmap, scroll horizontally if needed"></div>
+              <label class="catalogue-chart-control" data-catalogue-only="movie">Compare
+                <select id="catalogue-movie-heatmap-mode">
+                  <option value="movieActors:genres">Actors × genre</option>
+                  <option value="movieWriters:genres">Writers × genre</option>
+                </select>
+              </label>
+              <p>Up to 15 rows and 10 columns, ranked by title count. Each cell counts distinct <span data-catalogue-only="anime">anime</span><span data-catalogue-only="movie">movies</span>.</p>
+              <div class="catalogue-chart" data-catalogue-chart="heatmap" role="region" tabindex="0" aria-labelledby="catalogue-credit-heatmap-title"></div>
             </article>
           </section>
         </div>

@@ -13,7 +13,9 @@ Object.assign(elements, {
   insightCards: document.querySelector("#insight-cards"),
   catalogueGenreMetric: document.querySelector("#catalogue-genre-metric"),
   catalogueCreditMode: document.querySelector("#catalogue-credit-mode"),
-  catalogueHeatmapMode: document.querySelector("#catalogue-heatmap-mode")
+  catalogueHeatmapMode: document.querySelector("#catalogue-heatmap-mode"),
+  movieCreditMode: document.querySelector("#catalogue-movie-credit-mode"),
+  movieHeatmapMode: document.querySelector("#catalogue-movie-heatmap-mode")
 });
 
 const shortlist = new Set();
@@ -98,8 +100,8 @@ function renderCatalogueSummary(titles, movie) {
 
 function renderCatalogueCharts(titles, movie) {
   const byId = new Map(titles.map(title => [String(title.id), title]));
-  const creditMode = elements.catalogueCreditMode.value;
-  const heatmapMode = elements.catalogueHeatmapMode.value;
+  const creditMode = (movie ? elements.movieCreditMode : elements.catalogueCreditMode).value;
+  const heatmapMode = (movie ? elements.movieHeatmapMode : elements.catalogueHeatmapMode).value;
   if (!movie && animeCreditsStatus === "idle"
     && (creditMode === "originalCreators" || heatmapMode.startsWith("originalCreators:"))) {
     void loadCatalogueAnimeCredits();
@@ -107,7 +109,11 @@ function renderCatalogueCharts(titles, movie) {
   catalogueCharts.update({
     anime: titles,
     creditMode, heatmapMode, animeCredits, animeCreditsStatus,
+    movieDetailsStatus: movieCatalogue?.detailsStatus,
+    moviePopularityStatus: movieCatalogue?.popularityStatus,
     metric: elements.catalogueGenreMetric.value,
+    receptionMaxZoom: 25,
+    creditPortraitZoom: movie ? 25 : undefined,
     movieRankLimit: movie ? Math.max(2, movieCatalogue.titles.length) : null,
     onSelect: id => movie ? openCatalogueMovie(byId.get(id)) : openAnimeDetail(byId.get(id))
   });
@@ -268,7 +274,8 @@ async function loadMovieCatalogue() {
     });
     const years = titles.map(movie => movie.year).filter(Number.isFinite);
     movieCatalogue = { titles, hasCast: titles.some(movie => Array.isArray(movie.cast)),
-      hasWriters: titles.some(movie => Array.isArray(movie.writers)), meta: {
+      hasWriters: titles.some(movie => Array.isArray(movie.writers)),
+      detailsStatus: details ? "ready" : "unavailable", popularityStatus: snapshot ? "ready" : "unavailable", meta: {
       genres: [...new Set(titles.flatMap(movie => movie.genres))].sort(), studios: [], formats: [],
       year_min: years.length ? Math.min(...years) : 1900,
       year_max: years.length ? Math.max(...years) : new Date().getFullYear()
@@ -331,15 +338,14 @@ registerPage({
       note: elements.tableNote, d3, helpers: chartHelpers() });
     catalogueCharts = AnivizComposition.create({ onError: error => console.error(error) });
     document.querySelectorAll("[data-catalogue-chart]").forEach(container => {
-      catalogueCharts.mount(container, AnivizCharts.create(container.dataset.catalogueChart, { container, d3, helpers: chartHelpers() }), {
-        enabled: value => !value.movieRankLimit || !container.closest('[data-catalogue-only="anime"]')
-      });
+      catalogueCharts.mount(container, AnivizCharts.create(container.dataset.catalogueChart, { container, d3, helpers: chartHelpers() }));
     });
     elements.catalogueGenreMetric.addEventListener("change", renderCatalogueAnalysis);
-    for (const control of [elements.catalogueCreditMode, elements.catalogueHeatmapMode]) {
+    for (const control of [elements.catalogueCreditMode, elements.catalogueHeatmapMode, elements.movieCreditMode, elements.movieHeatmapMode]) {
       control.addEventListener("change", () => {
-        if (animeCreditsStatus === "unavailable") animeCreditsStatus = "idle";
-        renderCatalogueCharts(state.filteredAnime, false);
+        const movie = catalogueView === "movie";
+        if (!movie && animeCreditsStatus === "unavailable") animeCreditsStatus = "idle";
+        if (!movie || movieCatalogue) renderCatalogueCharts(movie ? filteredMovies : state.filteredAnime, movie);
       });
     }
     elements.tableBody.addEventListener("change", (event) => {

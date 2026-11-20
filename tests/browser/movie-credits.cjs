@@ -3,8 +3,10 @@ const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const { movies } = require('../../data/movie_details.json');
 const { popularity, vote_average } = require('../../data/movie_popularity.json');
+const { movies: recommendations } = require('../../data/movie_recommendations.json');
 const { anime } = require('../../data.json');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
+const movieGenres = new Map(recommendations.map(movie => [String(movie.id), movie.genres]));
 
 (async () => {
   const browser = await chromium.launch({ headless: true,
@@ -19,6 +21,55 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     const type = page.locator('#dust-type');
     const node = key => field.locator(`[data-match-id="${key}"]`);
     const pointIds = points => points.evaluateAll(nodes => nodes.map(dot => String(dot.__data__.id)).sort());
+    async function assertMovieCharts(ids, modes, plot, heatmap) {
+      for (const [mode, field, label] of [['movieActors', 'cast', 'Actors'], ['movieWriters', 'writers', 'Writers']]) {
+        const credits = new Map();
+        for (const id of ids) {
+          for (const { id: personId } of movies[id][field]) {
+            const key = String(personId);
+            if (!credits.has(key)) credits.set(key, new Set());
+            credits.get(key).add(id);
+          }
+        }
+        await modes.credit.selectOption(mode);
+        await plot.scrollIntoViewIfNeeded();
+        const dots = plot.locator('.credit-dot');
+        await dots.first().waitFor();
+        assert.equal(await plot.locator('svg').getAttribute('aria-label'), `Score vs. popularity · ${label}`);
+        assert.deepEqual(await plot.locator('.axis-label').allTextContents(),
+          ['Total TMDB popularity score (log scale)', 'TMDB score / 10']);
+        const expected = [...credits].flatMap(([personId, works]) => {
+          const titles = [...works].sort();
+          const scores = titles.map(id => vote_average[id]).filter(Number.isFinite);
+          const total = titles.map(id => popularity[id]).filter(Number.isFinite).reduce((sum, value) => sum + value, 0);
+          return scores.length && total > 0 ? [[personId, titles, scores.reduce((sum, score) => sum + score, 0) / scores.length, total]] : [];
+        }).sort();
+        const actual = await dots.evaluateAll(nodes => nodes.map(({ __data__: item }) =>
+          [item.id, item.ids.slice().sort(), item.score, item.popularity]).sort());
+        assert.equal(actual.length, expected.length);
+        actual.forEach(([id, titles, score, reach], i) => {
+          const [expectedId, expectedTitles, expectedScore, expectedReach] = expected[i];
+          assert.equal(id, expectedId);
+          assert.deepEqual(titles, expectedTitles);
+          assert.ok(Math.abs(score - expectedScore) < 1e-9);
+          assert.ok(Math.abs(reach - expectedReach) < 1e-9);
+        });
+
+        await modes.heatmap.selectOption(`${mode}:genres`);
+        await heatmap.scrollIntoViewIfNeeded();
+        const cells = heatmap.locator('rect[role="img"]');
+        await cells.first().waitFor();
+        const grid = await cells.evaluateAll(nodes => nodes.map(({ __data__: item }) => [item.row.id, item.column.title, item.count]));
+        const genres = new Set(ids.flatMap(id => movieGenres.get(id)));
+        assert.equal(grid.length, Math.min(15, credits.size) * Math.min(10, genres.size));
+        for (const [personId, genre, count] of grid) {
+          assert.equal(count, [...credits.get(personId)].filter(id => movieGenres.get(id).includes(genre)).length);
+        }
+      }
+    }
+    const dustChartModes = {
+      credit: page.locator('[data-dust-movie-credit-mode]'), heatmap: page.locator('[data-dust-movie-heatmap-mode]')
+    };
     async function assertCredits(panel, movieId) {
       const { cast, writers } = movies[movieId];
       const credits = panel.locator('.movie-credits');
@@ -90,6 +141,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       await work.click();
       await assertCredits(drawer, movieKey.split(':').at(-1));
       await page.keyboard.press('Escape');
+      await page.locator('#dust-connection-title').scrollIntoViewIfNeeded();
       await chart('connections').locator(`[data-dust-connection-id$=":${second}"]`).press('Enter');
       await assertFilmography(selectedMovies);
       await pressMoviePoint(reception);
@@ -105,6 +157,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       await node(first).press('Enter');
       await node(second).press('Enter');
       await assertFilmography(allMovies);
+      await assertMovieCharts([...new Set(groups.flatMap(group => group.memberIds))], dustChartModes, chart('studios'), chart('heatmap'));
     }
 
     await type.selectOption('movie-titles');
@@ -118,6 +171,8 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     await assertCredits(drawer, movieId);
     await page.keyboard.press('Escape');
     await pressMoviePoint(reception);
+    const dustIds = await page.evaluate(() => AnivizMain.snapshot().displayedDust.map(({ record }) => String(record.id)));
+    await assertMovieCharts(dustIds, dustChartModes, chart('studios'), chart('heatmap'));
 
     await page.goto(new URL('frontend/explorer/index.html', base).href);
     const summary = page.locator('#catalogue-kpis');
@@ -153,8 +208,19 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     await assertCredits(drawer, rowId);
     await page.keyboard.press('Escape');
     await pressMoviePoint(page.locator('[data-catalogue-chart="reception"]'));
+    const catalogueModes = {
+      credit: page.locator('#catalogue-movie-credit-mode'), heatmap: page.locator('#catalogue-movie-heatmap-mode')
+    };
+    assert.deepEqual(await catalogueModes.credit.locator('option').allTextContents(), ['Actors', 'Writers']);
+    assert.deepEqual(await catalogueModes.heatmap.locator('option').allTextContents(), ['Actors × genre', 'Writers × genre']);
+    const creditPlot = page.locator('[data-catalogue-chart="studios"]');
+    const heatmap = page.getByRole('region', { name: 'Movie credit heatmap', exact: true });
+    await assertMovieCharts(Object.keys(movies), catalogueModes, creditPlot, heatmap);
+    await page.locator('#genre-filter').selectOption('Science Fiction');
+    await assertMovieCharts(recommendations.filter(movie => movie.genres.includes('Science Fiction')).map(movie => String(movie.id)),
+      catalogueModes, creditPlot, heatmap);
     assert.deepEqual(errors, []);
-    console.log('Verified movie actor and writer portraits, linked chart filtering, catalogue counts, and movie credits across entry points.');
+    console.log('Verified movie credit scatterplots and heatmaps in every dust type and the filtered catalogue, plus portraits and credits.');
   } finally {
     await browser.close();
   }

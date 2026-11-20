@@ -2,7 +2,8 @@
 // Instances own their container and latest snapshot. No page-global controls or selectors.
 (function (root) {
   let nextClipId = 0;
-  const creditLabels = { studios: "Studios", voiceActors: "Voice actors", originalCreators: "Original creators" };
+  const creditLabels = { studios: "Studios", voiceActors: "Voice actors", originalCreators: "Original creators",
+    movieActors: "Actors", movieWriters: "Writers" };
   function create(kind, { container, d3, helpers, transforms = root.AnivizChartData }) {
     if (!container) throw new Error("A chart container is required");
     const { clearChart, renderEmpty, showTooltip, moveTooltip, hideTooltip, escapeHTML,
@@ -319,15 +320,21 @@
         }));
       }
       return metricData(`credits:${mode}`, () => {
-        const anime = mode === "originalCreators"
+        const titles = mode === "originalCreators"
           ? transforms.withOriginalCreators(context.anime, context.animeCredits || {}) : context.anime;
-        return transforms[mode](anime, context.selectedIds).map(item => ({
+        return transforms[mode](titles, context.selectedIds).map(item => ({
           ...item, key: item.key ?? item.genre, title: item.title ?? item.studio ?? item.genre
         }));
       });
     }
 
     function waitingForCredits(mode) {
+      if (context.movieRankLimit) {
+        if (context.movieDetailsStatus === "ready") return false;
+        renderEmpty(container, context.movieDetailsStatus === "unavailable"
+          ? "TMDB credits could not be loaded." : "Loading TMDB credits…");
+        return true;
+      }
       if (mode !== "originalCreators" || context.animeCreditsStatus === "ready") return false;
       renderEmpty(container, context.animeCreditsStatus === "unavailable"
         ? "Original creator credits could not be loaded." : "Loading original creator credits…");
@@ -336,20 +343,28 @@
 
     function renderCreditScatterplot() {
       clearChart(container);
-      const mode = context.creditMode || "studios";
+      const movie = Boolean(context.movieRankLimit);
+      const mode = context.creditMode || (movie ? "movieActors" : "studios");
       if (waitingForCredits(mode)) {
         popularityCamera = null;
+        return;
+      }
+      if (movie && context.moviePopularityStatus !== "ready") {
+        popularityCamera = null;
+        renderEmpty(container, context.moviePopularityStatus === "unavailable"
+          ? "Archived TMDB score and popularity data could not be loaded." : "Loading archived TMDB score and popularity data…");
         return;
       }
       const isStudio = mode === "studios";
       const label = `Score vs. popularity · ${creditLabels[mode]}`;
       const data = creditGroups(mode).map(item => ({
-        ...item, popularity: item.totalPopularity, score: item.averageScore
+        ...item, popularity: item.totalPopularity, score: item.averageScore,
+        portrait: movie ? root.AnivizArtwork.moviePortrait(item) : item.image
       })).filter(item => item.popularity > 0 && Number.isFinite(item.score));
 
       if (!data.length) {
         popularityCamera = null;
-        renderEmpty(container, context.metadataStatus === "unavailable" ? "Anime metadata could not be loaded."
+        renderEmpty(container, !movie && context.metadataStatus === "unavailable" ? "Anime metadata could not be loaded."
           : `No ${creditLabels[mode].toLowerCase()} with score and popularity data match the filters.`);
         return;
       }
@@ -359,36 +374,36 @@
       const popularity = item => item.popularity;
       const score = item => item.score;
       const chart = drawPopularityAxes(data, {
-        popularity, score, label, mode, popularityLabel: "Total popularity (log scale)"
+        popularity, score, label, mode, popularityLabel: `${popularityLabel()} (log scale)`
       });
       const radius = d3.scaleSqrt().domain([0, d3.max(data, item => item.count)]).range([0, 20]);
       const marks = chart.svg.append("g");
       const dots = marks.append("g").selectAll("circle").data(data, item => item.key).join("circle")
         .attr("class", "credit-dot")
         .classed("studio-dot", isStudio)
-        .classed("has-portrait", item => !isStudio && Boolean(item.image))
+        .classed("has-portrait", item => Boolean(item.portrait))
         .attr("r", item => radius(item.count))
         .attr("fill", "var(--purple)")
         .attr("fill-opacity", 0.8)
         .attr("stroke", "var(--text)")
         .attr("stroke-width", item => item.selectedCount ? 3 : 1);
 
-      const countLabel = context.studioGroups ? "Catalogue anime" : "Matching titles";
+      const countLabel = movie ? "Matching movies" : context.studioGroups ? "Catalogue anime" : "Matching titles";
       function bindMarks(selection) {
         selection.on("mouseenter", (event, item) => {
           showTooltip(event, `
             <strong>${escapeHTML(item.title)}</strong>
             <span>
-              Total popularity: ${formatNumber(item.popularity)}<br>
-              Average score: ${item.score.toFixed(1)}/100<br>
+              ${popularityLabel()}: ${formatNumber(item.popularity)}<br>
+              Average score: ${item.score.toFixed(1)}/${scoreMax()}<br>
               ${countLabel}: ${formatNumber(item.count)}
             </span>
           `);
         }).on("mousemove", moveTooltip).on("mouseleave", hideTooltip);
-        keyboardMarks(selection, item => `${item.title}. Total popularity ${formatNumber(item.popularity)}. Average score ${item.score.toFixed(1)} / 100. ${countLabel} ${item.count}.`);
+        keyboardMarks(selection, item => `${item.title}. ${popularityLabel()} ${formatNumber(item.popularity)}. Average score ${averageScore(item)}. ${countLabel} ${item.count}.`);
       }
       bindMarks(dots);
-      const portraits = isStudio ? [] : data.filter(item => item.image);
+      const portraits = data.filter(item => item.portrait);
       const portraitLayer = marks.append("g");
       const color = item => context.brushColor?.(item.ids) || "var(--text)";
       trackBrush(() => {
@@ -396,11 +411,11 @@
         portraitLayer.selectAll(".dust-poster-title").style("color", color);
       });
       attachPopularityZoom(chart, data, { popularity, score, label, mode,
-        maxZoom: 128,
+        maxZoom: 128, posterZoom: context.creditPortraitZoom,
         zoomContent: isStudio ? "individual studios" : "portraits",
         drawMarks({ zoomed, pointX, pointY, visible, showPosters }) {
           marks.attr("clip-path", zoomed ? chart.clip : null);
-          const dotVisible = item => (!zoomed || visible(item)) && !(showPosters && !isStudio && item.image);
+          const dotVisible = item => (!zoomed || visible(item)) && !(showPosters && item.portrait);
           dots.attr("cx", pointX).attr("cy", pointY)
             .attr("tabindex", item => dotVisible(item) ? 0 : -1)
             .attr("aria-hidden", item => dotVisible(item) ? null : "true");
@@ -412,7 +427,7 @@
               const { images } = root.AnivizPosterZoom.addCards(cards, {
                 title: item => item.title, color
               });
-              root.AnivizPosterZoom.drawArtwork(images, item => item.image);
+              root.AnivizPosterZoom.drawArtwork(images, item => item.portrait);
               bindMarks(cards);
               return cards;
             })
@@ -424,12 +439,13 @@
     function renderHeatmap() {
       clearChart(container);
 
-      const [rowMode, columnMode] = (context.heatmapMode || "studios:genres").split(":");
+      const movie = Boolean(context.movieRankLimit);
+      const [rowMode, columnMode] = (context.heatmapMode || (movie ? "movieActors:genres" : "studios:genres")).split(":");
       if (waitingForCredits(rowMode)) return;
       const { rows, columns, cells } = metricData(`heatmap:${rowMode}:${columnMode}`, () =>
         transforms.creditHeatmap(context.anime, creditGroups(rowMode), creditGroups(columnMode, false), context.selectedIds));
       if (!cells.length) {
-        renderEmpty(container, context.metadataStatus === "unavailable" ? "Anime metadata could not be loaded."
+        renderEmpty(container, !movie && context.metadataStatus === "unavailable" ? "Anime metadata could not be loaded."
           : "No titles with the chosen credits and categories match the filters.");
         return;
       }
@@ -492,7 +508,7 @@
     }
 
     function drawPopularityAxes(data, { popularity, score, label, popularityLabel, rankLimit, mode,
-      scoreLabel = rankLimit ? "TMDB score / 10" : "Average score / 100" }) {
+      scoreLabel = context.movieRankLimit ? "TMDB score / 10" : "Average score / 100" }) {
       const width = Math.max(container.clientWidth, 320);
       const height = Math.max(container.clientHeight, 473);
       const margin = { top: 52, right: 28, bottom: 58, left: 62 };
@@ -510,13 +526,13 @@
 
       const x = (rankLimit ? d3.scaleLinear().domain([rankLimit, 1]) : d3.scaleLog()
         .domain([
-          Math.max(1, xExtent[0] * 0.75),
+          context.movieRankLimit ? xExtent[0] * 0.75 : Math.max(1, xExtent[0] * 0.75),
           xExtent[1] * 1.25
         ]))
         .range([margin.left, width - margin.right]);
 
       const y = d3.scaleLinear()
-        .domain(rankLimit ? [0, 10] : [
+        .domain(context.movieRankLimit ? [0, 10] : [
           Math.max(0, Math.floor((yExtent[0] - 5) / 5) * 5),
           Math.min(100, Math.ceil((yExtent[1] + 4) / 5) * 5)
         ])
@@ -702,6 +718,7 @@
       });
       const thumbnail = rankLimit ? root.AnivizArtwork.movieThumbnail : root.AnivizArtwork.animeThumbnail;
       attachPopularityZoom(chart, data, { popularity, score, mode: rankLimit, label: "Score vs. popularity",
+        maxZoom: context.receptionMaxZoom,
         drawMarks({ zoomed, pointX, pointY, visible, showPosters }) {
           marks.attr("clip-path", zoomed ? clip : null);
           if (!showPosters) {
@@ -727,7 +744,7 @@
       });
     }
 
-    function attachPopularityZoom(chart, data, { popularity, score, mode, label, maxZoom, zoomContent, drawMarks }) {
+    function attachPopularityZoom(chart, data, { popularity, score, mode, label, maxZoom, posterZoom, zoomContent, drawMarks }) {
       const { x, y, svg, extent } = chart;
       const [[left, top], [right, bottom]] = extent;
       const centerX = (left + right) / 2, centerY = (top + bottom) / 2;
@@ -758,7 +775,7 @@
 
       const previous = popularityCamera;
       const camera = root.AnivizPosterZoom.attach({
-        container, svg, d3, extent, label, maxZoom, zoomContent, onStart: hideTooltip, onZoom: draw, zoomInPoint
+        container, svg, d3, extent, label, maxZoom, posterZoom, zoomContent, onStart: hideTooltip, onZoom: draw, zoomInPoint
       });
       if (previous && previous.mode === mode && previous.transform.k > 1) {
         const { k, x: tx, y: ty } = previous.transform;

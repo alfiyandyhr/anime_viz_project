@@ -215,7 +215,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     await page.evaluate(() => scrollTo(0, 0));
     await dustTypePicker.selectOption(movieTitles);
     assert.equal(await page.getByRole('radio', { name: 'Anime', exact: true }).isChecked(), true);
-    assert.equal(await page.locator('[data-anime-chart] svg').count(), 0);
+    assert.ok(await page.locator('[data-dust-credit-mode]').isHidden());
     await ready();
     assert.match(await page.locator('#movie-magnets').innerText(), /Attack on Titan.*Example/);
     const firstFavorite = page.locator('#movie-suggestions button').first();
@@ -391,7 +391,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     assert.deepEqual(await evidence(), savedReverse);
     assert.ok(Math.abs(await page.evaluate(() => scrollY) - reverseScroll) < 5);
     assert.deepEqual(await positions(), moved);
-    assert.equal(await page.locator('[data-anime-chart] svg').count(), 0);
+    assert.ok(await page.locator('[data-dust-credit-mode]').isHidden());
 
     for (const anchor of ['content', 'reception', 'creators']) {
       await page.goto(url(`#${anchor}`));
@@ -400,10 +400,10 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
         const section = document.getElementById(id);
         const top = section.getBoundingClientRect().top;
         return top >= 48 && top < 180;
-      }, anchor === 'creators' ? 'content' : anchor);
+      }, anchor);
     }
     assert.match(await page.locator('#reception').innerText(), /Rank #1 is most popular in the movie sample/);
-    assert.equal(await page.locator('#creators').isVisible(), false);
+    assert.ok(await page.locator('#creators').isVisible());
     await page.goto(url('frontend/story/index.html'));
     await page.waitForSelector('#history-pair');
     await page.goBack();

@@ -212,8 +212,8 @@
     const receptionTitles = people && snapshot.selectedKeys.length ? snapshot.supportingIds.map(titleFor) : records;
     const dustMatches = new Map(snapshot.displayedDust.map(match => [match.key, match]));
     const metric = $('[data-dust-genre-metric]').value;
-    const creditMode = $('[data-dust-credit-mode]').value;
-    const heatmapMode = $('[data-dust-heatmap-mode]').value;
+    const creditMode = $(reverse ? '[data-dust-movie-credit-mode]' : '[data-dust-credit-mode]').value;
+    const heatmapMode = $(reverse ? '[data-dust-movie-heatmap-mode]' : '[data-dust-heatmap-mode]').value;
     const selectedIds = people ? (snapshot.selectedKeys.length ? snapshot.supportingIds : [])
       : studios ? [] : snapshot.selectedKeys.flatMap(key => {
         const record = snapshot.lookup.get(key)?.record;
@@ -223,6 +223,7 @@
       filmography: group ? receptionTitles : null,
       studioGroups, creditMode, heatmapMode,
       animeCredits: snapshot.animeCredits, animeCreditsStatus: snapshot.animeCreditsStatus,
+      movieDetailsStatus: snapshot.movieDetailsStatus, moviePopularityStatus: snapshot.popularity.status,
       metadataStatus: snapshot.metadataStatus,
       metric, movieRankLimit: reverse ? Math.max(2, snapshot.titleLookup.size) : null,
       onSelect: id => {
@@ -431,15 +432,13 @@
           onCoverage: text => { $('[data-coverage="connections"]').textContent = text; }, renderEmpty })
         : AnivizCharts.create(kind, { container, d3, helpers: chartHelpers() });
       chartRenderers.push(renderer);
-      composition.mount(container, renderer, {
-        preserveHeight: kind === 'connections',
-        enabled: value => !value.movieRankLimit || !container.matches('[data-anime-chart]')
-      });
+      composition.mount(container, renderer, { preserveHeight: kind === 'connections' });
     });
     context.subscribe(publish);
     $('#dust-color-mode').addEventListener('change', event => context.setColorByMagnet(event.target.value === 'magnet'));
     $('[data-dust-genre-metric]').addEventListener('change', () => publish(context.snapshot()));
-    for (const selector of ['[data-dust-credit-mode]', '[data-dust-heatmap-mode]']) {
+    for (const selector of ['[data-dust-credit-mode]', '[data-dust-heatmap-mode]',
+      '[data-dust-movie-credit-mode]', '[data-dust-movie-heatmap-mode]']) {
       $(selector).addEventListener('change', event => {
         if (event.target.value.split(':')[0] === 'originalCreators') void loadAnimeCredits();
         publish(context.snapshot());
@@ -540,11 +539,14 @@
       ? 'Select up to three studios here or in the field to focus the analysis below on their catalogue anime. Select a studio again to remove it.'
       : group ? `Select up to three ${group.noun} here or in the field to filter ${reverse ? 'Score vs. popularity rank' : 'Score vs. popularity'} to their ${AnivizDust.titleNoun(latest.direction)} and highlight their contributions in the other charts. Select a dot again to remove it.`
         : 'Outlined titles are selected for comparison in the playground and here. Click an outlined title to remove it. Click any other title to open its details and add it to the comparison if there’s room for it. Compare up to three titles.';
-    $('#dust-mirror-guide').textContent = `Zoom in for ${studios ? 'studio names' : group ? 'portraits' : 'posters'}. Select a title magnet to show it in the In Focus panel. Drag magnets or use arrow keys to move them. Select ${group?.noun || 'titles'} to compare them, or click empty space to remove the latest selection.`;
+    $('#dust-mirror-guide').textContent = `In Brushing and linking mode, move or resize the shared brush here or in the main field. Zoom in for ${studios ? 'studio names' : group ? 'portraits' : 'posters'}. Select a title magnet to show it in the In Focus panel. Drag magnets or use arrow keys to move them. Select ${group?.noun || 'titles'} to compare them, or click empty space to remove the latest selection.`;
     $('[data-dust-genre-metric] option[value="popularity"]').textContent = reverse ? 'Popularity score' : 'Popularity';
     $('[data-dust-chart="heatmap"]').classList.toggle('studio-heatmap', studios);
     $('[data-title-studio-filter]').hidden = Boolean(group) || reverse;
-    document.querySelectorAll('[data-anime-only], [data-anime-chart]').forEach(node => { node.hidden = reverse; });
+    $('#dust-credit-heatmap-title').textContent = reverse ? 'Movie credit heatmap' : 'Anime credit heatmap';
+    $('#dust-heatmap-title-type').textContent = reverse ? 'movies' : 'anime';
+    document.querySelectorAll('[data-anime-only]').forEach(node => { node.hidden = reverse; });
+    document.querySelectorAll('[data-movie-only]').forEach(node => { node.hidden = !reverse; });
     populateFilterChoices();
     resetMagnetPicker();
   }
@@ -560,7 +562,7 @@
     requestAnimationFrame(() => {
       if (latest.direction !== direction) return;
       const returning = ['back_forward', 'reload'].includes(performance.getEntriesByType('navigation')[0]?.type);
-      const anchor = location.hash === '#creators' && isReverse() ? '#content' : location.hash;
+      const anchor = location.hash;
       const target = !returning && ['#content', '#creators', '#reception'].includes(anchor) ? $(anchor) : null;
       if (target) target.scrollIntoView();
       else window.scrollTo(0, context.getLayout().scrollY || 0);

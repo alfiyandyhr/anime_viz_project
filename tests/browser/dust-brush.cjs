@@ -12,6 +12,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(new URL('frontend/dust-magnet/index.html', base).href);
     const field = page.locator('#recommendation-chart');
+    const mirror = page.locator('#dust-mirror');
     const frame = field.locator('.dust-brush-frame');
     const brushBounds = () => frame.evaluate(el => el.getBoundingClientRect().toJSON());
     const strongest = page.getByRole('radio', { name: 'Strongest magnet' });
@@ -20,7 +21,14 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     await page.waitForFunction(() => AnivizMain.snapshot().metadataStatus === 'ready');
     assert.ok(await brushing.isChecked());
     assert.ok(await frame.isVisible());
+    assert.ok(await mirror.locator('.dust-brush-frame').isVisible());
     assert.equal(await field.locator('.dust-brush circle').count(), 0);
+    assert.ok(await frame.evaluate(el => {
+      const { x, y, width, height } = el.getBBox();
+      const view = el.ownerSVGElement.viewBox.baseVal;
+      return Math.abs(x + width / 2 - view.width / 2) < 0.1 && Math.abs(y + height / 2 - view.height / 2) < 0.1;
+    }));
+    assert.equal(await field.locator('.magnet-number').evaluate(el => getComputedStyle(el).userSelect), 'none');
 
     const heatmap = page.locator('[data-dust-chart="heatmap"]');
     const heatmapColors = async () => {
@@ -37,6 +45,17 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       await page.mouse.up();
     };
     const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 2, `${actual} ≈ ${expected}`);
+    const frameAttributes = plot => plot.locator('.dust-brush-frame').evaluate(el =>
+      ['x', 'y', 'width', 'height'].map(attribute => Number(el.getAttribute(attribute))));
+    const brushGrabPoint = plot => plot.locator('.dust-brush-surface').evaluate(surface => {
+      const rect = surface.getBoundingClientRect();
+      for (let y = rect.top + 12; y < rect.bottom - 12; y += 4) {
+        for (let x = rect.left + 12; x < rect.right - 12; x += 4) {
+          if (document.elementFromPoint(x, y) === surface) return [x, y];
+        }
+      }
+      throw new Error('No reachable point inside the brush');
+    });
     const selected = field.locator('.dust-node').first();
     await selected.press('Enter');
     const selection = await page.evaluate(() => AnivizMain.snapshot().selectedKeys);
@@ -48,7 +67,12 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     const dot = await selected.locator('.dust-hit-area').boundingBox();
     const dx = dot.x + dot.width / 2 - start.x - start.width / 2;
     const dy = dot.y + dot.height / 2 - start.y - start.height / 2;
-    await drag(start.x + start.width / 2, start.y + start.height / 2, dx, dy);
+    const [grabX, grabY] = await brushGrabPoint(field);
+    await page.mouse.click(grabX, grabY);
+    const brush = field.getByRole('group', { name: 'Brush selection' });
+    assert.equal(await brush.evaluate(el => getComputedStyle(el).outlineStyle), 'none');
+    assert.equal(await frame.evaluate(el => getComputedStyle(el).strokeDasharray), 'none');
+    await drag(grabX, grabY, dx, dy);
     const moved = await brushBounds();
     near(moved.x, start.x + dx);
     near(moved.y, start.y + dy);
@@ -120,10 +144,10 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 
     await strongest.check();
     assert.ok(await frame.isHidden());
+    assert.ok(await mirror.locator('.dust-brush-frame').isHidden());
     assert.equal(await field.locator('.dust-grain[fill="var(--pink)"]').count(), 0);
     await brushing.check();
     assert.deepEqual(await verifyGeometry(), keys);
-    const brush = field.getByRole('group', { name: 'Brush selection' });
     const beforeKeyboard = await frame.getAttribute('width');
     await brush.press('Shift+ArrowRight');
     assert.equal(Number(await frame.getAttribute('width')), Number(beforeKeyboard) + 8);
@@ -144,7 +168,20 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     near(resized.width, panned.width + 32);
     near(resized.height, panned.height + 24);
     await verifyGeometry();
+    await mirror.scrollIntoViewIfNeeded();
+    const initialMirror = await frameAttributes(mirror);
+    const [mirrorX, mirrorY] = await brushGrabPoint(mirror);
+    await drag(mirrorX, mirrorY, 28, 0);
+    const movedMirror = await frameAttributes(mirror);
+    assert.ok(movedMirror[0] > initialMirror[0]);
+    assert.deepEqual(movedMirror, await frameAttributes(field));
+    const mirrorBrush = mirror.getByRole('group', { name: 'Brush selection' });
+    await mirrorBrush.press('Shift+ArrowDown');
+    assert.equal((await frameAttributes(field))[3], movedMirror[3] + 8);
+    const finalKeys = await verifyGeometry();
+    assert.deepEqual(await mirror.locator('.dust-grain[fill="var(--pink)"]').evaluateAll(grains =>
+      grains.map(grain => grain.__data__.key)), finalKeys);
     assert.deepEqual(errors, []);
-    console.log('Verified linked colors, the independent heatmap, and brush resizing before and after zoom and pan.');
+    console.log('Verified centered brushes, pointer focus styling, shared drag and resize, and linked colors.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

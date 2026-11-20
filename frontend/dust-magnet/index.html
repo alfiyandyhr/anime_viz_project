@@ -314,21 +314,27 @@
             <p data-coverage="genres"></p><div class="dust-linked-chart" data-dust-chart="genres"></div></article>
           <article class="chart-card"><h3>Release years</h3>
             <p data-coverage="years"></p><div class="dust-linked-chart" data-dust-chart="years"></div></article>
-          <article class="chart-card" id="creators" data-anime-only>
+          <article class="chart-card" id="creators">
             <h3>Score vs. popularity by credit</h3>
-            <label class="dust-analysis-control">Group by
+            <label class="dust-analysis-control" data-anime-only>Group by
               <select data-dust-credit-mode>
                 <option value="studios">Studios</option>
                 <option value="voiceActors">Voice actors</option>
                 <option value="originalCreators">Original creators</option>
               </select>
             </label>
+            <label class="dust-analysis-control" data-movie-only hidden>Group by
+              <select data-dust-movie-credit-mode>
+                <option value="movieActors">Actors</option>
+                <option value="movieWriters">Writers</option>
+              </select>
+            </label>
             <p data-coverage="studios">Circle area represents matching titles. Zoom in for available portraits.</p>
-            <div class="dust-linked-chart" data-dust-chart="studios" data-anime-chart></div>
+            <div class="dust-linked-chart" data-dust-chart="studios"></div>
           </article>
-          <article class="chart-card" data-anime-only>
-            <h3>Anime credit heatmap</h3>
-            <label class="dust-analysis-control">Compare
+          <article class="chart-card">
+            <h3 id="dust-credit-heatmap-title">Anime credit heatmap</h3>
+            <label class="dust-analysis-control" data-anime-only>Compare
               <select data-dust-heatmap-mode>
                 <option value="studios:genres">Studio × genre</option>
                 <option value="voiceActors:genres">Voice actors × genre</option>
@@ -337,8 +343,14 @@
                 <option value="originalCreators:studios">Original creators × studio</option>
               </select>
             </label>
-            <p data-coverage="heatmap">Up to 15 rows and 10 columns, ranked by title count. Each cell counts distinct anime.</p>
-            <div class="dust-linked-chart" role="region" tabindex="0" aria-label="Anime credit heatmap, scroll horizontally if needed" data-dust-chart="heatmap" data-anime-chart></div>
+            <label class="dust-analysis-control" data-movie-only hidden>Compare
+              <select data-dust-movie-heatmap-mode>
+                <option value="movieActors:genres">Actors × genre</option>
+                <option value="movieWriters:genres">Writers × genre</option>
+              </select>
+            </label>
+            <p>Up to 15 rows and 10 columns, ranked by title count. Each cell counts distinct <span id="dust-heatmap-title-type">anime</span>.</p>
+            <div class="dust-linked-chart" role="region" tabindex="0" aria-labelledby="dust-credit-heatmap-title" data-dust-chart="heatmap"></div>
           </article>
         </section>
 

@@ -6,7 +6,7 @@ const DUST_UNIFORM_COLOR = "var(--dust-uniform)";
 const DUST_BRUSH_COLOR = "var(--pink)";
 const DUST_ENGINE = typeof module !== "undefined" && module.exports ? require("../common/dust-context.js") : AnivizDust;
 let dustChart = null;
-let dustBrushBounds = [.10, .11, .31, .28];
+let dustBrushBounds = [.395, .415, .605, .585];
 
 // Keep the original forward helper available to existing callers.
 function getDustMatches(data, scores, movieIds, limit = 60) {
@@ -374,7 +374,7 @@ function renderDustLegend({ magnets, colorByMagnet, mixed }) {
 
 function refreshDustColors() {
   renderDustLegend(AnivizMain.snapshot());
-  dustChart?.views?.[0].updateBrush();
+  dustChart?.updateBrush?.();
   dustChart?.views?.forEach(view => view.drawColors());
 }
 
@@ -454,11 +454,7 @@ function createDustBrush(scene, width, height, onChange) {
   const margin = 11, minimum = 44;
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   let scale = 1;
-  let [left, top, right, bottom] = dustBrushBounds.map((value, index) => value * (index % 2 ? height : width));
-  left = clamp(left, margin, width - margin - minimum);
-  top = clamp(top, margin, height - margin - minimum);
-  right = clamp(right, left + minimum, width - margin);
-  bottom = clamp(bottom, top + minimum, height - margin);
+  let left, top, right, bottom;
 
   const surface = scene.insert("rect", ":first-child").attr("class", "dust-brush dust-brush-surface");
   const layer = scene.append("g").attr("class", "dust-brush").attr("tabindex", 0).attr("role", "group")
@@ -487,6 +483,13 @@ function createDustBrush(scene, width, height, onChange) {
     }
     drawHandles();
   }
+  function setBounds(bounds) {
+    left = clamp(bounds[0] * width, margin, width - margin - minimum);
+    top = clamp(bounds[1] * height, margin, height - margin - minimum);
+    right = clamp(bounds[2] * width, left + minimum, width - margin);
+    bottom = clamp(bounds[3] * height, top + minimum, height - margin);
+    draw();
+  }
   function change(dx, dy, edge) {
     if (edge) {
       const [x, y] = edge;
@@ -499,9 +502,7 @@ function createDustBrush(scene, width, height, onChange) {
       dy = clamp(dy, margin - top, height - margin - bottom);
       left += dx; right += dx; top += dy; bottom += dy;
     }
-    dustBrushBounds = [left / width, top / height, right / width, bottom / height];
-    draw();
-    onChange();
+    onChange([left / width, top / height, right / width, bottom / height]);
   }
   const drag = d3.drag().container(scene.node()).clickDistance(4)
     .on("start", () => { hideTooltip(); layer.node().focus({ preventScroll: true }); })
@@ -514,9 +515,10 @@ function createDustBrush(scene, width, height, onChange) {
     event.preventDefault();
     change(...delta, event.shiftKey ? [1, 1] : null);
   });
-  draw();
+  setBounds(dustBrushBounds);
   let shown;
   return {
+    setBounds,
     show(visible) {
       if (visible === shown) return;
       shown = visible;
@@ -531,7 +533,7 @@ function createDustBrush(scene, width, height, onChange) {
   };
 }
 
-function createDustView(container, matches, anchors, width, height, onMove, { label, mixed, direction, zoomContent, primary }) {
+function createDustView(container, matches, anchors, width, height, { onMove, onBrushChange, label, mixed, direction, zoomContent }) {
   const group = AnivizDust.groupFor(direction);
   const svg = d3.select(container).append("svg").attr("viewBox", `0 0 ${width} ${height}`)
     .attr("width", width).attr("height", height).attr("class", "dust-map")
@@ -662,17 +664,7 @@ function createDustView(container, matches, anchors, width, height, onMove, { la
     return `${magnet.title} (${description})`;
   });
 
-  const brush = primary ? createDustBrush(scene, width, height, updateBrush) : null;
-  function updateBrush() {
-    if (!brush || !svg.node().isConnected) return;
-    const visible = !AnivizMain.snapshot().colorByMagnet;
-    brush.show(visible);
-    if (!visible || !positions) return;
-    AnivizMain.setBrushedKeys(matches.filter(match => {
-      const { x, y } = positions.get(match.key);
-      return brush.contains(x, y);
-    }).map(match => match.key));
-  }
+  const brush = createDustBrush(scene, width, height, onBrushChange);
 
   const camera = AnivizPosterZoom.attach({
     container, svg, d3, label, extent: [[0, 0], [width, height]],
@@ -690,13 +682,13 @@ function createDustView(container, matches, anchors, width, height, onMove, { la
         if (!posterImages) addPosters();
         scene.style("--dust-poster-scale", 1 / transform.k);
       }
-      brush?.setScale(transform.k);
+      brush.setScale(transform.k);
     }
   });
 
   return {
     drawArtwork,
-    updateBrush,
+    brush,
     drawColors() {
       grains.attr("fill", AnivizMain.dustColor);
       posterTitles?.style("color", AnivizMain.dustColor);
@@ -743,18 +735,16 @@ function renderDustChart(container, mirror, magnets, matches, mixed) {
   const group = AnivizDust.groupFor(direction);
   const noun = group?.noun || AnivizDust.titleNoun(direction);
   const zoomContent = direction === AnivizDust.STUDIOS ? "studio names" : group ? "portraits" : "posters";
-  const views = [createDustView(container, matches, anchors, width, height, moveAnchor, {
-    label: `Displayed ${noun}`, mixed, direction, zoomContent, primary: true
-  }), createDustView(mirror, matches, anchors, width, height, moveAnchor, {
-    label: `Mirror of ${noun}`, mixed, direction, zoomContent
-  })];
+  const viewOptions = { onMove: moveAnchor, onBrushChange: moveBrush, mixed, direction, zoomContent };
+  const views = [createDustView(container, matches, anchors, width, height, { ...viewOptions, label: `Displayed ${noun}` }),
+    createDustView(mirror, matches, anchors, width, height, { ...viewOptions, label: `Mirror of ${noun}` })];
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const nodes = createDustNodes(matches, anchors, width, height, dustChart, mixed);
   // First entry is already gathered. Later changes start from the previous positions.
   if (!dustChart || reducedMotion) settleDust(nodes, anchors, width, height, mixed);
   const positions = new Map(nodes.map((node) => [node.key, node]));
   let frame = null, lastTime = null, quietFrames = 0;
-  dustChart = { views, positions, anchors, width, height, setMagnetStrengths(strengths) {
+  dustChart = { views, positions, anchors, width, height, updateBrush, setMagnetStrengths(strengths) {
     anchors.forEach(anchor => { anchor.strength = strengths[anchor.magnet.key] ?? 1; });
     if (reducedMotion) {
       settleDust(nodes, anchors, width, height, mixed);
@@ -779,8 +769,21 @@ function renderDustChart(container, mirror, magnets, matches, mixed) {
   }
   function draw() {
     views.forEach(view => view.draw(positions));
-    views[0].updateBrush();
+    updateBrush();
     highlightDustConnections();
+  }
+  function moveBrush(bounds) {
+    dustBrushBounds = bounds;
+    views.forEach(({ brush }) => brush.setBounds(bounds));
+    updateBrush();
+  }
+  function updateBrush() {
+    if (!container.querySelector('.dust-map')) return;
+    const visible = !AnivizMain.snapshot().colorByMagnet;
+    views.forEach(({ brush }) => brush.show(visible));
+    if (!visible) return;
+    const { brush } = views[0];
+    AnivizMain.setBrushedKeys(nodes.filter(({ x, y }) => brush.contains(x, y)).map(({ key }) => key));
   }
   function animate(time) {
     frame = null;
