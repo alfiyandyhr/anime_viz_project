@@ -13,6 +13,8 @@ const HistoryMatchSpan = (() => {
     const $ = selector => root.querySelector(selector);
     const direction = $(".history-perspective");
     const yearPicker = $("#history-span-year");
+    const previousYear = $("#history-span-previous-year");
+    const nextYear = $("#history-span-next-year");
     const status = $("#history-span-status");
     const statusText = status.querySelector("span");
     const retry = status.querySelector("button");
@@ -38,17 +40,17 @@ const HistoryMatchSpan = (() => {
       retry.onclick = onRetry;
     }
 
-    function renderCalculation({ years, gaps, span }) {
-      const nodes = [textElement("span", years[0])];
+    function renderCalculation({ years, centralYears, gaps, span }) {
+      const nodes = [textElement("span", centralYears[0])];
       gaps.forEach((gap, index) => {
         const connector = document.createElement("span");
         connector.className = "history-span-gap";
         connector.append(textElement("span", gap));
-        nodes.push(connector, textElement("span", years[index + 1]));
+        nodes.push(connector, textElement("span", centralYears[index + 1]));
       });
       steps.replaceChildren(...nodes);
-      equation.firstElementChild.textContent = `Release years: ${years.join(", ")}. `;
-      equation.lastElementChild.textContent = `${gaps.join(" + ")} = ${formatSpan(span)}`;
+      equation.firstElementChild.textContent = `All five release years, newest first: ${years.join(", ")}. Using the middle three: ${centralYears.join(", ")}. `;
+      equation.lastElementChild.textContent = `Q3 − Q1: ${centralYears[0]} − ${centralYears.at(-1)} = ${formatSpan(span)}`;
     }
 
     function renderComparison(year, anchorMedium) {
@@ -66,7 +68,7 @@ const HistoryMatchSpan = (() => {
         label.className = "history-span-bar-title";
         label.append(textElement("span", item.year),
           textElement("strong", item.anchor?.title ?? `No top ${anchorMedium} available`));
-        const range = textElement("span", item.summary ? `${item.summary.years.at(-1)}–${item.summary.years[0]}` : "Range unavailable");
+        const range = textElement("span", item.summary ? `${item.summary.centralYears.at(-1)}–${item.summary.centralYears[0]}` : "Range unavailable");
         range.className = "history-span-bar-range";
         const length = textElement("span", item.summary ? formatSpan(item.summary.span) : "Unavailable");
         length.className = "history-span-bar-length";
@@ -106,7 +108,7 @@ const HistoryMatchSpan = (() => {
       value.hidden = calculation.hidden = !summary;
       if (summary) {
         value.textContent = formatSpan(summary.span);
-        caption.textContent = `Span of the 5 closest ${moviePerspective ? "anime" : "movie"} matches`;
+        caption.textContent = `Interquartile range (IQR) of the 5 closest ${moviePerspective ? "anime" : "movie"} matches. Uses the middle 3 release years; the earliest and latest are excluded.`;
         renderCalculation(summary);
       } else {
         caption.textContent = matches.length ? "Five dated matches are needed to calculate the span."
@@ -126,13 +128,20 @@ const HistoryMatchSpan = (() => {
         root.dataset.direction = mode;
         const moviePerspective = mode === "movie";
         comparisonHeading.textContent = `Compare nearby ${moviePerspective ? "movie" : "anime"} release years`;
-        comparisonDescription.textContent = `Each row shows that year’s top ${moviePerspective ? "movie" : "anime"} and the release range of its five closest ${moviePerspective ? "anime" : "movie"} matches. The span is the latest release year minus the earliest, equal to the sum of the gaps between adjacent years.`;
+        comparisonDescription.textContent = `Each row shows that year’s top ${moviePerspective ? "movie" : "anime"} and the interquartile release-year range of its five closest ${moviePerspective ? "anime" : "movie"} matches. The span is the second-newest year (Q3) minus the second-oldest (Q1), reducing the influence of isolated early or late matches.`;
         yearPicker.replaceChildren(...pairs.map(pair => new Option(pair.year, pair.year)));
         yearPicker.disabled = false;
         results.hidden = false;
       }
       yearPicker.selectedIndex = index;
+      previousYear.disabled = index <= 0;
+      nextYear.disabled = index >= pairs.length - 1;
       if (root.open) render();
+    }
+
+    function stepYear(offset) {
+      const pair = pairs[yearPicker.selectedIndex + offset];
+      if (pair) onYearChange(pair.year);
     }
 
     root.addEventListener("toggle", () => {
@@ -140,6 +149,8 @@ const HistoryMatchSpan = (() => {
     });
     direction.addEventListener("change", event => onDirectionChange(event.target));
     yearPicker.addEventListener("change", () => onYearChange(Number(yearPicker.value)));
+    previousYear.addEventListener("click", () => stepYear(-1));
+    nextYear.addEventListener("click", () => stepYear(1));
     return { setDirection, showStatus, update };
   }
 
