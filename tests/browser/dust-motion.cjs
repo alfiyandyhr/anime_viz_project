@@ -1,6 +1,7 @@
 // Optional real-browser verification. See tests/journey-verification.md for setup.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
+const { openAnalysisTab } = require('./dust-analysis-tab.cjs');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 const titles = ['tmdb:27205', 'tmdb:157336', 'tmdb:603'];
 const field = page => page.locator('#recommendation-chart');
@@ -93,6 +94,7 @@ async function setup(page, errors) {
     await page.locator('[data-field-options] summary').click();
     await page.selectOption('#genre-filter', 'Action');
     await dots(page).first().press('Enter');
+    await openAnalysisTab(page, 'ranking');
     await page.selectOption('[data-dust-ranking-sort]', titles[1]);
     const before = await evidence(page);
     const beforeTable = await page.locator('[data-dust-ranking-body]').innerText();
@@ -124,6 +126,7 @@ async function setup(page, errors) {
     for (const score of expectedScores) assert.ok((await page.locator('#tooltip.visible').innerText()).includes(score));
 
     const initialMagnets = await transforms(page, '.dust-magnet');
+    await openAnalysisTab(page, 'reception');
     await page.locator('#dust-mirror .dust-magnet').filter({ hasText: 'M2' }).press('ArrowRight');
     const movedMagnets = await transforms(page, '.dust-magnet');
     assert.notDeepEqual(movedMagnets, initialMagnets);

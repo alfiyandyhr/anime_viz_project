@@ -82,7 +82,7 @@
       <section class="chapter is-active" id="chapter-dust-magnet" data-chapter="dust-magnet" aria-label="Dust &amp; Magnet">
         <h1 class="sr-only">Dust &amp; Magnet</h1>
 
-        <div class="dust-playground">
+        <div class="dust-playground" id="dust-playground" role="region" aria-label="Dust &amp; Magnet playground" tabindex="-1">
         <aside class="recommendation-picker" aria-label="Magnets and field controls">
           <label class="picker-select-label" for="dust-type">
             <span>Dust type</span>
@@ -278,80 +278,103 @@
         <div id="dust-selection" class="dust-selection" role="status" aria-live="polite" hidden></div>
         <aside id="recommendation-detail" class="recommendation-detail" aria-label="Selected title comparison" hidden></aside>
 
-        <section id="dust-analysis" aria-label="Displayed dust analysis">
-
-          <article class="chart-card dust-analysis-wide"><p class="chart-kicker">Compare similarities &amp; differences</p>
-            <h3 id="dust-connection-title">Which stories are similar—and which differ?</h3>
-            <p id="dust-connection-method">Select a magnet to rank the displayed titles by cosine similarity. Thicker curves show higher scores within that magnet’s range. Dust members lists the titles that score highest for the selected magnet. Scroll either list to see more titles.</p>
-            <p id="dust-connection-selection">Outlined titles are selected for comparison in the playground and here. Click an outlined title to remove it. Click any other title to open its details and add it to the comparison if there’s room for it. Compare up to three titles.</p>
-            <p data-coverage="connections"></p><div class="dust-linked-chart" role="region" aria-label="Similarity connections" data-dust-chart="connections"></div></article>
-          <article class="chart-card dust-analysis-wide"><h3 id="dust-ranking-title">Full anime ranking</h3>
-            <p data-dust-ranking-note></p>
-            <p>Use Compare to select or deselect displayed dust. Compare up to three entries at a time.</p>
-            <label class="dust-analysis-control">Rank by <select data-dust-ranking-sort><option value="average">Average similarity</option></select></label>
-            <label class="dust-analysis-control">Rank order <select data-dust-ranking-order>
-              <option value="ascending">Ascending (rank 1 first)</option>
-              <option value="descending">Descending (last rank first)</option>
-            </select></label>
-            <div class="table-wrapper" role="region" tabindex="0" aria-label="Full similarity ranking, scroll horizontally">
-              <table><thead data-dust-ranking-head></thead><tbody data-dust-ranking-body></tbody></table>
-            </div><nav data-dust-ranking-pages aria-label="Full similarity ranking pages"></nav>
-            <p data-dust-ranking-notice role="status"></p>
-          </article>
-          <div class="dust-analysis-wide dust-reception">
-            <article class="chart-card" id="reception"><h3>Score vs. popularity</h3>
-              <p id="dust-studio-scope" hidden></p>
-              <p data-coverage="reception"></p><p id="dust-reception-guide">Zoom in for posters. Select a title to open its details.</p>
-              <div class="dust-linked-chart" data-dust-chart="reception"></div></article>
-            <article class="chart-card" aria-labelledby="dust-mirror-title">
-              <h3 id="dust-mirror-title">Dust &amp; Magnet mirror</h3>
-              <p id="dust-mirror-guide">Zoom in for posters. Select a title magnet to show it in the In Focus panel. Drag magnets or use arrow keys to move them. Select titles to compare them, or click empty space to remove the latest selection.</p>
-              <div class="dust-linked-chart" id="dust-mirror"></div>
+        <section id="dust-analysis" aria-labelledby="dust-analysis-heading">
+          <div class="dust-analysis-toolbar">
+            <div class="dust-analysis-heading">
+              <h2 id="dust-analysis-heading">In-depth analysis</h2>
+              <a href="#dust-playground" class="dust-playground-link"><span aria-hidden="true">↑</span> Back to playground</a>
+            </div>
+            <div class="dust-analysis-tabs" role="tablist" aria-labelledby="dust-analysis-heading">
+              <button type="button" role="tab" id="dust-tab-similarities" aria-controls="dust-panel-similarities"
+                aria-selected="true">Compare similarities &amp; differences</button>
+              <button type="button" role="tab" id="dust-tab-ranking" aria-controls="dust-panel-ranking"
+                aria-selected="false" tabindex="-1">Full anime ranking</button>
+              <button type="button" role="tab" id="dust-tab-reception" aria-controls="dust-panel-reception"
+                aria-selected="false" tabindex="-1">Score vs. popularity &amp; dust mirror</button>
+              <button type="button" role="tab" id="dust-tab-content" aria-controls="dust-panel-content"
+                aria-selected="false" tabindex="-1">Genres &amp; release years</button>
+              <button type="button" role="tab" id="dust-tab-credits" aria-controls="dust-panel-credits"
+                aria-selected="false" tabindex="-1">Score vs. popularity by credit &amp; heatmap</button>
+            </div>
+          </div>
+          <div class="dust-analysis-panel" role="tabpanel" id="dust-panel-similarities" aria-labelledby="dust-tab-similarities" tabindex="0">
+            <article class="chart-card"><h3 id="dust-connection-title">Which stories are similar—and which differ?</h3>
+              <p data-coverage="connections"></p><div class="dust-linked-chart" role="region" aria-label="Similarity connections" data-dust-chart="connections"></div></article>
+          </div>
+          <div class="dust-analysis-panel" role="tabpanel" id="dust-panel-ranking" aria-labelledby="dust-tab-ranking" tabindex="0" hidden>
+            <article class="chart-card"><h3 id="dust-ranking-title">Full anime ranking</h3>
+              <p>Use Compare to select or deselect displayed dust. Compare up to three entries at a time.</p>
+              <label class="dust-analysis-control">Rank by <select data-dust-ranking-sort><option value="average">Average similarity</option></select></label>
+              <label class="dust-analysis-control">Rank order <select data-dust-ranking-order>
+                <option value="ascending">Ascending (rank 1 first)</option>
+                <option value="descending">Descending (last rank first)</option>
+              </select></label>
+              <div class="table-wrapper" role="region" tabindex="0" aria-label="Full similarity ranking, scroll horizontally">
+                <table><thead data-dust-ranking-head></thead><tbody data-dust-ranking-body></tbody></table>
+              </div><nav data-dust-ranking-pages aria-label="Full similarity ranking pages"></nav>
+              <p data-dust-ranking-notice role="status"></p>
             </article>
           </div>
-          <article class="chart-card" id="content"><h3>Genres</h3>
-            <label class="dust-analysis-control">Metric <select data-dust-genre-metric><option value="count">Titles</option><option value="score">Average score</option><option value="popularity">Popularity</option></select></label>
-            <p data-coverage="genres"></p><div class="dust-linked-chart" data-dust-chart="genres"></div></article>
-          <article class="chart-card"><h3>Release years</h3>
-            <p data-coverage="years"></p><div class="dust-linked-chart" data-dust-chart="years"></div></article>
-          <article class="chart-card" id="creators">
-            <h3>Score vs. popularity by credit</h3>
-            <label class="dust-analysis-control" data-anime-only>Group by
-              <select data-dust-credit-mode>
-                <option value="studios">Studios</option>
-                <option value="voiceActors">Voice actors</option>
-                <option value="originalCreators">Original creators</option>
-              </select>
-            </label>
-            <label class="dust-analysis-control" data-movie-only hidden>Group by
-              <select data-dust-movie-credit-mode>
-                <option value="movieActors">Actors</option>
-                <option value="movieWriters">Writers</option>
-              </select>
-            </label>
-            <p data-coverage="studios">Circle area represents matching titles. Zoom in for available portraits.</p>
-            <div class="dust-linked-chart" data-dust-chart="studios"></div>
-          </article>
-          <article class="chart-card">
-            <h3 id="dust-credit-heatmap-title">Anime credit heatmap</h3>
-            <label class="dust-analysis-control" data-anime-only>Compare
-              <select data-dust-heatmap-mode>
-                <option value="studios:genres">Studio × genre</option>
-                <option value="voiceActors:genres">Voice actors × genre</option>
-                <option value="originalCreators:genres">Original creators × genre</option>
-                <option value="voiceActors:studios">Voice actors × studio</option>
-                <option value="originalCreators:studios">Original creators × studio</option>
-              </select>
-            </label>
-            <label class="dust-analysis-control" data-movie-only hidden>Compare
-              <select data-dust-movie-heatmap-mode>
-                <option value="movieActors:genres">Actors × genre</option>
-                <option value="movieWriters:genres">Writers × genre</option>
-              </select>
-            </label>
-            <p>Up to 15 rows and 10 columns, ranked by title count. Each cell counts distinct <span id="dust-heatmap-title-type">anime</span>.</p>
-            <div class="dust-linked-chart" role="region" tabindex="0" aria-labelledby="dust-credit-heatmap-title" data-dust-chart="heatmap"></div>
-          </article>
+          <div class="dust-analysis-panel" role="tabpanel" id="dust-panel-reception" aria-labelledby="dust-tab-reception" tabindex="0" hidden>
+            <div class="dust-reception">
+              <article class="chart-card" id="reception"><h3>Score vs. popularity</h3>
+                <p id="dust-studio-scope" hidden></p>
+                <p data-coverage="reception"></p><p id="dust-reception-guide">Zoom in for posters. Select a title to open its details.</p>
+                <div class="dust-linked-chart" data-dust-chart="reception"></div></article>
+              <article class="chart-card" aria-labelledby="dust-mirror-title">
+                <h3 id="dust-mirror-title">Dust &amp; Magnet mirror</h3>
+                <p id="dust-mirror-guide">Zoom in for posters. Select a title magnet to show it in the In Focus panel. Drag magnets or use arrow keys to move them. Select titles to compare them, or click empty space to remove the latest selection.</p>
+                <div class="dust-linked-chart" id="dust-mirror"></div>
+              </article>
+            </div>
+          </div>
+          <div class="dust-analysis-panel dust-analysis-pair" role="tabpanel" id="dust-panel-content" aria-labelledby="dust-tab-content" tabindex="0" hidden>
+            <article class="chart-card" id="content"><h3>Genres</h3>
+              <label class="dust-analysis-control">Metric <select data-dust-genre-metric><option value="count">Titles</option><option value="score">Average score</option><option value="popularity">Popularity</option></select></label>
+              <p data-coverage="genres"></p><div class="dust-linked-chart" data-dust-chart="genres"></div></article>
+            <article class="chart-card"><h3>Release years</h3>
+              <p data-coverage="years"></p><div class="dust-linked-chart" data-dust-chart="years"></div></article>
+          </div>
+          <div class="dust-analysis-panel dust-analysis-pair" role="tabpanel" id="dust-panel-credits" aria-labelledby="dust-tab-credits" tabindex="0" hidden>
+            <article class="chart-card" id="creators">
+              <h3>Score vs. popularity by credit</h3>
+              <label class="dust-analysis-control" data-anime-only>Group by
+                <select data-dust-credit-mode>
+                  <option value="studios">Studios</option>
+                  <option value="voiceActors">Voice actors</option>
+                  <option value="originalCreators">Original creators</option>
+                </select>
+              </label>
+              <label class="dust-analysis-control" data-movie-only hidden>Group by
+                <select data-dust-movie-credit-mode>
+                  <option value="movieActors">Actors</option>
+                  <option value="movieWriters">Writers</option>
+                </select>
+              </label>
+              <p data-coverage="studios">Circle area represents matching titles. Zoom in for available portraits.</p>
+              <div class="dust-linked-chart" data-dust-chart="studios"></div>
+            </article>
+            <article class="chart-card">
+              <h3 id="dust-credit-heatmap-title">Anime credit heatmap</h3>
+              <label class="dust-analysis-control" data-anime-only>Compare
+                <select data-dust-heatmap-mode>
+                  <option value="studios:genres">Studio × genre</option>
+                  <option value="voiceActors:genres">Voice actors × genre</option>
+                  <option value="originalCreators:genres">Original creators × genre</option>
+                  <option value="voiceActors:studios">Voice actors × studio</option>
+                  <option value="originalCreators:studios">Original creators × studio</option>
+                </select>
+              </label>
+              <label class="dust-analysis-control" data-movie-only hidden>Compare
+                <select data-dust-movie-heatmap-mode>
+                  <option value="movieActors:genres">Actors × genre</option>
+                  <option value="movieWriters:genres">Writers × genre</option>
+                </select>
+              </label>
+              <p>Up to 15 rows and 10 columns, ranked by title count. Each cell counts distinct <span id="dust-heatmap-title-type">anime</span>.</p>
+              <div class="dust-linked-chart" role="region" tabindex="0" aria-labelledby="dust-credit-heatmap-title" data-dust-chart="heatmap"></div>
+            </article>
+          </div>
         </section>
 
         <details class="methodology">
@@ -374,25 +397,25 @@
             <article><h3>A starting point</h3><p>These are text-based recommendations, not predictions of your enjoyment. Seasons, sequels, and the same animated film in both databases can appear separately. Genre labels are context, not an explanation of the model’s score.</p></article>
           </div>
         <div class="data-freshness"><span id="footer-generated">Data not loaded</span> · <span id="footer-cache"></span></div></details>
-        <div class="stage-foot recommendation-credits">
-          <div class="recommendation-credit-logos">
-            <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer" aria-label="The Movie Database">
-              <img src="../../assets/tmdb-logo.svg" alt="TMDB" width="72" height="52">
-            </a>
-            <a href="https://anilist.co/" target="_blank" rel="noopener noreferrer">
-              <img src="../../assets/anilist-logo.png" alt="AniList" width="52" height="52">
-            </a>
-          </div>
-          <p>This product uses the TMDB API but is not endorsed or certified by TMDB. Anime metadata from <a href="https://anilist.co/" target="_blank" rel="noopener noreferrer">AniList</a>.</p>
-        </div>
       </section>
 
-    <footer class="data-footer">
+      <footer class="data-footer">
         <div class="data-status" role="status" aria-live="polite">
           <span id="status-dot" class="status-dot loading"></span>
           <span id="data-status">Loading title data…</span>
         </div>
         <span class="source-credit">AniList × TMDB × D3.js</span>
+        <div class="data-attribution">
+          <div class="data-attribution-logos">
+            <a href="https://anilist.co/" target="_blank" rel="noopener noreferrer">
+              <img src="../../assets/anilist-logo.png" alt="AniList" width="36" height="36">
+            </a>
+            <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">
+              <img src="../../assets/tmdb-logo.svg" alt="TMDB" width="50" height="36">
+            </a>
+          </div>
+          <p>Anime data comes from AniList, and movie data comes from The Movie Database (TMDB).</p>
+        </div>
       </footer>
     </main>
   </div>

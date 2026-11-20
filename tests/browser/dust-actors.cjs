@@ -1,6 +1,7 @@
 // Optional browser regression. See journey-verification.md for Playwright setup.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
+const { openAnalysisTab } = require('./dust-analysis-tab.cjs');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 
 async function verifyCredits(browser, dustType, creditLabel) {
@@ -46,6 +47,7 @@ async function verifyCredits(browser, dustType, creditLabel) {
     const reception = chart('reception');
     const dots = reception.locator('.reception-dot');
     const ids = locator => locator.evaluateAll(nodes => nodes.map(node => node.__data__.id).sort());
+    await openAnalysisTab(page, 'reception');
     await reception.scrollIntoViewIfNeeded();
     await dots.first().waitFor();
     assert.deepEqual(await ids(dots), filmography);
@@ -60,10 +62,12 @@ async function verifyCredits(browser, dustType, creditLabel) {
       await page.keyboard.press('Escape');
     }
     const connections = chart('connections');
+    await openAnalysisTab(page, 'connections');
     await connections.scrollIntoViewIfNeeded();
     await connections.locator(`[data-dust-connection-id$=":${second}"]`).press('Enter');
     assert.deepEqual(await page.evaluate(() => AnivizMain.snapshot().selectedKeys), [first, second]);
 
+    await openAnalysisTab(page, 'reception');
     await reception.scrollIntoViewIfNeeded();
     await dots.first().waitFor();
     assert.deepEqual(await ids(dots), selected);
@@ -84,6 +88,7 @@ async function verifyCredits(browser, dustType, creditLabel) {
     await page.keyboard.press('Escape');
 
     for (const kind of ['genres', 'years', 'studios', 'heatmap']) {
+      await openAnalysisTab(page, kind);
       const plot = chart(kind);
       await plot.scrollIntoViewIfNeeded();
       const marks = plot.locator('[role="img"][tabindex="0"]');
@@ -95,6 +100,7 @@ async function verifyCredits(browser, dustType, creditLabel) {
     await actor.press('Enter');
     assert.deepEqual(await page.evaluate(() => AnivizMain.snapshot().selectedKeys), [second]);
     await field.locator(`[data-match-id="${second}"]`).press('Enter');
+    await openAnalysisTab(page, 'reception');
     await reception.scrollIntoViewIfNeeded();
     await dots.first().waitFor();
     assert.deepEqual(await ids(dots), filmography);

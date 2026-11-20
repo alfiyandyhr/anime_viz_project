@@ -19,12 +19,20 @@
         entry.container.style.minHeight = `${entry.container.offsetHeight}px`;
       }
     }
+    function canRender(entry) {
+      // Keyboard activation can arrive before the observer reports the scroll that exposed the chart.
+      return active && (entry.visible || entry.container.contains?.(root.document?.activeElement));
+    }
     function flush(entry) {
-      if (!active || destroyed || !entry.visible || !entry.latest) return;
+      if (destroyed || !canRender(entry) || !entry.latest || !entry.dirty
+        || entry.container.clientWidth === 0) return;
       retainHeight(entry);
-      try { entry.renderer.update(entry.latest); entry.dirty = false; }
+      try { entry.renderer.update(entry.latest); }
       catch (error) { entry.container.textContent = "Chart unavailable."; onError(error); }
-      finally { if (entry.preserveHeight) entry.container.style.removeProperty("min-height"); }
+      finally {
+        entry.dirty = false;
+        if (entry.preserveHeight) entry.container.style.removeProperty("min-height");
+      }
     }
     return {
       mount(container, renderer, { preserveHeight = false, enabled = () => true } = {}) {
@@ -42,7 +50,7 @@
             return;
           }
           entry.latest = value; entry.dirty = true;
-          if (active && entry.visible) flush(entry);
+          if (canRender(entry)) flush(entry);
           else {
             entry.renderer.pause?.();
             retainHeight(entry);
@@ -50,7 +58,12 @@
           }
         });
       },
-      refresh() { entries.forEach(entry => flush(entry)); },
+      refresh() {
+        entries.forEach(entry => {
+          entry.dirty = true;
+          flush(entry);
+        });
+      },
       setActive(value) {
         if (active === value) return;
         active = value;

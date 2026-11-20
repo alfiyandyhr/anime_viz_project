@@ -1,6 +1,7 @@
 // Optional browser regression: run with the Playwright setup in journey-verification.md.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
+const { openAnalysisTab } = require('./dust-analysis-tab.cjs');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 
 (async () => {
@@ -20,6 +21,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     await page.waitForFunction(() => AnivizMain.snapshot().metadataStatus === 'ready');
 
     const selection = () => page.evaluate(() => AnivizMain.snapshot().selectedKeys);
+    await openAnalysisTab(page, 'reception');
     await scatter.evaluate(el => el.scrollIntoView({ block: 'center' }));
     const firstPoint = scatter.locator('.reception-dot').first();
     await firstPoint.waitFor();
@@ -81,10 +83,10 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     assert.deepEqual(await geometry(mirror), afterMove);
 
     const grainColors = view => view.locator('.dust-grain').evaluateAll(grains => grains.map(grain => grain.getAttribute('fill')));
-    const uniform = await grainColors(field);
+    const brushColors = await grainColors(field);
     assert.equal(await colorControl.isChecked(), false);
-    assert.equal(new Set(uniform).size, 1);
-    assert.deepEqual(await grainColors(mirror), uniform);
+    assert.ok(brushColors.every(fill => ['var(--dust-uniform)', 'var(--pink)'].includes(fill)));
+    assert.deepEqual(await grainColors(mirror), brushColors);
     await colorControl.press('Space');
     assert.equal(await colorControl.isChecked(), true);
     const grouped = await grainColors(field);
@@ -100,6 +102,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     assert.deepEqual(await selection(), [firstId]);
 
     const verifyConnectionColors = async () => {
+      await openAnalysisTab(page, 'connections');
       await connections.scrollIntoViewIfNeeded();
       await connections.locator('.dust-connection-row').first().waitFor();
       const matchesField = await connections.evaluate(container => {
@@ -116,23 +119,23 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     };
     await verifyConnectionColors();
     await page.getByRole('radio', { name: 'Brushing and linking' }).check();
-    assert.deepEqual(await grainColors(field), uniform);
-    assert.deepEqual(await grainColors(mirror), uniform);
+    assert.deepEqual(await grainColors(field), brushColors);
+    assert.deepEqual(await grainColors(mirror), brushColors);
     assert.deepEqual(await page.locator('#dust-legend > span').allTextContents(), ['Dust', 'Brushed', 'Selected']);
     assert.deepEqual(await geometry(field), afterMove);
     assert.deepEqual(await selection(), [firstId]);
     await verifyConnectionColors();
 
+    await openAnalysisTab(page, 'reception');
     await scatter.scrollIntoViewIfNeeded();
     await scatter.locator('.reception-dot').first().waitFor();
     assert.match(await page.locator('[data-coverage="reception"]').innerText(), /Circle area: favourites/);
     const layout = await Promise.all([scatter.boundingBox(), mirror.boundingBox()]);
     assert.ok(layout[0].x + layout[0].width < layout[1].x);
     assert.equal(layout[0].height, 473);
-    const pair = await page.locator('.dust-reception').boundingBox();
-    const connectionBounds = await connections.boundingBox();
-    const genres = await page.locator('#content').boundingBox();
-    assert.ok(connectionBounds.y + connectionBounds.height < pair.y && pair.y + pair.height < genres.y);
+    assert.ok(await connections.isHidden());
+    assert.ok(await page.locator('#content').isHidden());
+    assert.ok(await page.locator('#dust-panel-reception').isVisible());
     const evidence = await scatter.evaluate(container => {
       const points = [...container.querySelectorAll('.reception-dot')];
       const dust = document.querySelector('#recommendation-chart');

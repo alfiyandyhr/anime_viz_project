@@ -1,6 +1,7 @@
 // Optional browser regression. See journey-verification.md for Playwright setup.
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
+const { openAnalysisTab } = require('./dust-analysis-tab.cjs');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 
 (async () => {
@@ -21,6 +22,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     await page.waitForFunction(() => AnivizMain.snapshot().metadataStatus === 'ready');
     assert.ok(await brushing.isChecked());
     assert.ok(await frame.isVisible());
+    await openAnalysisTab(page, 'reception');
     assert.ok(await mirror.locator('.dust-brush-frame').isVisible());
     assert.equal(await field.locator('.dust-brush circle').count(), 0);
     assert.ok(await frame.evaluate(el => {
@@ -32,6 +34,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 
     const heatmap = page.locator('[data-dust-chart="heatmap"]');
     const heatmapColors = async () => {
+      await openAnalysisTab(page, 'heatmap');
       await heatmap.scrollIntoViewIfNeeded();
       const tiles = heatmap.locator('rect[role="img"]');
       await tiles.first().waitFor();
@@ -104,6 +107,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     assert.deepEqual(await page.locator('#dust-mirror .dust-grain[fill="var(--pink)"]').evaluateAll(grains =>
       grains.map(grain => grain.__data__.key)), keys);
 
+    await openAnalysisTab(page, 'ranking');
     const ranking = await page.locator('[data-dust-ranking-body]').evaluate(body => {
       const grains = new Map([...document.querySelectorAll('#recommendation-chart .dust-grain')]
         .map(grain => [grain.__data__.key, getComputedStyle(grain).fill]));
@@ -124,6 +128,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
       ['years', 'rect[role="img"], circle'],
       ['studios', '.credit-dot']
     ]) {
+      await openAnalysisTab(page, kind);
       const chart = page.locator(`[data-dust-chart="${kind}"]`);
       await chart.scrollIntoViewIfNeeded();
       const marks = chart.locator(selector);
@@ -142,6 +147,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     }
     assert.deepEqual(await heatmapColors(), originalHeatmap);
 
+    await openAnalysisTab(page, 'reception');
     await strongest.check();
     assert.ok(await frame.isHidden());
     assert.ok(await mirror.locator('.dust-brush-frame').isHidden());
@@ -168,6 +174,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     near(resized.width, panned.width + 32);
     near(resized.height, panned.height + 24);
     await verifyGeometry();
+    await openAnalysisTab(page, 'reception');
     await mirror.scrollIntoViewIfNeeded();
     const initialMirror = await frameAttributes(mirror);
     const [mirrorX, mirrorY] = await brushGrabPoint(mirror);

@@ -1,6 +1,7 @@
 // Optional real-browser verification. See tests/journey-verification.md for setup.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
+const { openAnalysisTab } = require('./dust-analysis-tab.cjs');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 const url = new URL('frontend/dust-magnet/', base).href;
 const field = '#recommendation-chart';
@@ -132,6 +133,7 @@ async function assertTouchZoom(browser) {
 
     await page.selectOption('#dust-type', 'movie-titles');
     assert.equal((await camera(mainView)).k, 1);
+    await openAnalysisTab(page, 'reception');
     await zoomToPosters(mirrorView);
     assert.equal(await mirrorView.locator('.dust-poster img[src]').count(), 0);
     releaseMovieDetails();

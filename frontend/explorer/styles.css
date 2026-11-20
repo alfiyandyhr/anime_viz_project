@@ -322,6 +322,7 @@ body[data-chapter="explorer"] .range-control { grid-column: span 2; }
 @media(max-width:680px) { body[data-chapter="explorer"] .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.table-sort { width: 150px; } }
 
 .catalogue-tools { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; }
+.catalogue-freshness { padding: 0; font-size: inherit; }
 .catalogue-switch { display: flex; gap: 6px; flex: 1 1 100%; }
 .catalogue-switch button[aria-pressed="false"] { border: 1px solid var(--border-strong); color: var(--text); background: transparent; }
 body:not([data-catalogue-view="movie"]) [data-catalogue-only="movie"],

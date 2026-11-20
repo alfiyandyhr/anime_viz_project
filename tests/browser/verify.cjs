@@ -1,3 +1,4 @@
+const { openAnalysisTab } = require('./dust-analysis-tab.cjs');
 // Optional real-browser regression checks. See tests/journey-verification.md for setup.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
@@ -43,6 +44,7 @@ const url = route => new URL(route, base).href;
     };
     const assertChartScope = async () => {
       for(const kind of ['genres','years','studios','heatmap','reception']) {
+        await openAnalysisTab(page, kind);
         await page.locator(`[data-dust-chart="${kind}"]`).scrollIntoViewIfNeeded();
         await page.waitForFunction(kind=>document.querySelector(`[data-dust-chart="${kind}"] svg`),kind);
         const failures=await page.evaluate(kind=>{
@@ -67,7 +69,7 @@ const url = route => new URL(route, base).href;
     assert.equal(await page.locator('#recommendation-detail').isVisible(),false);
     assert.deepEqual(await page.locator('#view-destinations a').allTextContents(),['Dust & Magnet','History','Full Catalogue']);
     const menu=page.locator('[data-view-menu] > summary');await menu.focus();await page.keyboard.press('ArrowDown');
-    assert.equal(await page.locator('#view-destinations a').first().evaluate(el=>document.activeElement===el),true);
+    await page.waitForFunction(()=>document.activeElement===document.querySelector('#view-destinations a'));
     await page.keyboard.press('End');await page.keyboard.press('Escape');
     assert.equal(await menu.evaluate(el=>document.activeElement===el),true);
     await addMovie('Interstellar');await addMovie('The Matrix');
@@ -136,9 +138,11 @@ const url = route => new URL(route, base).href;
     assert.match(await page.locator('#recommendation-detail').innerText(),/Comparing 2 anime/);
     const chosen=await snapshot();
 
-    // A complete scroll walkthrough requires no task, show, or comparison action.
+    // Each panel uses the same dust selection.
     for(const kind of ['connections','reception','genres','years','studios','heatmap']) {
+      await openAnalysisTab(page, kind);
       const chart=page.locator(`[data-dust-chart="${kind}"]`);
+      await openAnalysisTab(page, kind);
       await chart.scrollIntoViewIfNeeded();await page.waitForFunction(kind=>document.querySelector(`[data-dust-chart="${kind}"] svg`),kind);
     }
     const scoped=await page.evaluate(()=>{
@@ -159,6 +163,7 @@ const url = route => new URL(route, base).href;
 
     await assertChartScope();
     assert.equal(await page.evaluate(()=>['.recommendation-picker','#dust-focus'].every(selector=>document.querySelector(selector).getBoundingClientRect().bottom<0)),true,'side panels scroll away above analysis');
+    await openAnalysisTab(page, 'ranking');
     for(const sort of [...chosen.movies,'average']) {
       await page.locator('[data-dust-ranking-pages] button').last().click();
       const positions=await page.evaluate(()=>recommendationState.magnetPositions);
@@ -174,6 +179,7 @@ const url = route => new URL(route, base).href;
     assert.equal(await page.locator('#detail-drawer.open h2').innerText(),outsideTitle);
     await page.locator('#close-drawer').click();
 
+    await openAnalysisTab(page, 'genres');
     await page.locator('[data-dust-chart="genres"]').scrollIntoViewIfNeeded();
     const genre=await page.locator('[data-dust-chart="genres"] [role="img"]').first().evaluate(el=>el.__data__.genre);
     await fieldOptions.locator('summary').click();
@@ -206,6 +212,7 @@ const url = route => new URL(route, base).href;
 
     console.log('Verified chart scopes, sort/pagination, comparison, filters and restored navigation');
     // Removing the selected sort's movie falls back to average and retains surviving selections.
+    await openAnalysisTab(page, 'ranking');
     await page.selectOption('[data-dust-ranking-sort]',persisted.movies[2]);
     await page.locator(`[data-remove-magnet="${persisted.movies[2]}"]`).click();
     assert.equal((await snapshot()).sort,'average');
@@ -448,6 +455,7 @@ const url = route => new URL(route, base).href;
       await fieldOptions.locator('summary').click();
       if(output) {fs.mkdirSync(output,{recursive:true});await page.screenshot({path:path.join(output,`verified-dust-${width}.png`)});}
       for(const kind of ['connections','reception','genres','years','studios','heatmap']) {
+        await openAnalysisTab(page, kind);
         await page.locator(`[data-dust-chart="${kind}"]`).scrollIntoViewIfNeeded();await overflow();
       }
       for(const view of ['story','explorer']) {

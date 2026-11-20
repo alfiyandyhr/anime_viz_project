@@ -265,7 +265,6 @@
     const brushNote = snapshot.colorByMagnet ? '' : 'Drag or resize the brush to highlight matching data below. ';
     $('#recommendation-score-note').textContent = `${brushNote}Zoom in for ${studios ? 'studio names' : people ? 'portraits' : 'posters'}. Hover or focus for ${scoreLabel}. Thicker links show a stronger pull. Select up to 3 ${unit}.`;
     const colorNote = snapshot.colorByMagnet ? ` Color identifies each ${group?.label.toLowerCase() || 'title'}’s highest-scoring magnet.` : '';
-    $('#dust-connection-method').textContent = `Select a magnet to rank the displayed ${unit} by ${snapshot.mixed ? 'attraction percentile' : group ? 'mean signed cosine similarity' : 'cosine similarity'}. Thicker curves show higher scores within that magnet’s range.${colorNote} Dust members lists the ${unit} that score highest for the selected magnet. Scroll either list to see more ${unit}.`;
     const notes = {
       genres: [metric === 'count' ? 'Genres' : 'Genre ' + metric,
         row => row.genres.length && (metric === 'score' ? Number.isFinite(row.average_score) : metric !== 'popularity' || Number.isFinite(row.popularity)),
@@ -298,7 +297,7 @@
     if (signature !== rankingSignature) { rankingPage = 0; rankingSignature = signature; }
     const sort = $('[data-dust-ranking-sort]');
     sort.innerHTML = `<option value="average">${AnivizDust.averageLabel(snapshot.mixed)}</option>` + snapshot.magnets.map((magnet, i) => {
-      const label = snapshot.mixed || magnet.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : `Similarity to M${i + 1} · ${magnet.title}`;
+      const label = snapshot.mixed || magnet.kind === 'genre' ? AnivizDust.magnetAnalysisLabel(magnet) : `Similarity to M${i + 1} · ${magnet.title}`;
       return `<option value="${escapeAttribute(magnet.key)}">${escapeHTML(label)}</option>`;
     }).join('');
     sort.value = snapshot.activeMagnetKeys.includes(snapshot.rankingSortKey) ? snapshot.rankingSortKey : 'average';
@@ -325,13 +324,7 @@
     const ordered = rankingOrder !== 'descending' ? ranking
       : [...ranking.filter(match => match.rank !== null).reverse(), ...ranking.filter(match => match.rank === null)];
     const start = rankingPage * size, rows = ordered.slice(start, start + size);
-    const ranked = rows.filter(match => match.rank !== null);
-    const metricNote = mixed
-      ? ` · ${magnets.filter(AnivizDust.isMetricMagnet).map(metricDescription).join(' · ')}. Individual sorts use raw values. Combined ranks require values for all active metrics.` : '';
     const group = dustGroup();
-    const corpus = group ? latest.lookup.size : ranking.length;
-    const coverageNote = group ? ` · Filters apply to the field. Tied ranks list ${group.noun} with more catalogue titles first.` : '';
-    $('[data-dust-ranking-note]').textContent = `${corpus} corpus ${dustNoun()} · ${ranked.length ? `ranks ${ranked[0].rank}–${ranked.at(-1).rank}` : 'Ranks unavailable'}` + metricNote + coverageNote;
     const title = group?.label || (isReverse() ? 'Movie' : 'Anime');
     const cohortLabels = magnets.map(magnet => magnet.kind === 'genre' ? AnivizDust.magnetScoreLabel(magnet) : '');
     const average = AnivizDust.averageLabel(mixed);
@@ -401,6 +394,75 @@
     if (isOriginalCreatorDust()) renderRecommendations();
     restoreScroll();
   }
+  function legacyAnalysisTarget() {
+    return ['#content', '#creators', '#reception'].includes(location.hash) ? $(location.hash) : null;
+  }
+  function bindAnalysisTabs() {
+    const analysis = $('#dust-analysis');
+    const tablist = analysis.querySelector('[role="tablist"]');
+    const tabs = [...tablist.querySelectorAll('[role="tab"]')];
+    const panels = tabs.map(tab => document.getElementById(tab.getAttribute('aria-controls')));
+    let active = 0;
+
+    function activate(index) {
+      if (active === index) return;
+      tabs[active].setAttribute('aria-selected', 'false');
+      tabs[active].tabIndex = -1;
+      panels[active].hidden = true;
+      active = index;
+      tabs[active].setAttribute('aria-selected', 'true');
+      tabs[active].tabIndex = 0;
+      panels[active].hidden = false;
+      hideTooltip();
+      if (!root.IntersectionObserver) composition?.refresh();
+    }
+    function selectTab(index) {
+      const scrolledPastTabs = analysis.getBoundingClientRect().top < tablist.parentElement.getBoundingClientRect().top;
+      if (index !== active) {
+        activate(index);
+        history.replaceState({ ...history.state, dustAnalysisTab: tabs[index].id }, '');
+      }
+      if (scrolledPastTabs) analysis.scrollIntoView();
+      tabs[index].focus({ preventScroll: true });
+    }
+    function restoreTab(target) {
+      const saved = tabs.findIndex(tab => tab.id === history.state?.dustAnalysisTab);
+      const linked = panels.indexOf(target?.closest('[role="tabpanel"]'));
+      activate(saved >= 0 ? saved : Math.max(0, linked));
+    }
+    restoreTab(legacyAnalysisTarget());
+    window.addEventListener('hashchange', () => {
+      const target = legacyAnalysisTarget();
+      if (!target) return;
+      restoreTab(target);
+      if (!target.closest('[hidden]')) analysis.scrollIntoView();
+    });
+
+    tablist.addEventListener('click', event => {
+      const index = tabs.indexOf(event.target.closest('[role="tab"]'));
+      if (index >= 0) selectTab(index);
+    });
+    tablist.addEventListener('keydown', event => {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const index = tabs.indexOf(event.target);
+      const next = {
+        ArrowLeft: (index + tabs.length - 1) % tabs.length,
+        ArrowRight: (index + 1) % tabs.length,
+        Home: 0,
+        End: tabs.length - 1
+      }[event.key];
+      if (index < 0 || next === undefined) return;
+      event.preventDefault();
+      selectTab(next);
+    });
+    analysis.querySelector('.dust-playground-link').addEventListener('click', event => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      const playground = $('#dust-playground');
+      playground.focus({ preventScroll: true });
+      playground.scrollIntoView();
+    });
+  }
   function loadMovieDetails() {
     if (movieDetailsRequest || !recommendationState.data) return;
     context.setMovieDetails(null, 'loading');
@@ -429,6 +491,7 @@
     context = AnivizDust.createContext({ storage, onNotice: notice });
     context.restore();
     latest = context.snapshot();
+    bindAnalysisTabs();
     $('#dust-magnet-strengths').addEventListener('input', event => {
       const input = event.target;
       context.setMagnetStrength(input.dataset.magnetStrength, input.valueAsNumber);
@@ -538,17 +601,17 @@
       [AnivizDust.MOVIE_WRITERS]: 'Christopher Nolan'
     };
     elements.searchInput.placeholder = `e.g. ${searchExamples[latest.direction] || (reverse ? 'Pacific Rim' : 'Attack on Titan')}`;
-    $('#dust-ranking-title').textContent = `Full ${groupLabel || (reverse ? 'movie' : 'anime')} ranking`;
+    const rankingTitle = `Full ${groupLabel || (reverse ? 'movie' : 'anime')} ranking`;
+    $('#dust-ranking-title').textContent = rankingTitle;
+    $('#dust-tab-ranking').textContent = rankingTitle;
+    $('#dust-tab-reception').textContent = reverse
+      ? 'Score vs. popularity rank & dust mirror' : 'Score vs. popularity & dust mirror';
     $('#reception h3').textContent = reverse ? 'Score vs. popularity rank'
       : group ? 'Score vs. popularity of catalogue anime' : 'Score vs. popularity';
     $('#dust-reception-guide').textContent = 'Zoom in for posters. Select a title to open its details.';
     $('#content h3').textContent = studios ? 'Genres of catalogue anime' : 'Genres';
     $('#content + article h3').textContent = studios ? 'Release years of catalogue anime' : 'Release years';
     $('#dust-connection-title').textContent = group ? `How do ${group.noun} compare against each magnet?` : 'Which stories are similar—and which differ?';
-    $('#dust-connection-selection').textContent = studios
-      ? 'Select up to three studios here or in the field to focus the analysis below on their catalogue anime. Select a studio again to remove it.'
-      : group ? `Select up to three ${group.noun} here or in the field to filter ${reverse ? 'Score vs. popularity rank' : 'Score vs. popularity'} to their ${AnivizDust.titleNoun(latest.direction)} and highlight their contributions in the other charts. Select a dot again to remove it.`
-        : 'Outlined titles are selected for comparison in the playground and here. Click an outlined title to remove it. Click any other title to open its details and add it to the comparison if there’s room for it. Compare up to three titles.';
     $('#dust-mirror-guide').textContent = `In Brushing and linking mode, move or resize the shared brush here or in the main field. Zoom in for ${studios ? 'studio names' : group ? 'portraits' : 'posters'}. Select a title magnet to show it in the In Focus panel. Drag magnets or use arrow keys to move them. Select ${group?.noun || 'titles'} to compare them, or click empty space to remove the latest selection.`;
     $('[data-dust-genre-metric] option[value="popularity"]').textContent = reverse ? 'Popularity score' : 'Popularity';
     $('[data-dust-chart="heatmap"]').classList.toggle('studio-heatmap', studios);
@@ -572,9 +635,8 @@
     requestAnimationFrame(() => {
       if (latest.direction !== direction) return;
       const returning = ['back_forward', 'reload'].includes(performance.getEntriesByType('navigation')[0]?.type);
-      const anchor = location.hash;
-      const target = !returning && ['#content', '#creators', '#reception'].includes(anchor) ? $(anchor) : null;
-      if (target) target.scrollIntoView();
+      const target = !returning && legacyAnalysisTarget();
+      if (target && !target.closest('[hidden]')) $('#dust-analysis').scrollIntoView();
       else window.scrollTo(0, context.getLayout().scrollY || 0);
     });
   }

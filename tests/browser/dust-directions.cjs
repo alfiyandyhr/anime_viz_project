@@ -1,5 +1,6 @@
 // Optional real-browser verification. See tests/journey-verification.md for setup.
 const { chromium } = require('playwright');
+const { openAnalysisTab } = require('./dust-analysis-tab.cjs');
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { movies, anime } = require('../../data/movie_recommendations.json');
@@ -144,7 +145,8 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     const positions = () => page.evaluate(() => dustChart.anchors.map(anchor =>
       [(anchor.x / dustChart.width).toFixed(6), (anchor.y / dustChart.height).toFixed(6)]));
     const assertScope = async () => {
-      for (const kind of ['connections', 'reception', 'genres', 'years']) {
+      for (const kind of ['connections', 'genres', 'years', 'reception']) {
+        await openAnalysisTab(page, kind);
         const chart = page.locator(`[data-dust-chart="${kind}"]`);
         await chart.scrollIntoViewIfNeeded();
         await chart.locator('svg').first().waitFor();
@@ -197,6 +199,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     assert.deepEqual(await radioTextStyle(page.locator('#title-magnet-label')),
       await radioTextStyle(page.locator('#genre-magnet-label')));
     await page.getByRole('radio', { name: 'Strongest magnet' }).check();
+    await openAnalysisTab(page, 'ranking');
     await ranking.first().locator('img').waitFor();
     assert.match(await ranking.first().locator('img').getAttribute('src'), /^https:\/\/s4\.anilist\.co\//);
     assert.match(await page.locator('#movie-magnets').innerText(), /Inception.*Example/);
@@ -210,6 +213,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     assert.equal(await magnetPoster.getAttribute('src'), `https://image.tmdb.org/t/p/w185${details['27205'].poster_path}`);
     assert.deepEqual(await evidence(), inception);
     const receptionChart = page.locator('[data-dust-chart="reception"]');
+    await openAnalysisTab(page, 'reception');
     await receptionChart.scrollIntoViewIfNeeded();
     await receptionChart.locator('svg').waitFor();
     await page.evaluate(() => scrollTo(0, 0));
@@ -348,6 +352,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
         nodes.map(node => [node.textContent, node.title, node.getAttribute('aria-label')]));
       assert.deepEqual(scores, expected.map(score => [score, `Cosine ${score}`, `Cosine ${score}`]));
     };
+    await openAnalysisTab(page, 'connections');
     for (const selector of ['[data-dust-connection-id]', '[data-dust-member-id]']) {
       const entry = page.locator(`${selector}[aria-pressed="false"]`).first();
       const key = await entry.evaluate(node => node.__data__.key);
@@ -356,6 +361,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
       await assertDrawerPoster(key);
       await page.keyboard.press('Escape');
     }
+    await openAnalysisTab(page, 'ranking');
     await page.selectOption('[data-dust-ranking-order]', 'descending');
     const outside = ranking.first();
     const outsideTitle = await outside.innerText();
@@ -381,6 +387,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     await page.locator('#reset-filters').click();
     assert.equal(await field.locator('.dust-node').count(), 60);
     await page.selectOption('#genre-filter', 'Science Fiction');
+    await openAnalysisTab(page, 'ranking');
     await page.locator('[data-dust-ranking-sort]').selectOption(narrowed.magnetKeys[1]);
     await dot(0).press('Enter');
     const savedReverse = await evidence();
@@ -405,10 +412,13 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
       await page.waitForFunction(id => {
         const section = document.getElementById(id);
         const top = section.getBoundingClientRect().top;
-        return top >= 48 && top < 180;
+        return top >= 48 && top < innerHeight / 2;
       }, anchor);
+      assert.ok(await page.locator(`#${anchor}`).isVisible());
+      if (anchor === 'reception') {
+        assert.match(await page.locator('#reception').innerText(), /Rank #1 is most popular in the movie sample/);
+      }
     }
-    assert.match(await page.locator('#reception').innerText(), /Rank #1 is most popular in the movie sample/);
     assert.ok(await page.locator('#creators').isVisible());
     await page.goto(url('frontend/story/index.html'));
     await page.waitForSelector('#history-pair');

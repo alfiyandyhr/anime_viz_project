@@ -238,6 +238,11 @@ test('lazy composition discards stale marks, renders latest revision and dispose
   composition.update({revision:1});composition.update({revision:2});
   assert.ok(!calls.some(Array.isArray)); callback([{target:a,isIntersecting:true}]);
   assert.deepEqual(calls.at(-1),['a',2]); callback([{target:a,isIntersecting:false}]);
+  callback([{target:a,isIntersecting:true}]);
+  assert.deepEqual(calls.filter(Array.isArray),[['a',2]], 're-entering the viewport preserves current chart marks');
+  composition.refresh();
+  assert.deepEqual(calls.filter(Array.isArray),[['a',2],['a',2]], 'explicit refresh redraws current charts');
+  callback([{target:a,isIntersecting:false}]);
   composition.update({revision:3});callback([{target:a,isIntersecting:true},{target:b,isIntersecting:true}]);
   assert.deepEqual(calls.slice(-2),[['a',3],['b',3]]);
   composition.setActive(false);composition.update({revision:4});composition.setActive(true);

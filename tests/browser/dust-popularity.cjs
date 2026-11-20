@@ -6,6 +6,7 @@ const dashboard = require('../../data.json');
 const catalogue = require('../../data/movie_recommendations.json');
 const popularityIds = new Set(dashboard.anime.filter(row => Number.isFinite(row.popularity)).map(row => String(row.id)));
 const animeEligible = catalogue.anime.filter(row => popularityIds.has(row.id)).length;
+const { openAnalysisTab } = require('./dust-analysis-tab.cjs');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 const animeTitles = 'anime-titles', movieTitles = 'movie-titles';
 const anime = 'anilist:popularity', movies = 'tmdb:popularity';
@@ -81,6 +82,8 @@ const state = page => page.evaluate(() => {
     await add(page).click();
     assert.match(await page.locator('#recommendation-status').innerText(), /already a magnet/);
     assert.match(await page.locator('[data-dust-ranking-head]').textContent(), average);
+    const popularityOption = page.locator(`[data-dust-ranking-sort] option[value="${anime}"]`);
+    assert.equal(await popularityOption.textContent(), 'Popularity (AniList users)');
     assert.match(await page.locator('#recommendation-score-note').innerText(), /attraction percentile/);
     await assertTooltip(page, 'Inception');
     assert.match(await page.locator('#tooltip').innerText(), /AniList users: \d{1,3}(,\d{3})+\nAttraction percentile:/);
@@ -89,7 +92,8 @@ const state = page => page.evaluate(() => {
     await dot(page).nth(2).press('Enter');
     assert.match(await page.locator('#dust-focus').innerText(), average);
     const comparison = page.locator('.dust-comparison-table');
-    const popularityRow = comparison.getByRole('row', { name: /M3 · AniList users/ });
+    const popularityRow = comparison.getByRole('row', { name: /M3 · Popularity \(AniList users\)/ });
+    assert.equal(await popularityRow.getByRole('rowheader').innerText(), 'M3 · POPULARITY (ANILIST USERS)');
     assert.match(await popularityRow.locator('strong').first().innerText(), /^\d{1,3}(,\d{3})+$/);
     assert.match(await popularityRow.locator('small').first().innerText(), /^Percentile \d\.\d{3}$/);
     const values = await page.evaluate(() => {
@@ -108,6 +112,7 @@ const state = page => page.evaluate(() => {
     assert.deepEqual(await meters(comparison.getByRole('row', { name: average })), values.map(row => [0, 1, row.average]));
     assert.match(await page.locator('#recommendation-detail').textContent(), /AniList users/);
     assert.match(await page.locator('#dust-mirror .dust-node').first().getAttribute('aria-label'), /Attraction percentile/);
+    await openAnalysisTab(page, 'connections');
     await page.locator('[data-dust-chart="connections"]').scrollIntoViewIfNeeded();
     await assertTitleMemberLayout(page);
     await page.locator(`[data-dust-connection-movie="${anime}"]`).click();
@@ -129,6 +134,7 @@ const state = page => page.evaluate(() => {
       assert.match(await missing.locator('td').nth(4).innerText(), /Unavailable/);
       assert.match(await missing.locator('td').nth(2).innerText(), /-?0\.\d+\s+Percentile Unavailable/);
     }
+    await openAnalysisTab(page, 'ranking');
     await page.locator('[data-dust-ranking-sort]').selectOption('tmdb:27205');
     assert.equal((await state(page)).ranking.filter(row => row[3] === null).length, 0);
     await page.locator('[data-dust-ranking-sort]').selectOption('average');
@@ -182,6 +188,7 @@ const state = page => page.evaluate(() => {
     assert.ok(await page.locator('#popularity-magnet-source').isHidden());
     assert.equal(await page.locator('#recommendation-chart .dust-magnet').last().locator('title').textContent(), 'Popularity');
     await assertTooltip(page, 'Attack on Titan');
+    await openAnalysisTab(page, 'connections');
     await page.locator(`[data-dust-member-movie="${movies}"]`).click();
     assert.deepEqual(await popularityMembers.locator('thead th').allTextContents(),
       ['Rank', 'Movie', 'TMDB popularity', 'Attraction percentile']);

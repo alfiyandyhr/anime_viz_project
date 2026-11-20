@@ -113,7 +113,7 @@
         ...metadataRows,
         ...magnets.map((magnet, index) => {
           const cohort = magnet.kind === 'genre';
-          const label = mixed || cohort ? root.AnivizDust.magnetScoreLabel(magnet) : magnet.title;
+          const label = mixed || cohort ? root.AnivizDust.magnetAnalysisLabel(magnet) : magnet.title;
           const metric = root.AnivizDust.isMetricMagnet(magnet);
           const min = metric ? 0 : -1;
           const max = metric && magnet.kind !== 'score'

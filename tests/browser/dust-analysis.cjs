@@ -1,6 +1,7 @@
 // Optional browser regression. See journey-verification.md for Playwright setup.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
+const { openAnalysisTab } = require('./dust-analysis-tab.cjs');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 
 async function verifyStudioAxes(chart) {
@@ -85,6 +86,21 @@ async function verifyCreditCharts(page, attribute) {
     await page.goto(new URL('frontend/dust-magnet/index.html', base).href);
     await page.locator('#recommendation-chart .dust-node').first().waitFor();
     await page.waitForFunction(() => AnivizMain.snapshot().metadataStatus === 'ready');
+    const tabs = page.getByRole('tab');
+    const activeTab = page.getByRole('tab', { selected: true });
+    const visiblePanel = page.getByRole('tabpanel');
+    assert.equal(await tabs.count(), 5);
+    assert.equal(await visiblePanel.getAttribute('id'), 'dust-panel-similarities');
+    await tabs.first().press('ArrowLeft');
+    assert.equal(await activeTab.getAttribute('id'), 'dust-tab-credits');
+    await activeTab.press('Home');
+    await activeTab.press('ArrowRight');
+    assert.equal(await visiblePanel.getAttribute('aria-labelledby'), 'dust-tab-ranking');
+    await page.keyboard.press('Tab');
+    assert.ok(await visiblePanel.evaluate(panel => panel === document.activeElement));
+    assert.equal(await visiblePanel.evaluate(panel => getComputedStyle(panel).animationName), 'none');
+    await page.getByRole('link', { name: 'Back to playground' }).click();
+    assert.ok(await page.evaluate(() => scrollY < 10 && document.activeElement.id === 'dust-playground'));
     await page.locator('#movie-search').fill('Interstellar');
     await page.locator('#movie-search').press('Enter');
     await page.waitForFunction(() => AnivizMain.snapshot().magnetKeys.length === 2);
@@ -94,6 +110,7 @@ async function verifyCreditCharts(page, attribute) {
     const filters = () => page.evaluate(() => AnivizMain.snapshot().filters);
     const initialFilters = await filters();
     for (const kind of ['reception', 'genres', 'years', 'studios', 'heatmap']) {
+      await openAnalysisTab(page, kind);
       await chart(kind).scrollIntoViewIfNeeded();
       const selectable = kind === 'reception';
       const marks = chart(kind).locator(`svg [role="${selectable ? 'button' : 'img'}"]`);
@@ -116,6 +133,7 @@ async function verifyCreditCharts(page, attribute) {
     }
 
     await page.getByRole('radio', { name: 'Strongest magnet' }).check();
+    await openAnalysisTab(page, 'genres');
     await chart('genres').scrollIntoViewIfNeeded();
     await chart('genres').locator('rect[role="img"]').first().waitFor();
     const barFills = await chart('genres').locator('rect[role="img"]')
@@ -124,6 +142,7 @@ async function verifyCreditCharts(page, attribute) {
     assert.equal(new Set(barFills).size, 1);
 
     const studioMarks = chart('studios').locator('.studio-dot');
+    await openAnalysisTab(page, 'studios');
     await verifyStudioAxes(chart('studios'));
     const { studios, expected } = await studioMarks.evaluateAll(marks => {
       const snapshot = AnivizMain.snapshot();
@@ -172,6 +191,7 @@ async function verifyCreditCharts(page, attribute) {
       `Average score: ${studio.averageScore.toFixed(1)}/100`, `Matching titles: ${studio.count}`
     ]);
     for (const kind of ['studios', 'reception']) {
+      await openAnalysisTab(page, kind);
       await chart(kind).scrollIntoViewIfNeeded();
       const value = chart(kind).locator('.chart-correlation');
       await value.waitFor();
@@ -187,14 +207,15 @@ async function verifyCreditCharts(page, attribute) {
       assert.equal(await chart(kind).locator('.chart-trendline').count(), 1);
     }
 
+    await openAnalysisTab(page, 'heatmap');
     await chart('heatmap').scrollIntoViewIfNeeded();
     const heatmapCells = chart('heatmap').locator('rect[role="img"]');
     await heatmapCells.first().waitFor();
     const heatmapStudios = await heatmapCells.evaluateAll(nodes => [...new Set(nodes.map(node => node.__data__.row.key))]);
     assert.equal(heatmapStudios.length, 15);
 
+    await openAnalysisTab(page, 'ranking');
     const rankOrder = page.locator('[data-dust-ranking-order]');
-    const rankNote = page.locator('[data-dust-ranking-note]');
     const heading = page.locator('[data-dust-ranking-head] th').first();
     const visibleRanks = () => page.locator('[data-dust-ranking-body] td:first-child').allTextContents();
     const visibleIds = () => page.locator('[data-dust-rank-id]')
@@ -209,7 +230,6 @@ async function verifyCreditCharts(page, attribute) {
       await rankOrder.selectOption('descending');
       assert.equal(await heading.getAttribute('aria-sort'), 'descending');
       assert.equal((await visibleRanks())[0], String(rankedIds.length));
-      assert.ok((await rankNote.innerText()).endsWith(`ranks ${rankedIds.length}–${rankedIds.length - 9}`));
       assert.deepEqual(await visibleIds(), rankedIds.slice(-10).reverse());
       await page.getByRole('button', { name: 'Next ranking page' }).click();
       assert.equal((await visibleRanks())[0], String(rankedIds.length - 10));
@@ -226,19 +246,17 @@ async function verifyCreditCharts(page, attribute) {
     assert.equal(types.length, 7);
     for (const type of types) {
       await dustType.selectOption(type);
-      await rankingToggles.first().waitFor();
+      await openAnalysisTab(page, 'studios');
       if (type.startsWith('movie-')) {
         assert.ok(await page.locator('[data-dust-movie-credit-mode]').isVisible(), type);
         assert.ok(await page.locator('[data-dust-movie-heatmap-mode]').isVisible(), type);
       } else {
         await verifyCreditCharts(page, 'dust');
       }
-      assert.ok(await page.locator('#dust-ranking-title').evaluate(title => {
-        const card = title.closest('article');
-        return card.previousElementSibling.contains(document.querySelector('#dust-connection-title'))
-          && card.nextElementSibling.contains(document.querySelector('#reception'))
-          && card.nextElementSibling.contains(document.querySelector('#dust-mirror'));
-      }), type);
+      await openAnalysisTab(page, 'ranking');
+      await rankingToggles.first().waitFor();
+      assert.equal(await visiblePanel.getAttribute('aria-labelledby'), 'dust-tab-ranking', type);
+      assert.equal(await activeTab.textContent(), await page.locator('#dust-ranking-title').textContent(), type);
       const toggle = rankingToggles.first();
       const key = await toggle.getAttribute('data-dust-rank-select');
       const dot = page.locator(`#recommendation-chart [data-match-id="${key}"]`);
@@ -271,6 +289,7 @@ async function verifyCreditCharts(page, attribute) {
     assert.deepEqual(await selection(), keys);
     await page.reload();
     await page.waitForFunction(() => window.AnivizMain?.snapshot()?.metadataStatus === 'ready');
+    assert.equal(await activeTab.getAttribute('id'), 'dust-tab-ranking');
     assert.deepEqual(await selection(), keys);
     assert.deepEqual(await page.locator('[data-dust-rank-select][aria-pressed="true"]')
       .evaluateAll(buttons => buttons.map(button => button.dataset.dustRankSelect)), keys);
@@ -281,6 +300,33 @@ async function verifyCreditCharts(page, attribute) {
     await page.locator('[data-catalogue-target="movie"]').click();
     assert.equal(await page.locator('#catalogue-credit-mode').isVisible(), false);
     assert.equal(await page.locator('#catalogue-heatmap-mode').isVisible(), false);
+    assert.equal(await page.getByText('About / Data', { exact: true }).count(), 0);
+    const catalogueSources = page.locator('.data-attribution');
+    const sourceCopy = await catalogueSources.locator('p').innerText();
+    assert.deepEqual(await catalogueSources.getByRole('img').evaluateAll(images => images.map(img => img.alt)),
+      ['AniList', 'TMDB']);
+
+    const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    await phone.goto(new URL('frontend/dust-magnet/index.html', base).href);
+    await phone.locator('#recommendation-chart .dust-node').first().waitFor();
+    await openAnalysisTab(phone, 'ranking');
+    assert.ok(await phone.getByRole('tab').evaluateAll(buttons => buttons.every(button => {
+      const { left, right } = button.getBoundingClientRect();
+      return left >= 0 && right <= innerWidth;
+    })));
+    await phone.locator('[data-dust-ranking-pages]').evaluate(el => el.scrollIntoView({ block: 'center' }));
+    assert.equal(await phone.locator('.dust-analysis-toolbar').evaluate(el => el.getBoundingClientRect().top), 48);
+    await openAnalysisTab(phone, 'reception');
+    const receptionPanel = phone.getByRole('tabpanel');
+    assert.equal(await receptionPanel.getAttribute('id'), 'dust-panel-reception');
+    assert.equal(await receptionPanel.evaluate(panel => getComputedStyle(panel).animationName), 'dust-analysis-appear');
+    await phone.getByRole('link', { name: 'Back to playground' }).tap();
+    assert.ok(await phone.evaluate(() => scrollY < 10));
+    const dustSources = phone.locator('.data-attribution');
+    assert.equal(await dustSources.locator('p').innerText(), sourceCopy);
+    assert.deepEqual(await dustSources.getByRole('img').evaluateAll(images => images.map(img => img.alt)),
+      ['AniList', 'TMDB']);
+    await phone.close();
     console.log('Verified anime credit heatmaps, portrait zoom, catalogue controls, chart evidence, and ranking in both views.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

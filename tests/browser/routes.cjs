@@ -14,6 +14,8 @@ const url=route=>new URL(route,base).href;
       assert.equal(new URL(page.url()).hash,`#${section}`);
       await page.waitForFunction(id=>{const r=document.getElementById(id).getBoundingClientRect();return r.top>=48&&r.top<innerHeight/2},section);
     }
+    await page.evaluate(() => { location.hash = '#content'; });
+    await page.waitForFunction(() => document.querySelector('#dust-tab-content').getAttribute('aria-selected') === 'true');
     await page.goto(url('frontend/creators/index.html?mode=catalogue#network-chart'));
     await page.waitForURL('**/frontend/dust-magnet/index.html#creators');
     const removed = await page.request.get(url('frontend/network/index.html'));

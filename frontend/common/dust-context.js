@@ -48,6 +48,8 @@
   const isMetricMagnet = magnet => isCountMagnet(magnet) || METRIC_MAGNET_TYPES.includes(magnet.kind);
   const magnetScoreLabel = magnet => isMetricMagnet(magnet) ? magnet.metric
     : magnet.kind === "genre" ? magnet.title : `Cosine to ${magnet.title}`;
+  const magnetAnalysisLabel = magnet => magnet.key === "anilist:popularity"
+    ? "Popularity (AniList users)" : magnetScoreLabel(magnet);
   const cohortDescription = magnet => `${magnet.source} · ${magnet.memberIds.length} ${magnet.noun}`;
   const metricMagnetKey = (direction, kind) => keyFor(DIRECTIONS[direction].dust, kind);
   const isMetricKey = (direction, key) => METRIC_MAGNET_TYPES.some(kind => key === metricMagnetKey(direction, kind));
@@ -664,7 +666,7 @@
   }
   return { VERSION, STORAGE_KEY, FORWARD, REVERSE, STUDIOS, ACTORS, ORIGINAL_CREATORS, MOVIE_ACTORS, MOVIE_WRITERS, DIRECTIONS,
     groupFor, isMovieDust, popularityLabel, titleNoun, METRIC_MAGNET_TYPES, isMetricMagnet,
-    keyFor, catalogueFor, magnetScoreLabel, cohortDescription,
+    keyFor, catalogueFor, magnetScoreLabel, magnetAnalysisLabel, cohortDescription,
     averageLabel, formatPercentile, formatRawScore, mixedEvidence, defaults, joinRecords,
     passesFilters, createScoreAccessor, forwardVectors, rankCorpus, sampleDust, createContext };
 });

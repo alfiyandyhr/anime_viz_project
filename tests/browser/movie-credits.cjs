@@ -5,6 +5,7 @@ const { movies } = require('../../data/movie_details.json');
 const { popularity, vote_average } = require('../../data/movie_popularity.json');
 const { movies: recommendations } = require('../../data/movie_recommendations.json');
 const { anime } = require('../../data.json');
+const { openAnalysisTab } = require('./dust-analysis-tab.cjs');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 const movieGenres = new Map(recommendations.map(movie => [String(movie.id), movie.genres]));
 
@@ -95,6 +96,7 @@ const movieGenres = new Map(recommendations.map(movie => [String(movie.id), movi
     const reception = chart('reception');
     const points = reception.locator('.filmography-dot');
     async function assertFilmography(ids) {
+      await openAnalysisTab(page, 'reception');
       await reception.scrollIntoViewIfNeeded();
       await points.first().waitFor();
       assert.deepEqual(await pointIds(points), ids);
@@ -125,6 +127,7 @@ const movieGenres = new Map(recommendations.map(movie => [String(movie.id), movi
       const allMovies = ids(groups);
       const selectedMovies = ids([lead, partner]);
       assert.ok(selectedMovies.length > 0 && selectedMovies.length < allMovies.length);
+      await openAnalysisTab(page, 'reception');
       for (const plot of [field, page.locator('#dust-mirror')]) {
         for (let step = 0; step < 3; step++) await plot.getByRole('button', { name: 'Zoom in', exact: true }).click();
         const image = plot.locator(`[data-match-id="${first}"] img`);
@@ -141,12 +144,14 @@ const movieGenres = new Map(recommendations.map(movie => [String(movie.id), movi
       await work.click();
       await assertCredits(drawer, movieKey.split(':').at(-1));
       await page.keyboard.press('Escape');
+      await openAnalysisTab(page, 'connections');
       await page.locator('#dust-connection-title').scrollIntoViewIfNeeded();
       await chart('connections').locator(`[data-dust-connection-id$=":${second}"]`).press('Enter');
       await assertFilmography(selectedMovies);
       await pressMoviePoint(reception);
       assert.deepEqual(await page.evaluate(() => AnivizMain.snapshot().selectedKeys), [first, second]);
       for (const kind of ['genres', 'years']) {
+        await openAnalysisTab(page, kind);
         const plot = chart(kind);
         await plot.scrollIntoViewIfNeeded();
         const marks = plot.locator('[role="img"][tabindex="0"]');
@@ -157,6 +162,7 @@ const movieGenres = new Map(recommendations.map(movie => [String(movie.id), movi
       await node(first).press('Enter');
       await node(second).press('Enter');
       await assertFilmography(allMovies);
+      await openAnalysisTab(page, 'studios');
       await assertMovieCharts([...new Set(groups.flatMap(group => group.memberIds))], dustChartModes, chart('studios'), chart('heatmap'));
     }
 
@@ -167,11 +173,14 @@ const movieGenres = new Map(recommendations.map(movie => [String(movie.id), movi
     await titleDot.press('Enter');
     await assertCredits(page.locator('#dust-focus'), movieId);
     const rankButton = page.locator(`[data-dust-rank-id="tmdb:${movieId}"]`);
+    await openAnalysisTab(page, 'ranking');
     await rankButton.click();
     await assertCredits(drawer, movieId);
     await page.keyboard.press('Escape');
+    await openAnalysisTab(page, 'reception');
     await pressMoviePoint(reception);
     const dustIds = await page.evaluate(() => AnivizMain.snapshot().displayedDust.map(({ record }) => String(record.id)));
+    await openAnalysisTab(page, 'studios');
     await assertMovieCharts(dustIds, dustChartModes, chart('studios'), chart('heatmap'));
 
     await page.goto(new URL('frontend/explorer/index.html', base).href);

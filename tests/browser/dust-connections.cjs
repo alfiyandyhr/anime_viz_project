@@ -3,6 +3,7 @@ const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { openAnalysisTab } = require('./dust-analysis-tab.cjs');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 
 (async () => {
@@ -22,6 +23,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     const visibleRanks = async () => chart.locator('svg path').evaluateAll(paths =>
       paths.map(el => el.__data__.match.rank).sort((a,b) => a-b));
     const check = async () => {
+      await openAnalysisTab(page, 'connections');
       await chart.scrollIntoViewIfNeeded();
       await page.waitForFunction(() => {
         const s = AnivizMain.snapshot();
@@ -146,6 +148,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     const [mapBounds, memberBounds] = await Promise.all([map.boundingBox(), members.boundingBox()]);
     assert.ok(memberBounds.x >= mapBounds.x + mapBounds.width, 'member ranking sits to the right of the map');
     for (const sort of [...magnetKeys,'average']) {
+      await openAnalysisTab(page, 'ranking');
       await control('[data-dust-ranking-sort]',sort);
       assert.deepEqual((await check()).cards[0].actual,third.actual);
     }
@@ -172,6 +175,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     assert.equal(await page.locator('#recommendation-chart .dust-selected-link').count(), 9);
     assert.deepEqual(await selection(), [first, secondId, thirdId]);
     assert.equal(await dustById(fourth).getAttribute('aria-pressed'), 'false');
+    await openAnalysisTab(page, 'reception');
     const mirrorDot = page.locator(`#dust-mirror [data-match-id="${fifth}"]`);
     await mirrorDot.press('Space');
     assert.equal(await focusTitle.innerText(), await titleFor(fifth));

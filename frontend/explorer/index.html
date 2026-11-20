@@ -285,14 +285,8 @@
             </article>
           </section>
         </div>
-
-        <details class="methodology">
-          <summary>About / Data</summary>
-          <div class="about-content" data-catalogue-only="anime"><p>The Full Catalogue is the loaded popularity-sorted AniList sample, not every anime. Seasons and films are separate entries. Popularity counts AniList list users; scores use a 0–100 scale. Missing values remain unknown.</p><p>Filters and shortlist are independent of Dust &amp; Magnet. Select a row for secondary metadata and credits.</p><p><a href="https://anilist.co/" target="_blank" rel="noopener noreferrer">Source: AniList</a></p></div>
-          <div class="about-content" data-catalogue-only="movie"><p>Movie uses the same archived TMDB sample, ratings, and popularity values as Dust &amp; Magnet. Scores use a 0–10 scale. Popularity rank sorts the full sample by the archived popularity values and stays fixed when you sort or filter the table.</p><p>Actor counts use up to five sampled cast members per film. Writer counts use TMDB’s Writing department credits. Select a row to see the synopsis and credits.</p><p><a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">Source: TMDB</a></p></div>
-        <div class="data-freshness" data-catalogue-only="anime"><span id="footer-generated">Data not loaded</span> · <span id="footer-cache"></span></div></details>
       </section>
-    <footer class="data-footer">
+      <footer class="data-footer">
         <div class="data-status" role="status" aria-live="polite" data-catalogue-only="anime">
           <span id="status-dot" class="status-dot loading"></span>
           <span id="data-status">Loading anime data…</span>
@@ -300,6 +294,20 @@
         <div class="data-status" id="movie-catalogue-status" role="status" data-catalogue-only="movie"></div>
         <span class="source-credit" data-catalogue-only="anime">AniList × Python × D3.js</span>
         <span class="source-credit" data-catalogue-only="movie">TMDB × Python × D3.js</span>
+        <div class="data-freshness catalogue-freshness" data-catalogue-only="anime">
+          <span id="footer-generated">Data not loaded</span> · <span id="footer-cache"></span>
+        </div>
+        <div class="data-attribution">
+          <div class="data-attribution-logos">
+            <a href="https://anilist.co/" target="_blank" rel="noopener noreferrer">
+              <img src="../../assets/anilist-logo.png" alt="AniList" width="36" height="36">
+            </a>
+            <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">
+              <img src="../../assets/tmdb-logo.svg" alt="TMDB" width="50" height="36">
+            </a>
+          </div>
+          <p>Anime data comes from AniList, and movie data comes from The Movie Database (TMDB).</p>
+        </div>
       </footer>
     </main>
   </div>

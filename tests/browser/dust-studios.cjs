@@ -1,6 +1,7 @@
 // Optional browser regression. See journey-verification.md for Playwright setup.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
+const { openAnalysisTab } = require('./dust-analysis-tab.cjs');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
 
@@ -35,6 +36,7 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
     });
     const reception = chart('reception');
     const marks = reception.locator('.reception-dot');
+    await openAnalysisTab(page, 'reception');
     await reception.scrollIntoViewIfNeeded();
     await marks.first().waitFor();
     assert.ok(await marks.evaluateAll(nodes => nodes.every(node => node.getAttribute('stroke-width') === '1')));
@@ -52,6 +54,7 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
     assert.equal(await page.locator('#recommendation-chart .dust-node').count(), displayed.length);
     assert.match(await page.locator('#dust-studio-scope').innerText(), new RegExp(`${titleScope.length} distinct catalogue anime`));
 
+    await openAnalysisTab(page, 'reception');
     await reception.scrollIntoViewIfNeeded();
     await marks.first().waitFor();
     const expectedMarks = await page.evaluate(ids => {
@@ -70,6 +73,7 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
     await page.keyboard.press('Escape');
 
     for (const kind of ['genres', 'years']) {
+      await openAnalysisTab(page, kind);
       await chart(kind).scrollIntoViewIfNeeded();
       const bars = chart(kind).locator('rect[role="img"]');
       await bars.first().waitFor();
@@ -83,6 +87,7 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
       }, titleScope));
     }
     const heatmap = chart('heatmap');
+    await openAnalysisTab(page, 'heatmap');
     await heatmap.scrollIntoViewIfNeeded();
     const tiles = heatmap.locator('rect[role="img"]');
     await tiles.first().waitFor();
@@ -103,6 +108,7 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
       ['Total popularity (log scale)', 'Average score / 100']);
 
     const extra = displayed.filter(key => !pair.includes(key));
+    await openAnalysisTab(page, 'connections');
     const connection = chart('connections').locator(`[data-dust-connection-id$=":${extra[0]}"]`);
     await chart('connections').scrollIntoViewIfNeeded();
     await connection.press('Enter');
@@ -112,6 +118,7 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
     await page.locator('[data-dust-clear]').click();
     assert.match(await page.locator('#dust-studio-scope').innerText(), new RegExp(`${fullScope} distinct catalogue anime`));
 
+    await openAnalysisTab(page, 'ranking');
     const rank = page.locator('[data-dust-rank-id]').first();
     await rank.click();
     assert.equal(await page.locator('#detail-drawer').getAttribute('aria-label'), 'Studio details');
@@ -154,10 +161,12 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
       await waitForDust();
       const { key, studio, totalPopularity, averageScore, count } = leaders[index];
       assert.deepEqual(await page.evaluate(() => AnivizMain.snapshot().activeMagnetKeys), [`anilist:${kind}`]);
+      await openAnalysisTab(page, 'ranking');
       assert.equal((await page.locator('[data-dust-rank-id]').first().innerText()).trim(), studio);
       assert.equal(await page.locator('[data-dust-ranking-head] th:nth-last-child(2)').textContent(), 'Anime counts');
       assert.equal(await page.locator('[data-dust-ranking-body] tr').first().locator('td:nth-last-child(2)').textContent(), String(count));
       assert.equal(await dot(key).count(), 1);
+      await openAnalysisTab(page, 'studios');
       const circles = chart('studios').locator('.studio-dot');
       await chart('studios').scrollIntoViewIfNeeded();
       await circles.first().waitFor();
@@ -165,6 +174,7 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
         const { popularity, score } = nodes.find(node => node.__data__.key === key).__data__;
         return [popularity, score];
       }, key), [totalPopularity, averageScore]);
+      await openAnalysisTab(page, 'connections');
       await chart('connections').scrollIntoViewIfNeeded();
       assert.equal(await chart('connections').locator('.dust-connection-rank').first().innerText(), '1');
       assert.equal(await chart('connections').locator('.dust-connection-title').first().innerText(), studio);

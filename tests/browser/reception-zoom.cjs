@@ -1,6 +1,7 @@
 // Optional real-browser verification. See tests/journey-verification.md for setup.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
+const { openAnalysisTab } = require('./dust-analysis-tab.cjs');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jrfcAAAAASUVORK5CYII=', 'base64');
 
@@ -127,6 +128,7 @@ async function verifyMovieCreditPortraits(page) {
 
     await page.goto(new URL('frontend/dust-magnet/index.html', base).href);
     await page.locator('#recommendation-chart .dust-node').first().waitFor();
+    await openAnalysisTab(page, 'reception');
     const dust = '[data-dust-chart="reception"]';
     await verifyZoom(page, dust, false, true);
     await page.selectOption('#dust-type', 'movie-titles');

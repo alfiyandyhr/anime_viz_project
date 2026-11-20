@@ -2,6 +2,7 @@
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const catalogue = require('../../data/movie_recommendations.json');
+const { openAnalysisTab } = require('./dust-analysis-tab.cjs');
 const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 const movies = 'tmdb:genre:Science Fiction', anime = 'anilist:genre:Sci-Fi';
 const animeTitles = 'anime-titles', movieTitles = 'movie-titles';
@@ -55,6 +56,7 @@ async function verifyCreatorPickers(page) {
     await selectGenre(page, movieGenre);
     await picker.getByRole('radio', { name: 'Title count' }).check();
     await page.getByRole('button', { name: 'Add title count magnet' }).click();
+    await openAnalysisTab(page, 'ranking');
     await page.locator('[data-dust-ranking-sort]').selectOption(movieGenre);
     assert.match(await page.locator('[data-dust-ranking-head]').textContent(), /Science Fiction movie count/);
     const counts = await page.evaluate(() => {
@@ -67,6 +69,7 @@ async function verifyCreatorPickers(page) {
     assert.deepEqual(counts.activeMagnetKeys, ['anilist:16498', movieGenre, titleCount]);
     assert.deepEqual(counts.raw, counts.expected);
     const memberLabel = dustType === 'movie-writers' ? 'Movie writer' : 'Movie actor';
+    await openAnalysisTab(page, 'connections');
     for (const [key, title, countLabel] of [
       [movieGenre, 'Science Fiction movies', 'Science Fiction movie count'],
       [titleCount, 'Title count', 'Title count']
@@ -130,11 +133,13 @@ async function verifyCreatorPickers(page) {
     assert.match(await page.locator('#dust-focus .dust-detail-scores').innerText(), new RegExp(label));
     assert.match(await page.locator('#recommendation-detail').textContent(), new RegExp(label));
     assert.match(await page.locator('#dust-mirror .dust-node').first().getAttribute('aria-label'), new RegExp(label));
+    await openAnalysisTab(page, 'connections');
     const connection = page.locator(`[data-dust-connection-movie="${movies}"]`);
     await page.locator('[data-dust-chart="connections"]').scrollIntoViewIfNeeded();
     await connection.press('Enter');
     assert.match(await page.locator('[data-coverage="connections"]').innerText(), new RegExp(label));
     assert.match(await page.locator('.dust-connection-row').first().getAttribute('aria-label'), new RegExp(label));
+    await openAnalysisTab(page, 'ranking');
     const sort = page.locator('[data-dust-ranking-sort]');
     await sort.selectOption(movies);
     assert.equal(await page.getByRole('columnheader', { name: `M2 · ${label}`, exact: true }).count(), 1);
