@@ -73,7 +73,7 @@
       <a class="button button-secondary" href="${link}" target="_blank" rel="noopener noreferrer">Explore on ${movie ? 'TMDB' : 'AniList'} ↗</a>`;
   }
 
-  function render({ snapshot, focusedMagnet, color, helpers }) {
+  function render({ snapshot, focusedMagnet, focusedDustKey, color, helpers }) {
     const { escapeHTML: escape, escapeAttribute: attr, humanize, formatNumber } = helpers;
     const { dustThumbnail, detailHero, movieHero } = root.AnivizArtwork;
     const { magnets, mixed } = snapshot;
@@ -149,7 +149,7 @@
         <tbody>${rows.map(([label, cell], index) => `<tr${index >= metadataRows.length && index < metadataRows.length + magnets.length ? ` style="--magnet-color:${color(magnets[index - metadataRows.length].key)}" class="dust-movie-metric"` : ''}><th scope="row">${escape(label)}</th>${values.map((value, i) => `<td>${cell(value, i)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
         <p class="table-note">${group ? `Each magnet uses all catalogue ${titleNoun} with data for that magnet. ` : reverse ? '' : 'Estimated runtime multiplies episodes by minutes per episode. '}${mixed ? `Magnet bars show the highlighted values.${scaleNote}` : 'Cosine scores range from −1 to 1.'}</p>`;
     }
-    const focused = focusedMagnet ? null : selected.at(-1);
+    const focused = focusedMagnet ? null : snapshot.displayedDust.find(row => row.key === focusedDustKey) || selected.at(-1);
     const record = focusedMagnet || (focused && recordFor(focused));
     const movie = focusedMagnet ? !reverse : reverse;
     const cover = record?.cover?.extra_large || record?.cover?.large || '';

@@ -568,6 +568,15 @@ function createDustView(container, matches, anchors, width, height, { onMove, on
     const key = hovered || focused;
     drawLinks(previewPaths, "dust-preview-link", key && !selectedKeys.includes(key) ? [key] : []);
   }
+  function clearPreview() {
+    hovered = focused = null;
+    drawPreview();
+    hideTooltip();
+  }
+  function selectDust(match) {
+    clearPreview();
+    AnivizMain.select(match.key);
+  }
   const dots = scene.append("g").selectAll("g").data(matches, (match) => match.key).join("g")
     .attr("class", "dust-node").attr("data-match-id", (match) => match.key)
     .attr("role", "button").attr("tabindex", 0).attr("aria-controls", "dust-focus recommendation-detail")
@@ -596,14 +605,10 @@ function createDustView(container, matches, anchors, width, height, { onMove, on
       drawPreview();
       hideTooltip();
     })
-    .on("click", (event, match) => { hideTooltip(); AnivizMain.select(match.key); })
+    .on("click", (event, match) => selectDust(match))
     .on("keydown", (event, match) => {
-      if (["Enter", " "].includes(event.key)) { event.preventDefault(); hideTooltip(); AnivizMain.select(match.key); }
-      if (event.key === "Escape") {
-        hovered = focused = null;
-        drawPreview();
-        hideTooltip();
-      }
+      if (["Enter", " "].includes(event.key)) { event.preventDefault(); selectDust(match); }
+      if (event.key === "Escape") clearPreview();
     });
   dots.append("circle").attr("class", "dust-hit-area").attr("r", DUST_HIT_RADIUS);
   const grains = dots.append("circle").attr("class", "dust-grain").attr("r", 4.5).attr("fill", AnivizMain.dustColor);
@@ -645,11 +650,7 @@ function createDustView(container, matches, anchors, width, height, { onMove, on
       event.preventDefault();
       onMove(anchor, anchor.x + delta[0], anchor.y + delta[1]);
     })
-    .call(d3.drag().clickDistance(4).on("start", () => {
-      hovered = focused = null;
-      drawPreview();
-      hideTooltip();
-    })
+    .call(d3.drag().clickDistance(4).on("start", clearPreview)
       .on("drag", (event, anchor) => onMove(anchor, event.x, event.y)));
   const magnetArt = magnets.append("g").attr("class", "dust-magnet-art");
   magnetArt.append("circle").attr("class", "magnet-halo").attr("r", DUST_CLEARANCE).attr("stroke", (anchor) => anchor.color);
@@ -670,11 +671,7 @@ function createDustView(container, matches, anchors, width, height, { onMove, on
     container, svg, d3, label, extent: [[0, 0], [width, height]],
     zoomContent,
     canDragFrom: target => !target.closest(".dust-magnet, .dust-brush"),
-    onStart() {
-      hovered = focused = null;
-      drawPreview();
-      hideTooltip();
-    },
+    onStart: clearPreview,
     onZoom(transform, showPosters) {
       scene.attr("transform", transform);
       scene.style("--dust-magnet-scale", Math.min(1, 2 / transform.k));

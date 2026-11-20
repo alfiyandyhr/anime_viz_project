@@ -3,7 +3,7 @@
 (function (root) {
   let context, composition, latest, rankingPage = 0, rankingSignature = "";
   let scrollRestored = false, pendingNotice = "", metadataLoading = false;
-  let movieDetailsRequest, focusedMagnetKey = null, inspectedMovieKey = null;
+  let movieDetailsRequest, focusedMagnetKey = null, focusedDustKey = null, inspectedMovieKey = null;
   let brushedKeys = new Set(), brushedTitleIds = new Set();
   const chartRenderers = [];
   const $ = selector => document.querySelector(selector);
@@ -123,17 +123,24 @@
     });
     openDrawer(`${group.label} details`);
   }
-  function select(key, { showDrawer = false } = {}) {
+  function select(key, { showDrawer = false, compareOnly = false } = {}) {
     if (!latest.displayedKeys.includes(key)) return;
     const wasSelected = latest.selectedKeys.includes(key);
-    if (wasSelected || latest.selectedKeys.length < 3) focusedMagnetKey = null;
+    const comparisonFull = !wasSelected && latest.selectedKeys.length >= 3;
+    const previewTitle = comparisonFull && !compareOnly && !dustGroup();
+    if (!comparisonFull || previewTitle) {
+      focusedMagnetKey = null;
+      focusedDustKey = previewTitle ? key : null;
+    }
     if (pendingNotice.startsWith('Compare up to 3')) notice('');
     context.toggleSelection(key);
+    if (previewTitle) renderFocus();
     if (showDrawer && !wasSelected && !dustGroup()) inspectTitle(key);
   }
   function focusMagnet(key) {
     if (!context.getMagnetRecord(key)) return;
     focusedMagnetKey = key;
+    focusedDustKey = null;
     renderFocus();
     if (!isReverse()) loadMovieDetails();
   }
@@ -144,7 +151,7 @@
   }
   function detailResult() {
     return AnivizDustDetails.render({ snapshot: latest, focusedMagnet: context.getMagnetRecord(focusedMagnetKey),
-      color, helpers: detailHelpers() });
+      focusedDustKey, color, helpers: detailHelpers() });
   }
   function renderDetails() {
     const result = detailResult();
@@ -182,6 +189,9 @@
       return;
     }
     if (switched || !snapshot.activeMagnetKeys.includes(focusedMagnetKey)) focusedMagnetKey = null;
+    if (focusedDustKey && (switched || snapshot.selectedKeys.length < 3 || !snapshot.displayedKeys.includes(focusedDustKey))) {
+      focusedDustKey = null;
+    }
     if (switched) {
       brushedKeys.clear();
       loadLayout();
@@ -453,7 +463,7 @@
     $('[data-dust-ranking-body]').addEventListener('click', event => {
       const toggle = event.target.closest('[data-dust-rank-select]');
       if (toggle) {
-        select(toggle.dataset.dustRankSelect);
+        select(toggle.dataset.dustRankSelect, { compareOnly: true });
         if (pendingNotice.startsWith('Compare up to 3')) $('[data-dust-ranking-notice]').textContent = pendingNotice;
         return;
       }

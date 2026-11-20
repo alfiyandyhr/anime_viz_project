@@ -152,19 +152,31 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
 
     const selection = () => page.evaluate(() => AnivizMain.snapshot().selectedKeys);
     const dust = page.locator('#recommendation-chart .dust-node');
-    const [first, secondId, thirdId, fourth] = (await dust.evaluateAll(nodes =>
-      nodes.slice(0, 4).map(node => node.dataset.matchId)));
+    const [first, secondId, thirdId, fourth, fifth] = (await dust.evaluateAll(nodes =>
+      nodes.slice(0, 5).map(node => node.dataset.matchId)));
     const dustById = id => dust.and(page.locator(`[data-match-id="${id}"]`));
     const titleFor = id => page.evaluate(id => AnivizMain.snapshot().lookup.get(id).record.title, id);
     for (const id of [first, secondId, thirdId]) {
       await dustById(id).focus();
       await page.keyboard.press('Enter');
     }
-    await dustById(fourth).focus();
-    await page.keyboard.press('Enter');
-    assert.equal(await page.locator('#dust-focus h3').innerText(), await titleFor(thirdId));
+    await page.locator('#recommendation-chart .dust-magnet').first().press('Enter');
+    const fourthHitArea = dustById(fourth).locator('.dust-hit-area');
+    const previewLinks = page.locator('#recommendation-chart .dust-preview-link');
+    await fourthHitArea.hover();
+    assert.equal(await previewLinks.count(), 3);
+    await fourthHitArea.click();
+    const focusTitle = page.locator('#dust-focus h3');
+    assert.equal(await focusTitle.innerText(), await titleFor(fourth));
+    assert.equal(await previewLinks.count(), 0);
+    assert.equal(await page.locator('#recommendation-chart .dust-selected-link').count(), 9);
     assert.deepEqual(await selection(), [first, secondId, thirdId]);
     assert.equal(await dustById(fourth).getAttribute('aria-pressed'), 'false');
+    const mirrorDot = page.locator(`#dust-mirror [data-match-id="${fifth}"]`);
+    await mirrorDot.press('Space');
+    assert.equal(await focusTitle.innerText(), await titleFor(fifth));
+    assert.equal(await page.locator('#dust-mirror .dust-preview-link').count(), 0);
+    assert.deepEqual(await selection(), [first, secondId, thirdId]);
 
     await check();
     const selectedRows = () => chart.locator('.dust-connection-row[aria-pressed="true"]').evaluateAll(rows =>

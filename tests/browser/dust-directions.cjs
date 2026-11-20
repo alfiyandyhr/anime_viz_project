@@ -306,9 +306,15 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     assert.ok(await page.locator('#filterbar').isVisible());
     for (const id of ['studio-filter', 'format-filter', 'score-filter']) assert.equal(await page.locator(`#${id}`).isVisible(), false);
     if ((await evidence()).selectedKeys.length) await page.locator('[data-dust-clear]').click();
-    for (let i = 0; i < 4; i++) await dot(i).press('Enter');
+    for (let i = 0; i < 3; i++) await dot(i).press('Enter');
     const selected = (await evidence()).selectedKeys;
     assert.equal(selected.length, 3);
+    await dot(3).focus();
+    assert.equal(await field.locator('.dust-preview-link').count(), 3);
+    await dot(3).press('Enter');
+    assert.equal(await page.locator('#dust-focus h3').innerText(), await dot(3).evaluate(node => node.__data__.record.title));
+    assert.equal(await field.locator('.dust-preview-link').count(), 0);
+    assert.deepEqual((await evidence()).selectedKeys, selected);
     assert.match(await page.locator('[data-dust-notice]').innerText(), /Compare up to 3 movies/);
     assert.match(await page.locator('#recommendation-detail').innerText(), /Comparing 3 movies[\s\S]*Release year[\s\S]*Genres/i);
     const comparison = page.locator('.dust-comparison-table');
