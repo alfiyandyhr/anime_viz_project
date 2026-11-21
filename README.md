@@ -123,7 +123,8 @@ The refresh workflow builds Full Catalogue and Dust & Magnet from the same
 when the browser cannot load richer metadata.
 Unknown values stay unknown, with metric-specific coverage. Metadata failure
 leaves dust and similarity evidence usable; matrix failure offers Retry without
-invented scores. Detailed methods, data freshness and credits sit in About / Data.
+invented scores. Dust & Magnet’s **About the methodology** section explains the
+methods and shows when the similarity scores were generated.
 
 See [the shared interfaces](frontend/common/README.md) and
 [the verification guide](tests/journey-verification.md) for contracts, checks,
@@ -233,7 +234,7 @@ also work. AniList uses its public GraphQL API.
 
 The frontend reads the displayed dates from the published files. The Anime tab
 shows the AniList collection time, the Movie tab shows its source
-snapshot date, and Dust & Magnet's **About / Data**
+snapshot date, and Dust & Magnet's **About the methodology** section
 shows when the similarity scores finished. Reload after the updated files are
 available to see the new dates.
 

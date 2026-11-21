@@ -100,7 +100,7 @@ Full Catalogue always uses catalogue mode, including legacy `?mode=matches`
 entries. Its saved filters and page-local shortlist stay independent of dust;
 comparison is automatic and inline. History keeps its separate annual data,
 six-era scroll mapping, posters and rankings, without movie detour loading.
-Detailed methods and freshness live in each view's About / Data disclosure.
+Dust & Magnet describes its methods and data freshness in **About the methodology**.
 
 ## Loading and failure
 
