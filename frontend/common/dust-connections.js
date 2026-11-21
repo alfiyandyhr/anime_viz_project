@@ -127,15 +127,14 @@
       const members = ranking.filter(match => match.closest === magnetIndex);
       const memberPanel = comparison.append('section').attr('class', 'dust-member-panel')
         .attr('aria-labelledby', 'dust-members-heading');
-      memberPanel.append('h4').attr('id', 'dust-members-heading').text('Dust members');
+      memberPanel.append('h4').attr('id', 'dust-members-heading').text('Dust members by score');
       magnetButtons(memberPanel, 'dust-member-magnets', 'data-dust-member-movie');
       memberPanel.append('p').attr('class', 'dust-member-count').text(`${members.length} of ${displayedDust.length} displayed ${noun}`);
       let memberRows;
       if (members.length) {
         const scroll = memberPanel.append('div').attr('class', 'dust-member-scroll').attr('role', 'region')
           .attr('tabindex', 0).attr('aria-label', `Dust member ranking for ${title}`).attr('data-dust-member-scroll', '');
-        const table = scroll.append('table').attr('aria-label', `Dust members for ${title}`)
-          .style('--dust-color', matchColor(members[0]));
+        const table = scroll.append('table').attr('aria-label', `Dust members for ${title}`);
         const memberScoreLabel = AnivizDust.isMetricMagnet(magnet)
           ? AnivizDust.magnetScoreLabel(magnet) : 'Similarity';
         const showTitleCounts = group && AnivizDust.METRIC_MAGNET_TYPES.includes(magnet.kind);
@@ -147,6 +146,7 @@
           .classed('dust-member-similarity', label => label === 'Similarity')
           .text(label => label);
         const rows = memberRows = table.append('tbody').selectAll('tr').data(members).join('tr')
+          .style('--dust-color', matchColor)
           .classed('dust-member-selected', isSelected)
           .on('click', (event, match) => {
             event.currentTarget.querySelector('button').focus({ preventScroll: true });
@@ -187,15 +187,12 @@
           .attr('stroke-width', row => max === min ? 5 : 1 + 8 * (row.match.similarity - min) / (max - min));
       };
       drawLines();
-      if (brushColor) {
-        recolor = () => {
-          if (!active.isConnected) return;
-          lists.forEach(({ rows }) => rows.style('--dust-color', matchColor));
-          memberRows?.style('--dust-color', matchColor);
-          svg.selectAll('path').attr('stroke', row => matchColor(row.match));
-        };
-        recolor();
-      }
+      recolor = () => {
+        if (!active.isConnected) return;
+        lists.forEach(({ rows }) => rows.style('--dust-color', matchColor));
+        memberRows?.style('--dust-color', matchColor);
+        svg.selectAll('path').attr('stroke', row => matchColor(row.match));
+      };
 
       if (focusKey) container.querySelector(`[${focusKey}="${CSS.escape(focused.getAttribute(focusKey))}"]`)
         ?.focus({ preventScroll: true });

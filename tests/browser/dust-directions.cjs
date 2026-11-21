@@ -198,7 +198,7 @@ async function assertTitleBrowse(page, noun, records, namespace, touch = false) 
     });
     assert.deepEqual(await radioTextStyle(page.locator('#title-magnet-label')),
       await radioTextStyle(page.locator('#genre-magnet-label')));
-    await page.getByRole('radio', { name: 'Strongest magnet' }).check();
+    await page.getByRole('radio', { name: 'Strongest pull' }).check();
     await openAnalysisTab(page, 'ranking');
     await ranking.first().locator('img').waitFor();
     assert.match(await ranking.first().locator('img').getAttribute('src'), /^https:\/\/s4\.anilist\.co\//);

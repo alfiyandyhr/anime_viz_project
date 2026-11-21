@@ -9,6 +9,7 @@ Explore story similarities between anime and live-action movies in a visualizati
 ## Three views
 
 The root URL opens **Dust & Magnet** with **Anime titles** as dust and Inception as the example magnet.
+The site defaults to dark mode. The theme toggle saves your choice across views.
 Set **Dust type** to **Movie titles** for movie dots and Attack on Titan as the first-use example. Choose the **Movie** magnet type with anime dust or **Anime** with movie dust to search by title, alias, or year. **Movie genre** with anime dust and **Anime genre** with movie dust compare against a genre from the other catalogue. Use **Popularity** or **Score** to attract dust by audience size or rating. Fill up to three slots and remove any magnet with ×.
 
 | View | Data and interactions |
@@ -122,7 +123,8 @@ The refresh workflow builds Full Catalogue and Dust & Magnet from the same
 when the browser cannot load richer metadata.
 Unknown values stay unknown, with metric-specific coverage. Metadata failure
 leaves dust and similarity evidence usable; matrix failure offers Retry without
-invented scores. Detailed methods, data freshness and credits sit in About / Data.
+invented scores. Dust & Magnet’s **About the methodology** section explains the
+methods and shows when the similarity scores were generated.
 
 See [the shared interfaces](frontend/common/README.md) and
 [the verification guide](tests/journey-verification.md) for contracts, checks,
@@ -232,7 +234,7 @@ also work. AniList uses its public GraphQL API.
 
 The frontend reads the displayed dates from the published files. The Anime tab
 shows the AniList collection time, the Movie tab shows its source
-snapshot date, and Dust & Magnet's **About / Data**
+snapshot date, and Dust & Magnet's **About the methodology** section
 shows when the similarity scores finished. Reload after the updated files are
 available to see the new dates.
 
@@ -414,13 +416,18 @@ available by scrolling.
 The dust field defaults to **60 dots**, with 30 and 90 options. It reserves half
 the candidate budget equally for each magnet's strongest matches, then fills
 remaining slots with the highest average attraction scores, deduplicating overlap.
-The reference sample stays fixed when dot count or filters change. Dots share
-one color by default. **Color dust by strongest magnet** colors each
-title by its highest-scoring magnet in the field, mirror, and linked charts.
-With Popularity or Score active, the control uses the highest attraction
-percentile. White outlines mark selected anime. Hover, keyboard-focus,
-or select a dot to see its links. Thicker links show a stronger pull for that
-dot. Hover or focus a dot to see its scores.
+The reference sample stays fixed when dot count or filters change.
+**Strongest pull** is the default under **Color dust by**. A dot takes the color
+of the magnet that pulls on it most at the current strengths. The field, mirror,
+reception scatterplot for titles, and similarity connections use the same colors.
+A magnet at 0× cannot color a dot. If all strengths are 0×, dots use a neutral color.
+Choose **Brushing and linking** to highlight dots within the brush and their
+corresponding data in the linked charts.
+With all strengths at 1×, color follows the highest similarity score or
+attraction percentile, depending on the magnets in use. White outlines mark
+selected anime. Hover, keyboard-focus, or select a dot to see its links.
+Thicker links show a stronger pull for that dot. Hover or focus a dot to see
+its scores and the magnet with the strongest pull.
 
 With two or three magnets, each dot moves toward a weighted center of the
 magnets, with separate tuning for cosines and attraction percentiles. Close

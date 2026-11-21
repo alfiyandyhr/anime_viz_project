@@ -329,7 +329,7 @@
     let catalogue = new Map(), lookup = new Map(), titleLookup = new Map(), groups = [];
     let magnets = [], magnetSlots = [], vectors = [], candidates = [], displayed = [], ranking = [];
     let metricMagnets = {};
-    let persistent = true, warned = false, revision = 0, colorByMagnet = false;
+    let persistent = true, warned = false, revision = 0, colorByMagnet = true;
     const listeners = new Set();
     const creditStatus = () => direction === ORIGINAL_CREATORS ? animeCreditsStatus
       : isMovieDust(direction) ? movieDetailsStatus : metadataStatus;
@@ -511,7 +511,7 @@
             if (Array.isArray(entry?.state?.magnetKeys)) sessions.set(name, readSession(name, entry));
           }
           direction = saved.direction;
-          colorByMagnet = saved.colorByMagnet === true;
+          colorByMagnet = saved.colorByMagnet !== false;
         } else {
           const legacy = read(LEGACY_KEY);
           if (legacy?.version !== 1 || legacy.state?.version !== 1 || !Array.isArray(legacy.state.movieIds)) return false;

@@ -64,7 +64,7 @@ const state = page => page.evaluate(() => {
     });
     await page.goto(base);
     await ready(page);
-    const colorByMagnet = page.getByRole('radio', { name: 'Strongest magnet' });
+    const colorByMagnet = page.getByRole('radio', { name: 'Strongest pull' });
     assert.ok(await colorByMagnet.isVisible());
     await page.getByRole('radio', { name: 'Movie genre' }).check();
     await page.selectOption('#genre-magnet-choice', 'tmdb:genre:Science Fiction');
@@ -82,6 +82,22 @@ const state = page => page.evaluate(() => {
     await add(page).click();
     assert.match(await page.locator('#recommendation-status').innerText(), /already a magnet/);
     assert.match(await page.locator('[data-dust-ranking-head]').textContent(), average);
+    const colors = () => page.locator('#recommendation-chart .dust-grain').evaluateAll(grains =>
+      grains.map(grain => grain.getAttribute('fill')));
+    const originalColors = await colors();
+    await page.getByRole('slider', { name: 'Popularity strength' }).press('End');
+    const strongerColors = await page.evaluate(() => {
+      const { displayedDust, activeMagnetKeys } = AnivizMain.snapshot();
+      return displayedDust.map(({ scores: [first, second, popularity] }) => {
+        const weighted = [first, second, popularity + 0.24 * Math.log(2)];
+        return AnivizMain.color(activeMagnetKeys[weighted.indexOf(Math.max(...weighted))]);
+      });
+    });
+    assert.notDeepEqual(strongerColors, originalColors);
+    assert.deepEqual(await colors(), strongerColors);
+    assert.deepEqual(await state(page), combined);
+    await page.getByRole('button', { name: 'Reset strengths' }).press('Enter');
+    assert.deepEqual(await colors(), originalColors);
     const popularityOption = page.locator(`[data-dust-ranking-sort] option[value="${anime}"]`);
     assert.equal(await popularityOption.textContent(), 'Popularity (AniList users)');
     assert.match(await page.locator('#recommendation-score-note').innerText(), /attraction percentile/);
@@ -252,7 +268,7 @@ const state = page => page.evaluate(() => {
     await choosePopularity(phone);
     await add(phone).tap();
     await mixed(phone);
-    assert.ok(await phone.getByRole('radio', { name: 'Strongest magnet' }).isVisible());
+    assert.ok(await phone.getByRole('radio', { name: 'Strongest pull' }).isVisible());
     await dot(phone).first().press('Enter');
     assert.match(await phone.locator('#dust-focus').innerText(), /AniList users/);
     await phone.locator('[data-dust-chart="connections"]').scrollIntoViewIfNeeded();

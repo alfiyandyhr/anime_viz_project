@@ -18,6 +18,7 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
     const waitForDust = () => page.locator('#recommendation-chart .dust-node').first().waitFor();
     await page.goto(dustUrl);
     await waitForDust();
+    await page.getByRole('radio', { name: 'Brushing and linking' }).check();
     const picker = page.locator('#dust-type');
     await picker.selectOption('anime-studios');
     await waitForDust();

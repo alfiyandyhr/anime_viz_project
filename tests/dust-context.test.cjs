@@ -88,29 +88,29 @@ test('layout, hover-free snapshots, ranking sort and selection do not resample c
   }
   assert.equal(context.getLayout().scrollY,1444);
 });
-test('dust coloring starts uniform and stores one display preference across direction sessions', () => {
+test('dust coloring defaults to strongest magnet and stores one preference across direction sessions', () => {
   const { context, memory, storage } = setup();
   context.setSelection(context.snapshot().displayedKeys.slice(0, 2));
   const before = context.snapshot();
-  assert.equal(before.colorByMagnet, false);
-  const enabled = context.setColorByMagnet(true);
-  assert.equal(enabled.colorByMagnet, true);
+  assert.equal(before.colorByMagnet, true);
+  const brushing = context.setColorByMagnet(false);
+  assert.equal(brushing.colorByMagnet, false);
   for (const key of ['candidateDust', 'displayedDust', 'ranking', 'filters', 'selectedKeys']) {
-    assert.equal(enabled[key], before[key]);
+    assert.equal(brushing[key], before[key]);
   }
-  assert.equal(context.setDirection(REVERSE).colorByMagnet, true);
+  assert.equal(context.setDirection(REVERSE).colorByMagnet, false);
   const restored = createContext({ storage });
   assert.equal(restored.restore(), true);
-  assert.equal(restored.snapshot().colorByMagnet, true);
-  assert.equal(context.setColorByMagnet(false).colorByMagnet, false);
-  assert.equal(context.setDirection(FORWARD).colorByMagnet, false);
+  assert.equal(restored.snapshot().colorByMagnet, false);
+  assert.equal(context.setColorByMagnet(true).colorByMagnet, true);
+  assert.equal(context.setDirection(FORWARD).colorByMagnet, true);
 
   const saved = JSON.parse(memory.get(STORAGE_KEY));
   delete saved.colorByMagnet;
   memory.set(STORAGE_KEY, JSON.stringify(saved));
   const older = createContext({ storage });
   assert.equal(older.restore(), true);
-  assert.equal(older.snapshot().colorByMagnet, false);
+  assert.equal(older.snapshot().colorByMagnet, true);
 });
 test('magnet strengths follow magnet IDs and directions without recomputing dust evidence', () => {
   const { context, memory, storage } = setup();

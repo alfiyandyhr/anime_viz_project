@@ -17,6 +17,7 @@
     [AnivizDust.MOVIE_WRITERS]: 'movie-writers'
   };
   const magnetColors = new Map();
+  let pullWinners = new Map();
   const isReverse = () => AnivizDust.isMovieDust(latest.direction);
   const isStudio = () => latest.direction === AnivizDust.STUDIOS;
   const isOriginalCreatorDust = () => latest.direction === AnivizDust.ORIGINAL_CREATORS;
@@ -26,8 +27,9 @@
   const detailHelpers = () => ({ escapeHTML, escapeAttribute, humanize, formatNumber });
   const color = key => magnetColors.get(key);
   const brushColor = highlighted => highlighted ? DUST_BRUSH_COLOR : DUST_UNIFORM_COLOR;
+  const strongestPull = key => pullWinners.get(key);
   const dustColor = match => latest.colorByMagnet
-    ? color(latest.activeMagnetKeys[match.closest]) : brushColor(brushedKeys.has(match.key));
+    ? color(strongestPull(match.key)?.key) ?? DUST_UNIFORM_COLOR : brushColor(brushedKeys.has(match.key));
   const linkedTitleColor = ids => brushColor(ids.some(id => brushedTitleIds.has(String(id))));
   const notice = message => {
     pendingNotice = message;
@@ -181,11 +183,25 @@
     const switched = latest.direction !== snapshot.direction;
     const recolor = latest.colorByMagnet !== snapshot.colorByMagnet;
     const magnetsChanged = switched || latest.activeMagnetKeys.join('|') !== snapshot.activeMagnetKeys.join('|');
-    const strengthOnly = latest.magnetStrengths !== snapshot.magnetStrengths && latest.magnets === snapshot.magnets;
+    const strengthsChanged = latest.magnetStrengths !== snapshot.magnetStrengths;
+    const strengthOnly = !switched && strengthsChanged && latest.magnets === snapshot.magnets;
+    if (magnetsChanged || strengthsChanged || latest.displayedDust !== snapshot.displayedDust) {
+      const anchors = activeDustAnchors(snapshot.magnets.map(magnet => ({ magnet, strength: snapshot.magnetStrengths[magnet.key] })));
+      const temperature = dustTemperature(snapshot.mixed);
+      pullWinners = new Map(snapshot.displayedDust.map(({ key, scores }) => {
+        const pulls = dustPullScores(scores, anchors, temperature);
+        const winner = anchors[pulls.indexOf(Math.max(...pulls))];
+        return [key, winner?.magnet];
+      }));
+    }
     latest = snapshot;
     if (strengthOnly) {
       syncMotionControls();
       dustChart?.setMagnetStrengths?.(snapshot.magnetStrengths);
+      if (snapshot.colorByMagnet) {
+        refreshDustColors();
+        chartRenderers.forEach(renderer => renderer.recolor?.());
+      }
       return;
     }
     if (switched || !snapshot.activeMagnetKeys.includes(focusedMagnetKey)) focusedMagnetKey = null;
@@ -264,7 +280,7 @@
     const scoreLabel = snapshot.mixed ? 'attraction percentiles' : group ? 'mean story similarity' : 'similarity scores';
     const brushNote = snapshot.colorByMagnet ? '' : 'Drag or resize the brush to highlight matching data below. ';
     $('#recommendation-score-note').textContent = `${brushNote}Zoom in for ${studios ? 'studio names' : people ? 'portraits' : 'posters'}. Hover or focus for ${scoreLabel}. Thicker links show a stronger pull. Select up to 3 ${unit}.`;
-    const colorNote = snapshot.colorByMagnet ? ` Color identifies each ${group?.label.toLowerCase() || 'title'}’s highest-scoring magnet.` : '';
+    const colorNote = snapshot.colorByMagnet && !group ? ' Color shows which magnet has the strongest pull.' : '';
     const notes = {
       genres: [metric === 'count' ? 'Genres' : 'Genre ' + metric,
         row => row.genres.length && (metric === 'score' ? Number.isFinite(row.average_score) : metric !== 'popularity' || Number.isFinite(row.popularity)),
@@ -278,7 +294,7 @@
           : snapshot.popularity.status === 'unavailable' ? 'Archived TMDB reception data unavailable.'
             : 'Loading archived TMDB reception data…'];
     } else {
-      notes.reception = ['Ratings', row => row.popularity > 0 && Number.isFinite(row.average_score), `Circle area: favourites.${group ? '' : colorNote}`];
+      notes.reception = ['Ratings', row => row.popularity > 0 && Number.isFinite(row.average_score), `Circle area: favourites.${colorNote}`];
     }
     Object.entries(notes).forEach(([kind, [label, predicate, suffix]]) => {
       const chartRecords = kind === 'reception' ? receptionTitles : records;
@@ -678,7 +694,7 @@
     },
     setMagnets(keys) { context.setMagnets(keys); renderRecommendations(); },
     setDustLimit(value) { context.setDustLimit(value); renderRecommendations(); },
-    select, focusMagnet, color, dustColor, setBrushedKeys, saveLayout, loadMetricData, loadAnimeCredits, loadMovieDetails,
+    select, focusMagnet, color, dustColor, strongestPull, setBrushedKeys, saveLayout, loadMetricData, loadAnimeCredits, loadMovieDetails,
     deselectLast() {
       if (latest.selectedKeys.length) {
         focusedMagnetKey = null;

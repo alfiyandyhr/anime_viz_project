@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <script src="../common/theme.js"></script>
@@ -69,7 +69,7 @@
           <a href="../explorer/index.html?mode=catalogue">Full Catalogue</a>
         </nav>
       </details>
-      <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to dark mode" title="Switch to dark mode">
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to light mode" title="Switch to light mode">
         <svg class="theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path></svg>
         <svg class="theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"></path></svg>
       </button>
@@ -165,8 +165,8 @@
           </fieldset>
           <fieldset class="magnet-type-picker" id="dust-color-mode">
             <legend>Color dust by</legend>
-            <label><input id="dust-color-by-magnet" type="radio" name="dust-color-mode" value="magnet"> Strongest magnet</label>
-            <label><input id="dust-color-by-brush" type="radio" name="dust-color-mode" value="brush" checked> Brushing and linking</label>
+            <label><input id="dust-color-by-magnet" type="radio" name="dust-color-mode" value="magnet" checked> Strongest pull</label>
+            <label><input id="dust-color-by-brush" type="radio" name="dust-color-mode" value="brush"> Brushing and linking</label>
           </fieldset>
           <button id="reset-magnets" class="small-button ghost" type="button">Reset positions</button>
           <details class="field-options" data-field-options>
@@ -378,7 +378,7 @@
         </section>
 
         <details class="methodology">
-          <summary>About / Data</summary>
+          <summary>About the methodology</summary>
           <div class="method-grid">
             <article><h3>One million comparisons</h3><p id="recommendation-method-data">1,000 popular AniList anime × 1,000 popular TMDB movies. Anime and movie dust use the same pair scores from the complete score matrix.</p></article>
             <article><h3>Story similarity</h3><p id="recommendation-method-model">Qwen3-Embedding-4B embeds titles, genres, tags, and synopses. Cosine similarity compares the normalized vectors; ratings and popularity do not affect the score.</p></article>
@@ -391,10 +391,11 @@
             <article><h3>Movie writers</h3><p>Movie writers group movies by TMDB Writing department credits, including screenplay, story, and source material. The magnets and linked charts follow the same rules as Movie actors. Zoom in for available writer portraits.</p></article>
             <article><h3>Attraction percentiles</h3><p>Popularity uses AniList users for anime and TMDB popularity for movies. Score uses AniList ratings out of 100 and TMDB ratings out of 10. With a count, Popularity, or Score magnet active, each magnet’s raw values become attraction percentiles from 0 to 1. The reference sample includes dust with values for every active magnet. Ties share the average percentile and a sample of one gets 0.5. Dot count and filters leave the reference sample fixed. The full ranking keeps entries with missing values and supports sorting by each magnet’s raw values.</p></article>
 
-            <article><h3>Reading the magnets</h3><p>The field samples each magnet’s strongest matches, then fills remaining slots by average cosine or average attraction percentile. Similar scores draw a dot into the space between magnets. Nearby dots can shift it to make room. Hover, focus, or select a dot to see its links. Thicker links show which magnets pull more strongly on that dot. Coloring uses each dot’s highest score across the active magnets. Hover or focus a dot, or use the full ranking table, to compare scores. Select up to three dots with a click, tap, Enter, or Space. Select again to remove a title, or click empty space to remove the latest selection.</p></article>
-            <article><h3>Adjusting magnet strength</h3><p>Each magnet’s strength ranges from 0× to 2×. At 0× the magnet exerts no pull. Higher values draw dots closer when their scores are similar across magnets. Scores and dust selection use equal weights. Reset strengths restores each magnet to 1×.</p></article>
+            <article><h3>Reading the magnets</h3><p>The field samples each magnet’s strongest matches, then fills remaining slots by average cosine or average attraction percentile. Similar scores draw a dot into the space between magnets. Nearby dots can shift it to make room. Hover, focus, or select a dot to see its links. Thicker links show which magnets pull more strongly on that dot. Strongest pull colors each dot by the magnet pulling on it most at the current strengths. Hover or focus a dot, or use the full ranking table, to compare scores. Select up to three dots with a click, tap, Enter, or Space. Select again to remove a title, or click empty space to remove the latest selection.</p></article>
+            <article><h3>Adjusting magnet strength</h3><p>Each magnet’s strength ranges from 0× to 2×. At 0× the magnet exerts no pull. In Strongest pull mode, dots use a neutral color when all strengths are 0×. Scores, rankings, and the displayed dust stay fixed as strength changes. Reset strengths restores each magnet to 1×.</p></article>
             <article><h3>Reading the charts</h3><p>Charts use the displayed titles. The full ranking uses the entire dust catalogue. Genres can overlap. With anime dust, AniList popularity counts list users and reception marker size shows favourites. With movie dust, reception, the Movie catalogue, and the Popularity and Score magnets share the archived TMDB snapshot. Movie posters and runtimes come from a separate TMDB details snapshot for those same titles.</p></article>
             <article><h3>A starting point</h3><p>These are text-based recommendations, not predictions of your enjoyment. Seasons, sequels, and the same animated film in both databases can appear separately. Genre labels are context, not an explanation of the model’s score.</p></article>
+            <article><h3>Brushing and linking</h3><p>In Brushing and linking mode, the brush highlights dots whose centers fall inside its outline. Similarity connections and the full ranking highlight the same entries. In the genre, release-year, and credit charts, a mark lights up when it includes at least one brushed title. Brushing a studio or person highlights contributions from their credited titles. Chart totals and comparison selections stay the same as you move the brush.</p></article>
           </div>
         <div class="data-freshness"><span id="footer-generated">Data not loaded</span> · <span id="footer-cache"></span></div></details>
       </section>
