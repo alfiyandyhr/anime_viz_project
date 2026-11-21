@@ -50,8 +50,9 @@ async function setup(page, errors) {
     await setup(page, errors);
     const inception = page.getByRole('slider', { name: 'Inception strength' });
     const interstellar = page.getByRole('slider', { name: 'Interstellar strength' });
+    const matrix = page.getByRole('slider', { name: 'The Matrix strength' });
     const reset = page.getByRole('button', { name: 'Reset strengths' });
-    const color = page.getByRole('radio', { name: 'Strongest magnet' });
+    const color = page.getByRole('radio', { name: 'Strongest pull' });
     const positions = page.getByRole('button', { name: 'Reset positions' });
     assert.deepEqual(await settings(page), defaults);
     assert.equal(await page.getByRole('group', { name: 'Magnet strength', exact: true }).getByRole('slider').count(), 3);
@@ -65,6 +66,46 @@ async function setup(page, errors) {
     await page.getByRole('radio', { name: 'Brushing and linking' }).check();
     assert.ok((await colors(page)).every(fill => fill === 'var(--dust-uniform)' || fill === 'var(--pink)'));
     assert.deepEqual(await transforms(page), grouped);
+
+    await color.check();
+    const originalColors = await colors(page);
+    assert.equal(new Set(originalColors).size, 3);
+    const legend = page.locator('#dust-legend');
+    await openAnalysisTab(page, 'connections');
+    const connections = page.locator('[data-dust-chart="connections"]');
+    await connections.locator('.dust-connection-row').first().waitFor();
+    const initialMembers = await connections.locator('.dust-member-scroll tbody').innerText();
+    await inception.press('Home');
+    const twoColors = await colors(page);
+    const expectedColors = await page.evaluate(() => {
+      const { activeMagnetKeys, displayedDust } = AnivizMain.snapshot();
+      return displayedDust.map(({ scores }) => AnivizMain.color(activeMagnetKeys[scores[1] >= scores[2] ? 1 : 2]));
+    });
+    assert.deepEqual(twoColors, expectedColors);
+    assert.equal(new Set(twoColors).size, 2);
+    assert.deepEqual(await legend.locator('span[title]').allTextContents(), ['M2', 'M3']);
+    assert.equal(await connections.locator('.dust-member-scroll tbody').innerText(), initialMembers);
+    assert.ok(await connections.locator('.dust-connection-dot').evaluateAll(marks => marks.every(mark => {
+      const grain = document.querySelector(`#recommendation-chart [data-match-id="${mark.__data__.key}"] .dust-grain`);
+      return getComputedStyle(mark).backgroundColor === getComputedStyle(grain).fill;
+    })));
+
+    await openAnalysisTab(page, 'reception');
+    const reception = page.locator('[data-dust-chart="reception"]');
+    await reception.locator('.reception-dot').first().waitFor();
+    await interstellar.press('Home');
+    await matrix.press('Home');
+    assert.deepEqual([...new Set(await colors(page))], ['var(--dust-uniform)']);
+    assert.ok(await page.locator('#dust-mirror .dust-grain').evaluateAll(marks =>
+      marks.every(mark => mark.getAttribute('fill') === 'var(--dust-uniform)')));
+    assert.ok(await reception.locator('.reception-dot').evaluateAll(marks => marks.every(mark =>
+      mark.getAttribute(mark.getAttribute('fill') === 'transparent' ? 'stroke' : 'fill') === 'var(--dust-uniform)')));
+    assert.match(await legend.innerText(), /No pull/);
+    await dots(page).first().focus();
+    assert.match(await page.locator('#tooltip').innerText(), /No magnets pulling/);
+    assert.match(await dots(page).first().getAttribute('aria-label'), /No magnets pulling/);
+    await reset.press('Enter');
+    assert.deepEqual(await colors(page), originalColors);
 
     const nearTieIndex = await dots(page).evaluateAll(nodes => nodes.findIndex(node => {
       const [best, next, third] = node.__data__.scores.slice().sort((a, b) => b - a);
@@ -80,6 +121,7 @@ async function setup(page, errors) {
     assert.ok(widths[0] - widths[1] < .2 && widths[1] - widths[2] > .3);
     await nearTie.press('Escape');
     assert.equal(await previewLinks.count(), 0);
+    await page.mouse.move(0, 0);
     await nearTie.locator('.dust-hit-area').hover();
     assert.equal(await previewLinks.count(), 3);
     await nearTie.press('Enter');
@@ -145,6 +187,7 @@ async function setup(page, errors) {
     assert.deepEqual(await transforms(page), resetField);
     assert.deepEqual(await evidence(page), before);
     assert.deepEqual(await settings(page), custom);
+    const savedColors = await colors(page);
     await page.selectOption('#dust-type', 'movie-titles');
     assert.deepEqual(await settings(page), [defaultStrength]);
     await page.selectOption('#dust-type', 'anime-titles');
@@ -152,6 +195,7 @@ async function setup(page, errors) {
     await dots(page).first().waitFor();
     assert.deepEqual(await settings(page), custom);
     assert.deepEqual(await evidence(page), before);
+    assert.deepEqual(await colors(page), savedColors);
     assert.equal(await color.isChecked(), true);
     await page.locator('[data-field-options] summary').click();
     await page.locator('#reset-filters').click();
@@ -171,7 +215,7 @@ async function setup(page, errors) {
     }
     assert.equal(await phone.evaluate(() => document.documentElement.scrollWidth === innerWidth), true);
     const narrowPositions = await transforms(phone);
-    await phone.getByRole('radio', { name: 'Strongest magnet' }).check();
+    await phone.getByRole('radio', { name: 'Strongest pull' }).check();
     assert.deepEqual(await transforms(phone), narrowPositions);
 
     const animated = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -179,17 +223,24 @@ async function setup(page, errors) {
     const transition = await animated.evaluate(() => {
       const state = () => [...dustChart.positions.values()].map(({ x, y, vx, vy }) => [x, y, vx, vy]);
       const input = document.querySelector('#dust-magnet-strength-1');
+      const color = AnivizMain.color(input.dataset.magnetStrength);
+      const usesColor = () => [...document.querySelectorAll('#recommendation-chart .dust-grain')]
+        .some(grain => grain.getAttribute('fill') === color);
       const before = state();
+      const colorBefore = usesColor();
       input.value = '0';
       input.dispatchEvent(new Event('input', { bubbles: true }));
       const after = state();
+      const colorAfter = usesColor();
       return new Promise(resolve => requestAnimationFrame(() => {
         const moved = state();
         const maxTravel = Math.max(...moved.map(([x, y], i) => Math.hypot(x - before[i][0], y - before[i][1])));
-        resolve({ before, after, maxTravel });
+        resolve({ before, after, maxTravel, colorBefore, colorAfter });
       }));
     });
     assert.deepEqual(transition.before, transition.after);
+    assert.equal(transition.colorBefore, true);
+    assert.equal(transition.colorAfter, false);
     assert.ok(transition.maxTravel > 0 && transition.maxTravel <= 4.84, transition.maxTravel);
     assert.deepEqual(...await transforms(animated));
     const magnet = field(animated).locator('.dust-magnet:not(.is-muted) .magnet-core').first();

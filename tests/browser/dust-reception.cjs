@@ -16,7 +16,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     const mirror = page.locator('#dust-mirror');
     const scatter = page.locator('[data-dust-chart="reception"]');
     const connections = page.locator('[data-dust-chart="connections"]');
-    const colorControl = page.getByRole('radio', { name: 'Strongest magnet' });
+    const colorControl = page.getByRole('radio', { name: 'Strongest pull' });
     await field.locator('.dust-node').first().waitFor();
     await page.waitForFunction(() => AnivizMain.snapshot().metadataStatus === 'ready');
     await page.getByRole('radio', { name: 'Brushing and linking' }).check();

@@ -10,10 +10,10 @@
       formatNumber, truncate, compactFormatter } = helpers;
     let context, dataIdentity, selectionKey, popularityCamera;
     const cached = new Map();
-    const brushUpdates = [];
+    const colorUpdates = [];
     function trackBrush(update) {
       if (!context.brushColor) return;
-      brushUpdates.push(update);
+      colorUpdates.push(update);
       update();
     }
     const aggregateColor = item => context.brushColor(item.ids);
@@ -711,7 +711,7 @@
         .attr("r", item => pointRadius(item) + 3);
 
       const posterLayer = marks.append("g");
-      trackBrush(() => {
+      colorUpdates.push(() => {
         dots.attr("fill", item => filled(item) ? color(item) : "transparent")
           .attr("stroke", stroke);
         posterLayer.selectAll(".dust-poster-title").style("color", color);
@@ -857,7 +857,7 @@
         dataIdentity = anime; selectionKey = nextSelection;
         context = { onSelect() {}, dustColor: () => "var(--color-primary-strong)", hasSelection: Boolean(value.selectedIds),
           ...value, anime, filmography, selectedIds };
-        brushUpdates.length = 0;
+        colorUpdates.length = 0;
         renderers[kind]();
         if (kind !== "reception" && kind !== "studios") {
           keyboardMarks(d3.select(container).selectAll("rect, circle").filter(function () {
@@ -868,7 +868,7 @@
           node.tabIndex === 0 && !node.disabled && node.getAttribute('aria-label') === focused)?.focus({ preventScroll: true });
       },
       recolor() {
-        if (container.hasChildNodes()) brushUpdates.forEach(update => update());
+        if (container.hasChildNodes()) colorUpdates.forEach(update => update());
       },
       destroy() { container.replaceChildren(); context = popularityCamera = null; }
     };

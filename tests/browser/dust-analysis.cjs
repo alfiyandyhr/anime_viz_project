@@ -132,7 +132,7 @@ async function verifyCreditCharts(page, attribute) {
       }
     }
 
-    await page.getByRole('radio', { name: 'Strongest magnet' }).check();
+    await page.getByRole('radio', { name: 'Strongest pull' }).check();
     await openAnalysisTab(page, 'genres');
     await chart('genres').scrollIntoViewIfNeeded();
     await chart('genres').locator('rect[role="img"]').first().waitFor();

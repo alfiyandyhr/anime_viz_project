@@ -361,21 +361,33 @@ function bindDustControls() {
   document.querySelector("#reset-magnets").addEventListener("click", AnivizMain.resetPositions);
 }
 
-function renderDustLegend({ magnets, colorByMagnet, mixed }) {
+function renderDustLegend({ magnets, colorByMagnet, magnetStrengths }) {
   const legend = document.querySelector("#dust-legend");
   legend.hidden = !magnets.length;
   if (!magnets.length) { legend.replaceChildren(); return; }
-  const colors = colorByMagnet ? magnets.map((magnet, index) => `
-    <span title="${mixed ? "Highest attraction percentile for" : "Titles most similar to"} ${escapeAttribute(magnet.title)}"><i class="dust-legend-dot" style="--magnet-color:${AnivizMain.color(magnet.key)}" aria-hidden="true"></i>M${index + 1}</span>`).join("")
+  const colors = colorByMagnet ? magnets.map((magnet, index) => magnetStrengths[magnet.key] === 0 ? "" : `
+    <span title="Strongest pull: ${escapeAttribute(magnet.title)}"><i class="dust-legend-dot" style="--magnet-color:${AnivizMain.color(magnet.key)}" aria-hidden="true"></i>M${index + 1}</span>`).join("")
     : `<span><i class="dust-legend-dot" style="--magnet-color:${DUST_UNIFORM_COLOR}" aria-hidden="true"></i>Dust</span>
       <span><i class="dust-legend-dot" style="--magnet-color:${DUST_BRUSH_COLOR}" aria-hidden="true"></i>Brushed</span>`;
-  legend.innerHTML = colors + '<span><i class="dust-legend-dot is-selected" aria-hidden="true"></i>Selected</span>';
+  const neutral = `<span><i class="dust-legend-dot" style="--magnet-color:${DUST_UNIFORM_COLOR}" aria-hidden="true"></i>No pull</span>`;
+  legend.innerHTML = (colors || neutral) + '<span><i class="dust-legend-dot is-selected" aria-hidden="true"></i>Selected</span>';
+}
+
+function dustPullLabel(key) {
+  if (!AnivizMain.snapshot().colorByMagnet) return "";
+  const winner = AnivizMain.strongestPull(key);
+  return winner ? `Strongest pull: ${winner.title}` : "No magnets pulling";
 }
 
 function refreshDustColors() {
   renderDustLegend(AnivizMain.snapshot());
   dustChart?.updateBrush?.();
   dustChart?.views?.forEach(view => view.drawColors());
+  const pull = document.querySelector("#tooltip.visible [data-dust-pull]");
+  if (pull) {
+    pull.textContent = dustPullLabel(pull.dataset.dustPull);
+    pull.hidden = !pull.textContent;
+  }
 }
 
 function renderDustRecommendations() {
@@ -577,11 +589,19 @@ function createDustView(container, matches, anchors, width, height, { onMove, on
     clearPreview();
     AnivizMain.select(match.key);
   }
+  const evidenceLabels = new Map(matches.map(match => [match.key, [
+    match.record.title,
+    group ? AnivizDustDetails.groupCoverage(match, direction) : "",
+    ...anchors.map(({ magnet }, index) => mixed ? AnivizDust.mixedEvidence(match, magnet, index)
+      : `${AnivizDust.magnetScoreLabel(magnet)}: ${match.scores[index].toFixed(3)}`)
+  ].filter(Boolean).join(". ")]));
+  const dotLabel = match => [
+    evidenceLabels.get(match.key), dustPullLabel(match.key), "Toggle selection for details or comparison."
+  ].filter(Boolean).join(". ");
   const dots = scene.append("g").selectAll("g").data(matches, (match) => match.key).join("g")
     .attr("class", "dust-node").attr("data-match-id", (match) => match.key)
     .attr("role", "button").attr("tabindex", 0).attr("aria-controls", "dust-focus recommendation-detail")
-    .attr("aria-label", (match) => `${match.record.title}. ${group ? `${AnivizDustDetails.groupCoverage(match, direction)}. ` : ""}${anchors.map(({ magnet }, index) => mixed ? AnivizDust.mixedEvidence(match, magnet, index)
-      : `${AnivizDust.magnetScoreLabel(magnet)}: ${match.scores[index].toFixed(3)}`).join(". ")}. Toggle selection for details or comparison.`)
+    .attr("aria-label", dotLabel)
     .on("mouseenter focus", (event, match) => {
       if (event.type === "focus") focused = match.key;
       else hovered = match.key;
@@ -590,7 +610,9 @@ function createDustView(container, matches, anchors, width, height, { onMove, on
       const pointer = event.type === "focus" ? { clientX: rect.x + rect.width / 2, clientY: rect.y + rect.height / 2 } : event;
       const subtitle = group ? AnivizDustDetails.groupCoverage(match, direction)
         : `${match.key.startsWith("anilist:") ? escapeHTML(humanize(match.record.format)) + " · " : ""}${match.record.year || "Year unknown"}`;
+      const pull = dustPullLabel(match.key);
       showTooltip(pointer, `<strong>${escapeHTML(match.record.title)}</strong><span>${subtitle}</span>`
+        + `<span data-dust-pull="${escapeAttribute(match.key)}"${pull ? "" : " hidden"}>${escapeHTML(pull)}</span>`
         + anchors.map(({ magnet, color }, index) => `<span class="dust-tooltip-score"><i style="background:${color}"></i>${mixed
           ? `<span>${escapeHTML(AnivizDust.magnetScoreLabel(magnet))}: ${AnivizDust.formatRawScore(match.rawScores[index], magnet)}<br>
             Attraction percentile: ${AnivizDust.formatPercentile(match.scores[index])}</span>`
@@ -687,6 +709,7 @@ function createDustView(container, matches, anchors, width, height, { onMove, on
     drawArtwork,
     brush,
     drawColors() {
+      dots.attr("aria-label", dotLabel);
       grains.attr("fill", AnivizMain.dustColor);
       posterTitles?.style("color", AnivizMain.dustColor);
     },

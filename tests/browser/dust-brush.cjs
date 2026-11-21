@@ -16,7 +16,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     const mirror = page.locator('#dust-mirror');
     const frame = field.locator('.dust-brush-frame');
     const brushBounds = () => frame.evaluate(el => el.getBoundingClientRect().toJSON());
-    const strongest = page.getByRole('radio', { name: 'Strongest magnet' });
+    const strongest = page.getByRole('radio', { name: 'Strongest pull' });
     const brushing = page.getByRole('radio', { name: 'Brushing and linking' });
     await field.locator('.dust-node').first().waitFor();
     await page.waitForFunction(() => AnivizMain.snapshot().metadataStatus === 'ready');

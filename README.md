@@ -405,14 +405,17 @@ The dust field defaults to **60 dots**, with 30 and 90 options. It reserves half
 the candidate budget equally for each magnet's strongest matches, then fills
 remaining slots with the highest average attraction scores, deduplicating overlap.
 The reference sample stays fixed when dot count or filters change.
-**Strongest magnet** is the default under **Color dust by**. It colors each
-title by its highest-scoring magnet in the field, mirror, and linked charts.
+**Strongest pull** is the default under **Color dust by**. A dot takes the color
+of the magnet that pulls on it most at the current strengths. The field, mirror,
+reception scatterplot for titles, and similarity connections use the same colors.
+A magnet at 0× cannot color a dot. If all strengths are 0×, dots use a neutral color.
 Choose **Brushing and linking** to highlight dots within the brush and their
 corresponding data in the linked charts.
-With Popularity or Score active, the control uses the highest attraction
-percentile. White outlines mark selected anime. Hover, keyboard-focus,
-or select a dot to see its links. Thicker links show a stronger pull for that
-dot. Hover or focus a dot to see its scores.
+With all strengths at 1×, color follows the highest similarity score or
+attraction percentile, depending on the magnets in use. White outlines mark
+selected anime. Hover, keyboard-focus, or select a dot to see its links.
+Thicker links show a stronger pull for that dot. Hover or focus a dot to see
+its scores and the magnet with the strongest pull.
 
 With two or three magnets, each dot moves toward a weighted center of the
 magnets, with separate tuning for cosines and attraction percentiles. Close

@@ -16,7 +16,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     await page.goto(new URL('frontend/dust-magnet/index.html',base).href);
     await page.waitForSelector('.dust-node');
     await page.waitForFunction(() => AnivizMain.snapshot().metadataStatus === 'ready');
-    await page.getByRole('radio', { name: 'Strongest magnet' }).check();
+    await page.getByRole('radio', { name: 'Strongest pull' }).check();
     const chart = page.locator('[data-dust-chart="connections"]');
     const magnets = chart.locator('[data-dust-connection-movie]');
     const memberMagnets = chart.locator('[data-dust-member-movie]');
