@@ -1,6 +1,6 @@
 # AniMoViz
 
-**[Open the live demo](https://alfiyandyhr.github.io/animoviz/)**
+Open the live demo: [https://alfiyandyhr.github.io/animoviz/ ](https://alfiyandyhr.github.io/animoviz/)
 
 AniMoViz lets you explore story similarities between 1,000 AniList anime and 1,000 TMDB movies. Use the view menu to switch between the interactive comparison, release timelines, and searchable catalogue.
 
@@ -35,7 +35,7 @@ The three views use the bundled data and scores. The browser loads D3 and artwor
 
 </details>
 
-**History** connects a year's most popular anime or movie to its closest matches in the other catalogue.
+**History** connects a year's most popular anime or movie to its closest matches in the other catalogue. Open **Match year span** to compare the release-year spread of the closest matches.
 
 ![History linking the 2020 anime Jujutsu Kaisen to the 1988 movie Beetlejuice](assets/history_light.png)
 
