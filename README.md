@@ -12,7 +12,14 @@ With Python 3.10+ installed, run this from the project root and open [http://loc
 python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
-The three views use the bundled data and scores. The browser loads D3 and artwork over the internet. For the Flask server, install `backend/requirements.txt` and run `python3 backend/app.py` (default port 5000).
+The three views use the bundled data and scores. The browser loads D3 and artwork over the internet.
+
+To use Flask, run these commands from the project root and open [http://localhost:5000](http://localhost:5000).
+
+```bash
+python3 -m pip install -r backend/requirements.txt
+python3 backend/app.py
+```
 
 ## Explore the three views
 
