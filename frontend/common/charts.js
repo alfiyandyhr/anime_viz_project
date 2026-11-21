@@ -455,7 +455,7 @@
       const studioColumns = columnMode === "studios";
       const minWidth = studioColumns ? 650 : 560;
       const width = Math.max(container.clientWidth, minWidth);
-      const height = context.studioGroups ? Math.max(128, 84 + 34 * rows.length) : Math.max(container.clientHeight, 480);
+      const height = Math.max(container.clientHeight, 480);
       const margin = { top: studioColumns ? 88 : 64, right: 25, bottom: 20, left: 130 };
       const svg = d3.select(container).append("svg")
         .attr("viewBox", [0, 0, width, height])

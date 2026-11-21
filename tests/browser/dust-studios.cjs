@@ -20,8 +20,19 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
     await waitForDust();
     await page.getByRole('radio', { name: 'Brushing and linking' }).check();
     const picker = page.locator('#dust-type');
+    const heatmap = chart('heatmap');
+    const tiles = heatmap.locator('rect[role="img"]');
+    const tileSize = () => tiles.first().evaluate(tile => {
+      const { width, height } = tile.getBoundingClientRect();
+      return { width: width.toFixed(2), height: height.toFixed(2) };
+    });
+    await openAnalysisTab(page, 'heatmap');
+    await tiles.first().waitFor();
+    const animeTitleTileSize = await tileSize();
     await picker.selectOption('anime-studios');
     await waitForDust();
+    await tiles.first().waitFor();
+    assert.deepEqual(await tileSize(), animeTitleTileSize);
     assert.equal(await page.locator('#studio-minimum').count(), 0);
     assert.match(await page.locator('#movie-magnets').innerText(), /Inception/);
 
@@ -87,10 +98,8 @@ const dustUrl = new URL('frontend/dust-magnet/index.html', base).href;
         });
       }, titleScope));
     }
-    const heatmap = chart('heatmap');
     await openAnalysisTab(page, 'heatmap');
     await heatmap.scrollIntoViewIfNeeded();
-    const tiles = heatmap.locator('rect[role="img"]');
     await tiles.first().waitFor();
     assert.ok(await tiles.evaluateAll((nodes, keys) => {
       const { lookup, titleLookup } = AnivizMain.snapshot();

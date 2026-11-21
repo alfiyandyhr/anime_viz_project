@@ -630,7 +630,6 @@
     $('#dust-connection-title').textContent = group ? `How do ${group.noun} compare against each magnet?` : 'Which stories are similar—and which differ?';
     $('#dust-mirror-guide').textContent = `In Brushing and linking mode, move or resize the shared brush here or in the main field. Zoom in for ${studios ? 'studio names' : group ? 'portraits' : 'posters'}. Select a title magnet to show it in the In Focus panel. Drag magnets or use arrow keys to move them. Select ${group?.noun || 'titles'} to compare them, or click empty space to remove the latest selection.`;
     $('[data-dust-genre-metric] option[value="popularity"]').textContent = reverse ? 'Popularity score' : 'Popularity';
-    $('[data-dust-chart="heatmap"]').classList.toggle('studio-heatmap', studios);
     $('[data-title-studio-filter]').hidden = Boolean(group) || reverse;
     $('#dust-credit-heatmap-title').textContent = reverse ? 'Movie credit heatmap' : 'Anime credit heatmap';
     $('#dust-heatmap-title-type').textContent = reverse ? 'movies' : 'anime';
