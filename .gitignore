@@ -16,7 +16,15 @@ data/anilist_story_cache.json
 .env.local
 data/semantic_similarity/output/
 
-# Keep local asset documents out of version control.
+# Keep local asset documents out of version control and include the README screenshots.
 /assets/*
 !/assets/anilist-logo.png
 !/assets/tmdb-logo.svg
+!/assets/analysis_dark.png
+!/assets/analysis_light.png
+!/assets/catalogue_light.png
+!/assets/comparison_light.png
+!/assets/dnm_dark.png
+!/assets/dnm_light.png
+!/assets/dnm_zoom.png
+!/assets/history_light.png

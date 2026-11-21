@@ -1,137 +1,40 @@
-# Local anime-movie semantic similarity
+# Embeddings and similarity scores
 
-For website updates, use the [shared catalogue refresh](../../README.md#refresh-full-catalogue-and-dust--magnet).
-The scorer can also be run directly to analyze standalone CSVs in `output/`.
+For updates to the website, use the [shared catalogue workflow](README.md). The browser reads precomputed scores. Python runs the model during a refresh or a separate research run.
 
-## Model and method
+## How scoring works
 
-The scorer uses **Qwen/Qwen3-Embedding-4B**, a multilingual text embedding
-model with 2,560 output dimensions. A specific Hugging Face commit is pinned
-in the script.
+**Qwen/Qwen3-Embedding-4B** encodes each anime and movie as a 2,560-dimensional vector. The scorer pins the model revision to `5cf2132abc99cad020ac570b19d031efec650f2b` and uses the same document encoding with an empty prompt for both catalogues. [Qwen model card](https://huggingface.co/Qwen/Qwen3-Embedding-4B)
 
-Each record becomes one labeled text containing **title, genres, tags, and
-synopsis**, then one L2-normalized dense vector. Qwen's trained pipeline pools
-the final non-padding token representation. Both corpora use the same
-model and an explicitly empty prompt: symmetric document-to-document encoding,
-rather than a retrieval query on one side and a passage on the other.
+Each document contains the title, genres, tags (AniList tags or TMDB keywords), and synopsis. The scorer cleans text, deduplicates genre and tag labels within each field, and omits empty fields. It falls back to English and then romaji if the preferred title is missing or visibly damaged. Ratings, popularity, IDs, release dates, and aliases are excluded from the embedding input. AniList tags marked as spoilers are excluded during collection.
 
-`title` is preferred; `title_original` and `title_native` are never embedded.
-If `title` is empty or contains replacement/non-whitespace control characters,
-the script tries `title_english`, then `title_romaji`, then omits the title.
-Valid non-Latin text is preserved. Strict UTF-8 reading prevents silent byte
-replacement; already-corrupted but syntactically valid mojibake cannot always
-be detected or repaired. Inspect `*_records.jsonl` for the exact text used.
+Vectors are saved as normalized float32 arrays. Their dot product gives signed cosine similarity in `[-1, 1]`. Higher scores indicate closer text representations. Scores have no percentage or probability interpretation. Shared genres, franchise entries, and gaps in source metadata can influence the ranking.
 
-Genres/tags are parsed as JSON arrays, cleaned, and deduplicated within each
-field. Missing fields are omitted; their rows remain present. Source, IDs,
-ratings, popularity, alternative titles, and the prebuilt `semantic_text`
-column are excluded from the embedding input. There are no explicit field
-weights: field length, wording, and model attention affect the final vector.
+## Run a standalone experiment
 
-Scores are **raw cosine similarity in [-1, 1]**. Since vectors are unit length,
-the full matrix is `anime_vectors @ movie_vectors.T`. Larger means closer in
-this embedding space. A score of 0.8 does **not** mean an 80% probability of
-similarity. Ranking is a useful starting point; thresholds need human labels.
-
-## Install and run yourself
-
-From the repository root, use a separate environment, for example:
-
-```bash
-python3 -m venv /tmp/anime-similarity-venv
-source /tmp/anime-similarity-venv/bin/activate
-python -m pip install -r data/semantic_similarity/requirements-embeddings.txt
-python data/semantic_similarity/compute_similarity.py
-```
-
-The first run downloads model weights from Hugging Face. Inference runs
-locally in float16 and saves float32 vectors and scores. Runtime and memory
-depend on your hardware, token lengths, and batch size.
-
-`--device auto` selects CUDA, then Apple MPS, then CPU. If GPU memory is tight,
-lower `--batch-size` to 1 or 2; if your MPS runtime lacks an operation, use
-`--device cpu`. No FlashAttention or CUDA-only dependency is required.
-
-After weights for the pinned revision are cached, prevent network access with:
+Install `data/semantic_similarity/requirements-embeddings.txt` in a Python 3.10+ environment. Pass both input CSVs and a new output directory. For example, with two 100-title CSVs in the project root:
 
 ```bash
 python data/semantic_similarity/compute_similarity.py \
-  --offline --output-dir data/semantic_similarity/output/similarity_offline
+  --anime-csv anime.csv --movies-csv movies.csv \
+  --expected-count 100 --batch-size 2 \
+  --output-dir data/semantic_similarity/output/experiment
 ```
 
-An existing output directory is refused, even if it is empty. Use a new
-`--output-dir` for each experiment; there is intentionally no overwrite flag.
-The default checks **exactly 1,000 rows per CSV** and unique `(source, source_id)`
-keys. For deliberately smaller input CSVs, set `--expected-count` to their
-shared row count. `--anime-csv` and `--movies-csv` override input paths.
-Defaults are anchored to the script directory; explicit relative paths are
-relative to your shell's working directory.
+The CSVs require `source`, `source_id`, `title`, `genres`, `tags`, and `synopsis`. Use `anilist` and `tmdb` for the respective sources, unique IDs within each file, and JSON arrays for genres and tags. `--expected-count` applies to each CSV and defaults to 1,000.
 
-The default input budget is **2,048 tokens**, including special tokens. Every
-input is counted before encoding. If any input is longer, the run stops rather
-than silently dropping text. Increase `--max-tokens` up to 32,768, or explicitly
-choose `--allow-truncation`; that choice records affected rows and drops text
-from the right. Retain the default budget unless the length check says otherwise.
-Longer budgets and bigger batches can increase memory use substantially.
+The first run downloads model weights. The default device selection tries CUDA, Apple MPS, then CPU. Reduce `--batch-size` to 1 or 2 to lower memory use, or select `--device cpu`. For a standalone run with cached weights, use `--offline`. The default 2,048-token budget includes special tokens. Longer inputs halt the run unless you raise `--max-tokens` (up to 32,768) or explicitly allow truncation with `--allow-truncation`.
 
-## Saved outputs
+## Read the outputs
 
-The default destination is `data/semantic_similarity/output/similarity/`:
-
-| File | Meaning |
+| Output | How to read it |
 | --- | --- |
-| `anime_embeddings.npy` | Float32 unit vectors, shape `(1000, 2560)` |
-| `movie_embeddings.npy` | Float32 unit vectors, shape `(1000, 2560)` |
-| `cosine_similarity.npy` | Float32 matrix, shape `(1000, 1000)`; anime rows, movie columns |
-| `anime_records.jsonl`, `movie_records.jsonl` | Zero-based row maps, source IDs, titles, cleaned fields, exact input text, token counts and missing/truncated-field flags |
-| `all_pairs.csv.gz` | All 1,000,000 pairs with indices, source IDs, and raw cosine score; gzip-compressed CSV |
-| `top_movies_per_anime.csv` | Best 20 movies per anime by default, with titles and scores |
-| `top_anime_per_movie.csv` | Best 20 anime per movie by default, with titles and scores |
-| `run_metadata.json` | Model revision, hashes, parameters, actual package versions, quality counts, score statistics, completion marker |
+| `anime_embeddings.npy`, `movie_embeddings.npy` | One normalized vector per title in input order |
+| `cosine_similarity.npy` | Anime rows × movie columns |
+| `anime_records.jsonl`, `movie_records.jsonl` | Row-to-ID maps, exact input text, token counts, and missing or truncated fields |
+| `all_pairs.csv.gz`, `top_movies_per_anime.csv`, `top_anime_per_movie.csv` | All scores and ranked matches in both directions |
+| `run_metadata.json` | Completion status, model revision, runtime versions, settings, and input and output hashes |
 
-The binary arrays occupy approximately 24.5 MB total before file headers.
-CSV/JSONL outputs add more space. The all-pairs CSV uses source IDs and index
-maps to avoid repeating long titles one million times. Ranks start at 1;
-array/record indices start at 0. `--top-k` changes the ranked-output size only,
-never the complete matrix. Exact score ties retain candidate CSV order.
+The website export stores the same scores movie-first in `data/movie_anime_scores.bin` as little-endian float32, with the axis order and hash in `data/movie_recommendations.json`. For annual anime outside the main matrix, the History exporter uses the same pinned model and reuses the catalogue's movie vectors when available.
 
-For a later consumer of the generated files (not a command executed here):
-
-```python
-import json
-from pathlib import Path
-import numpy as np
-
-folder = Path("data/semantic_similarity/output/similarity")
-scores = np.load(folder / "cosine_similarity.npy", allow_pickle=False)
-with (folder / "anime_records.jsonl").open(encoding="utf-8") as f:
-    anime = [json.loads(line) for line in f]
-with (folder / "movie_records.jsonl").open(encoding="utf-8") as f:
-    movies = [json.loads(line) for line in f]
-# scores[i, j] compares anime[i] with movies[j].
-```
-
-`run_metadata.json` is written last. Its absence means an interrupted/failed
-bundle is incomplete; choose a new directory when retrying. The script records
-input and output hashes but does not guarantee bitwise identical results across
-different hardware or library versions.
-
-## Review before interpreting results
-
-Check best matches, random pairs, and low-score pairs manually. Shared genres
-can inflate apparent similarity; different tag vocabularies and missing
-synopses can weaken it. The scorer compares every pair supplied in its two
-CSV inputs. The shared catalogue refresh handles cross-source duplicates
-before scoring. Franchises and seasons can still dominate top results.
-The score measures the semantic similarity of the supplied text.
-
-## References
-
-- [Qwen3-Embedding-4B model card](https://huggingface.co/Qwen/Qwen3-Embedding-4B)
-- [Qwen3 embedding technical report](https://arxiv.org/abs/2506.05176)
-- [BAAI BGE-M3 alternative](https://huggingface.co/BAAI/bge-m3)
-- [Google EmbeddingGemma alternative (license acceptance required)](https://huggingface.co/google/embeddinggemma-300m)
-- [Sentence Transformers semantic textual similarity](https://www.sbert.net/docs/sentence_transformer/usage/semantic_textual_similarity.html)
-
-The five-page `similarity_methodology.pdf` and its `.tex` source explain the
-selection, text representation, equations, outputs, libraries, and limitations.
+Read the [methodology PDF](similarity_methodology.pdf) or its [LaTeX source](similarity_methodology.tex) for the scoring formula, data selection, and how the three views use the results.
