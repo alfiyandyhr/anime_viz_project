@@ -9,6 +9,7 @@ Explore story similarities between anime and live-action movies in a visualizati
 ## Three views
 
 The root URL opens **Dust & Magnet** with **Anime titles** as dust and Inception as the example magnet.
+The site defaults to dark mode. The theme toggle saves your choice across views.
 Set **Dust type** to **Movie titles** for movie dots and Attack on Titan as the first-use example. Choose the **Movie** magnet type with anime dust or **Anime** with movie dust to search by title, alias, or year. **Movie genre** with anime dust and **Anime genre** with movie dust compare against a genre from the other catalogue. Use **Popularity** or **Score** to attract dust by audience size or rating. Fill up to three slots and remove any magnet with ×.
 
 | View | Data and interactions |
@@ -403,9 +404,11 @@ available by scrolling.
 The dust field defaults to **60 dots**, with 30 and 90 options. It reserves half
 the candidate budget equally for each magnet's strongest matches, then fills
 remaining slots with the highest average attraction scores, deduplicating overlap.
-The reference sample stays fixed when dot count or filters change. Dots share
-one color by default. **Color dust by strongest magnet** colors each
+The reference sample stays fixed when dot count or filters change.
+**Strongest magnet** is the default under **Color dust by**. It colors each
 title by its highest-scoring magnet in the field, mirror, and linked charts.
+Choose **Brushing and linking** to highlight dots within the brush and their
+corresponding data in the linked charts.
 With Popularity or Score active, the control uses the highest attraction
 percentile. White outlines mark selected anime. Hover, keyboard-focus,
 or select a dot to see its links. Thicker links show a stronger pull for that

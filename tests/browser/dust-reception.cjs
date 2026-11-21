@@ -19,6 +19,7 @@ const base = process.env.ANIVIZ_BASE_URL || 'http://127.0.0.1:8765/';
     const colorControl = page.getByRole('radio', { name: 'Strongest magnet' });
     await field.locator('.dust-node').first().waitFor();
     await page.waitForFunction(() => AnivizMain.snapshot().metadataStatus === 'ready');
+    await page.getByRole('radio', { name: 'Brushing and linking' }).check();
 
     const selection = () => page.evaluate(() => AnivizMain.snapshot().selectedKeys);
     await openAnalysisTab(page, 'reception');

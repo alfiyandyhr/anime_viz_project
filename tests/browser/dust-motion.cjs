@@ -55,18 +55,16 @@ async function setup(page, errors) {
     const positions = page.getByRole('button', { name: 'Reset positions' });
     assert.deepEqual(await settings(page), defaults);
     assert.equal(await page.getByRole('group', { name: 'Magnet strength', exact: true }).getByRole('slider').count(), 3);
-    assert.equal(await color.isChecked(), false);
+    assert.equal(await color.isChecked(), true);
     for (const count of [30, 90, 60]) {
       await page.selectOption('#dust-limit', String(count));
       await assertCenters(page, count);
     }
-    const uncolored = await transforms(page);
-    await color.check();
+    const grouped = await transforms(page);
     assert.ok(new Set(await colors(page)).size > 1);
-    assert.deepEqual(await transforms(page), uncolored);
     await page.getByRole('radio', { name: 'Brushing and linking' }).check();
-    assert.equal(new Set(await colors(page)).size, 1);
-    assert.deepEqual(await transforms(page), uncolored);
+    assert.ok((await colors(page)).every(fill => fill === 'var(--dust-uniform)' || fill === 'var(--pink)'));
+    assert.deepEqual(await transforms(page), grouped);
 
     const nearTieIndex = await dots(page).evaluateAll(nodes => nodes.findIndex(node => {
       const [best, next, third] = node.__data__.scores.slice().sort((a, b) => b - a);

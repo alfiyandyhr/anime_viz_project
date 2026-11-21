@@ -11,7 +11,7 @@ const url = route => new URL(route, base).href;
 (async () => {
   const browser = await chromium.launch({ headless: true, ...(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {}) });
   try {
-    const context = await browser.newContext({viewport:{width:1440,height:900}, reducedMotion:'reduce'});
+    const context = await browser.newContext({viewport:{width:1440,height:900}, colorScheme:'light', reducedMotion:'reduce'});
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.stack));
     const dustReady = async () => {
@@ -64,6 +64,14 @@ const url = route => new URL(route, base).href;
     };
 
     await page.goto(url(''));await dustReady();
+    const theme = () => page.locator('html').getAttribute('data-theme');
+    assert.equal(await theme(), 'dark');
+    await page.getByRole('button', { name: 'Switch to light mode' }).click();
+    assert.equal(await theme(), 'light');
+    await page.reload();await dustReady();
+    assert.equal(await theme(), 'light');
+    await page.getByRole('button', { name: 'Switch to dark mode' }).click();
+    assert.equal(await theme(), 'dark');
     assert.match(await page.locator('#movie-magnets').innerText(),/Example/);
     assert.equal((await snapshot()).ids.length,60);
     assert.equal(await page.locator('#recommendation-detail').isVisible(),false);

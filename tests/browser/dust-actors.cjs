@@ -17,6 +17,7 @@ async function verifyCredits(browser, dustType, creditLabel) {
     const field = page.locator('#recommendation-chart');
     const chart = kind => page.locator(`[data-dust-chart="${kind}"]`);
     await field.locator('.dust-node').first().waitFor();
+    await page.getByRole('radio', { name: 'Brushing and linking' }).check();
     await page.locator('#dust-type').selectOption(dustType);
     if (creators) await field.getByRole('button', { name: 'Retry original creator credits' }).click();
     await field.locator('[data-match-id^="anilist:staff:"]').first().waitFor();
